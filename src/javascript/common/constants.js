@@ -32,3 +32,11 @@ export const PAGE_EVENT = 'security-updates:page';
 
 /** "Upgrading Jahia" in the Jahia Customer Center (Academy), linked from the jahia-core findings. */
 export const JAHIA_UPGRADE_URL = 'https://academy.jahia.com/customer-center/jahia/howtoupgrade';
+
+/**
+ * Fetch policy of the page's queries (report and settings). Both answers sit under Query.securityUpdates, an object
+ * without id that the Jahia UI's Apollo cache has no merge function for: written to the cache, each answer would
+ * replace the other one's fields (and a watched query missing its fields fetches again). The answers are therefore
+ * kept out of the cache; refetch still updates the query that asks.
+ */
+export const QUERY_FETCH_POLICY = 'no-cache';

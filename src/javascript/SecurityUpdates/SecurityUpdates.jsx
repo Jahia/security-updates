@@ -5,7 +5,7 @@ import {Button, Chip, Header, LayoutContent, Loader, Typography} from '@jahia/mo
 import styles from './SecurityUpdates.scss';
 import {GET_SECURITY_REPORT, REFRESH_SECURITY_REPORT} from './SecurityUpdates.gql';
 import {SettingsForm} from '../Settings/SettingsForm';
-import {NS, PAGE_EVENT} from '../common/constants';
+import {NS, PAGE_EVENT, QUERY_FETCH_POLICY} from '../common/constants';
 import {values} from '../common/i18n';
 import {StatusMessage} from './StatusMessage';
 import {StoreErrors} from './StoreErrors';
@@ -38,7 +38,7 @@ const usePageEvents = () => {
 
 export const SecurityUpdates = () => {
     const {t} = useTranslation(NS);
-    const {data, loading, error, refetch} = useQuery(GET_SECURITY_REPORT, {fetchPolicy: 'network-only'});
+    const {data, loading, error, refetch} = useQuery(GET_SECURITY_REPORT, {fetchPolicy: QUERY_FETCH_POLICY});
     const [refreshReport] = useMutation(REFRESH_SECURITY_REPORT);
     const report = data?.securityUpdates?.report;
     const check = useCheck({report, refetch, refreshReport, t});

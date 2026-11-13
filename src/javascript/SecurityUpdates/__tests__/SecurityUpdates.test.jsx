@@ -71,6 +71,12 @@ describe('SecurityUpdates page', () => {
             expect(screen.getByRole('alert')).toHaveTextContent('page.error');
         });
 
+        test('the report is read outside the Apollo cache (see apolloCache.test.js)', () => {
+            mockReport(report());
+            render(<SecurityUpdates/>);
+            expect(useQuery).toHaveBeenCalledWith(expect.anything(), {fetchPolicy: 'no-cache'});
+        });
+
         test('the status region exists before any announcement', () => {
             mockReport(report());
             render(<SecurityUpdates/>);

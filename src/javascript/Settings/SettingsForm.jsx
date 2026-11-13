@@ -18,6 +18,7 @@ import {
     DEFAULT_BANNER_TEXT,
     DISMISS_POLICIES,
     NS,
+    QUERY_FETCH_POLICY,
     THRESHOLD_SEVERITIES
 } from '../common/constants';
 import {values} from '../common/i18n';
@@ -44,7 +45,7 @@ Section.propTypes = {children: PropTypes.node.isRequired};
  */
 export const SettingsForm = () => {
     const {t} = useTranslation(NS);
-    const {data, error} = useQuery(GET_SETTINGS, {fetchPolicy: 'network-only'});
+    const {data, error} = useQuery(GET_SETTINGS, {fetchPolicy: QUERY_FETCH_POLICY});
     const [updateSettings] = useMutation(UPDATE_SETTINGS);
     const [resetSettings] = useMutation(RESET_SETTINGS);
     const [form, setForm] = useState(null);

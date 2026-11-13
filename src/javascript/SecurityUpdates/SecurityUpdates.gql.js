@@ -35,11 +35,18 @@ const REPORT_FIELDS = gql`
     }
 `;
 
+// The banner's own count and threshold come with the report, so that the page can say when the banner counts fewer
+// components than the page lists (threshold, module owner reports).
 export const GET_SECURITY_REPORT = gql`
     query SecurityUpdatesReport {
         securityUpdates {
             report {
                 ...SecurityUpdatesReportFields
+            }
+            banner {
+                visible
+                count
+                minimumSeverity
             }
         }
     }

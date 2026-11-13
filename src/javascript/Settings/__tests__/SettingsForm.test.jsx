@@ -83,6 +83,11 @@ describe('SettingsForm', () => {
         expect(field('bannerDismissHours')).toHaveValue(24);
     });
 
+    test('the settings are read outside the Apollo cache (see apolloCache.test.js)', () => {
+        render(<SettingsForm/>);
+        expect(useQuery).toHaveBeenCalledWith(expect.anything(), {fetchPolicy: 'no-cache'});
+    });
+
     test('labels are native labels: no control is named by aria-label only', () => {
         const {container} = render(<SettingsForm/>);
         container.querySelectorAll('input, select, textarea').forEach(control => {
