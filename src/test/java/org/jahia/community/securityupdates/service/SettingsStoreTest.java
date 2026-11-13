@@ -261,7 +261,8 @@ class SettingsStoreTest {
         when(configuration.getProperties()).thenAnswer(invocation -> stored.get());
         org.mockito.Mockito.doAnswer(invocation -> {
             Dictionary<String, Object> next = invocation.getArgument(0);
-            Thread.sleep(20);
+            // Widens the window in which the two saves overlap.
+            java.util.concurrent.locks.LockSupport.parkNanos(java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(20));
             stored.set(next);
             return null;
         }).when(configuration).update(any());

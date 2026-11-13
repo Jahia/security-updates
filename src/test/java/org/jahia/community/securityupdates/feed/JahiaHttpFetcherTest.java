@@ -23,6 +23,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.LockSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -128,12 +129,14 @@ class JahiaHttpFetcherTest {
             while (System.nanoTime() < end) {
                 os.write('x');
                 os.flush();
-                Thread.sleep(TRICKLE_MILLIS);
+                // Paces the trickle; not a wait for a condition, so no latch fits here.
+                LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(TRICKLE_MILLIS));
+                if (Thread.currentThread().isInterrupted()) {
+                    break;
+                }
             }
         } catch (IOException e) {
             // the client aborted the request: what is expected
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
         }
         exchange.close();
     }

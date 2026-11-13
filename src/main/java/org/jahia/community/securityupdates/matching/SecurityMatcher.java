@@ -157,26 +157,34 @@ public final class SecurityMatcher {
             return Optional.empty();
         }
         String line = Versions.line(installed, core);
-        String max = null;
+        if (fixedOnLine(installed, fixes, line, core) || Versions.compare(installed, highestOf(fixes)) >= 0) {
+            return Optional.empty();
+        }
         String lowestAboveOnLine = null;
         String lowestAbove = null;
         for (String fix : fixes) {
-            boolean onLine = line.equals(Versions.line(fix, core));
-            if (onLine && Versions.compare(fix, installed) <= 0) {
-                return Optional.empty();
-            }
-            max = max == null || Versions.compare(fix, max) > 0 ? fix : max;
             if (Versions.compare(fix, installed) > 0) {
                 lowestAbove = lowest(lowestAbove, fix);
-                if (onLine) {
+                if (line.equals(Versions.line(fix, core))) {
                     lowestAboveOnLine = lowest(lowestAboveOnLine, fix);
                 }
             }
         }
-        if (Versions.compare(installed, max) >= 0) {
-            return Optional.empty();
-        }
         return Optional.ofNullable(lowestAboveOnLine != null ? lowestAboveOnLine : lowestAbove);
+    }
+
+    /** Whether a fix on the installed version's line is at or below it: the installed version already has the fix. */
+    private static boolean fixedOnLine(String installed, List<String> fixes, String line, boolean core) {
+        return fixes.stream()
+                .anyMatch(fix -> line.equals(Versions.line(fix, core)) && Versions.compare(fix, installed) <= 0);
+    }
+
+    private static String highestOf(List<String> versions) {
+        String max = null;
+        for (String version : versions) {
+            max = highest(max, version);
+        }
+        return max;
     }
 
     private static boolean introducedLater(String installed, String introduced) {

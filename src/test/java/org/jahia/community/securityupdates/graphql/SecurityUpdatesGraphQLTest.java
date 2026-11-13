@@ -224,7 +224,7 @@ class SecurityUpdatesGraphQLTest {
 
     @Test
     @DisplayName("canEdit is false, never an error, when the session or the permission check fails")
-    void canEditFailsClosed() throws Exception {
+    void canEditFailsClosed() {
         org.jahia.services.content.JCRNodeWrapper failing = mock(org.jahia.services.content.JCRNodeWrapper.class);
         when(failing.hasPermission(Permissions.ADMIN)).thenThrow(new IllegalStateException("no session"));
         org.jahia.services.content.JCRNodeWrapper admin = mock(org.jahia.services.content.JCRNodeWrapper.class);
