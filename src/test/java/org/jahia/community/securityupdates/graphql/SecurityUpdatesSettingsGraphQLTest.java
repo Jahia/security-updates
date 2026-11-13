@@ -167,4 +167,17 @@ class SecurityUpdatesSettingsGraphQLTest {
         assertThat(banner.getDismissPolicy()).isEqualTo(DismissPolicy.UNTIL_CHANGE);
         assertThat(banner.getDismissHours()).isEqualTo(24);
     }
+
+    @Test
+    @DisplayName("the banner gives the current user name, for the per-user dismissal key")
+    void bannerUsername() {
+        when(service.getBanner()).thenReturn(new org.jahia.community.securityupdates.model.BannerDecision(false, 0, Severity.HIGH,
+                java.util.List.of()));
+        ServiceLocator.overrideUsername(() -> "jdoe");
+
+        assertThat(new SecurityUpdatesQuery().getBanner().getUsername()).isEqualTo("jdoe");
+
+        ServiceLocator.overrideUsername(() -> null);
+        assertThat(new SecurityUpdatesQuery().getBanner().getUsername()).isEmpty();
+    }
 }

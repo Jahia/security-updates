@@ -38,7 +38,7 @@ public class SecurityUpdatesQuery {
         SecurityUpdateService service = ServiceLocator.service();
         return new GqlBanner(service == null
                 ? new BannerDecision(false, 0, Severity.HIGH, Collections.emptyList())
-                : service.getBanner());
+                : service.getBanner(), ServiceLocator.username());
     }
 
     @GraphQLField

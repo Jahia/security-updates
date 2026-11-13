@@ -18,9 +18,26 @@ import java.util.List;
 public class GqlBanner {
 
     private final BannerDecision decision;
+    private final String username;
 
     public GqlBanner(BannerDecision decision) {
+        this(decision, null);
+    }
+
+    /**
+     * @param username the Jahia user the decision is shown to, used by the browser to key a dismissal per user
+     */
+    public GqlBanner(BannerDecision decision, String username) {
         this.decision = decision;
+        this.username = username == null ? "" : username;
+    }
+
+    @GraphQLField
+    @GraphQLName("username")
+    @GraphQLNonNull
+    @GraphQLDescription("The current Jahia user, so that a dismissal stored in the browser is kept per user")
+    public String getUsername() {
+        return username;
     }
 
     @GraphQLField
