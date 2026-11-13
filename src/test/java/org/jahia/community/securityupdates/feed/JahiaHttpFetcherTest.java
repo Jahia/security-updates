@@ -47,6 +47,8 @@ class JahiaHttpFetcherTest {
     private JahiaHttpFetcher fetcher;
     private final AtomicReference<String> lastAuthorization = new AtomicReference<>();
     private final CountDownLatch slowRequestReceived = new CountDownLatch(1);
+    /** Released at the end of each test, so that the slow and trickling handlers end with it. */
+    private final CountDownLatch testDone = new CountDownLatch(1);
 
     @BeforeEach
     void setUp() throws IOException {
@@ -67,8 +69,9 @@ class JahiaHttpFetcherTest {
         server.createContext("/slow", exchange -> {
             slowRequestReceived.countDown();
             try {
-                // Never released: the handler holds the response for at most 5 s, like a slow store.
-                if (!new CountDownLatch(1).await(5, TimeUnit.SECONDS)) {
+                // Released when the test ends: the handler holds the response like a slow store, for at most
+                // SLOW_FOR, far beyond the bounds the tests assert.
+                if (!testDone.await(SLOW_FOR.toSeconds(), TimeUnit.SECONDS)) {
                     respond(exchange, 200, "late");
                     return;
                 }
@@ -78,10 +81,10 @@ class JahiaHttpFetcherTest {
             respond(exchange, 200, "late");
         });
         // A hostile store: a body declared huge, sent one byte at a time, each byte within the response timeout
-        server.createContext("/trickle-404", exchange -> trickle(exchange, 404, HUGE, MAX_ERROR_PREFIX));
-        server.createContext("/trickle-404-from-start", exchange -> trickle(exchange, 404, HUGE, 0));
-        server.createContext("/declared-huge", exchange -> trickle(exchange, 200, HUGE, 0));
-        server.createContext("/trickle-200", exchange -> trickle(exchange, 200, 0, 0));
+        server.createContext("/trickle-404", exchange -> trickle(exchange, 404, HUGE, MAX_ERROR_PREFIX, testDone));
+        server.createContext("/trickle-404-from-start", exchange -> trickle(exchange, 404, HUGE, 0, testDone));
+        server.createContext("/declared-huge", exchange -> trickle(exchange, 200, HUGE, 0, testDone));
+        server.createContext("/trickle-200", exchange -> trickle(exchange, 200, 0, 0, testDone));
         server.createContext("/redirect", exchange -> {
             exchange.getResponseHeaders().add("Location", base + "/ok");
             respond(exchange, 302, "");
@@ -99,6 +102,7 @@ class JahiaHttpFetcherTest {
 
     @AfterEach
     void tearDown() throws IOException {
+        testDone.countDown();
         server.stop(0);
         client.close();
     }
@@ -108,25 +112,32 @@ class JahiaHttpFetcherTest {
     /** More than the bytes kept of an error body: the client then stops reading. */
     private static final int MAX_ERROR_PREFIX = 2 * JahiaHttpFetcher.MAX_ERROR_BODY_BYTES;
     private static final long TRICKLE_MILLIS = 50;
-    private static final long TRICKLE_FOR_NANOS = TimeUnit.SECONDS.toNanos(15);
+    /** How long a slow or trickling handler goes on at most: three times {@link #WITHIN}, so a bound proves a limit. */
+    private static final Duration SLOW_FOR = Duration.ofSeconds(30);
+    private static final long TRICKLE_FOR_NANOS = SLOW_FOR.toNanos();
     /** Short bounds, so that a test of a hostile store ends in about a second. */
     private static final JahiaHttpFetcher.Timeouts SHORT = new JahiaHttpFetcher.Timeouts(Duration.ofSeconds(2),
             Duration.ofSeconds(1), Duration.ofSeconds(1));
-    private static final Duration WITHIN = Duration.ofSeconds(4);
+    /**
+     * Upper bound of a call that a 1 s limit stops: wide, so that a loaded build machine does not fail the test, and
+     * far below {@link #SLOW_FOR}, so that only the limit can end the call in time.
+     */
+    private static final Duration WITHIN = Duration.ofSeconds(10);
 
     /**
      * Sends {@code prefix} bytes at once, then one byte every {@value #TRICKLE_MILLIS} ms (so no read ever waits for
-     * the response timeout) until the client goes away or {@link #TRICKLE_FOR_NANOS} passes.
+     * the response timeout) until the client goes away, the test ends or {@link #TRICKLE_FOR_NANOS} passes.
      *
      * @param length the declared body length, 0 for chunked
      */
-    private static void trickle(HttpExchange exchange, int status, long length, int prefix) throws IOException {
+    private static void trickle(HttpExchange exchange, int status, long length, int prefix, CountDownLatch done)
+            throws IOException {
         exchange.sendResponseHeaders(status, length);
         long end = System.nanoTime() + TRICKLE_FOR_NANOS;
         try (OutputStream os = exchange.getResponseBody()) {
             os.write(new byte[prefix]);
             os.flush();
-            while (System.nanoTime() < end) {
+            while (System.nanoTime() < end && done.getCount() > 0) {
                 os.write('x');
                 os.flush();
                 // Paces the trickle; not a wait for a condition, so no latch fits here.
@@ -236,13 +247,14 @@ class JahiaHttpFetcherTest {
     @Test
     @DisplayName("a response that does not come within the response timeout fails as a timeout")
     void responseTimeoutIsEnforced() {
+        // the whole-request limit is above SLOW_FOR: only the 1 s response timeout can end the call within WITHIN
         JahiaHttpFetcher quick = new JahiaHttpFetcher(new JahiaHttpFetcher.Timeouts(Duration.ofSeconds(2),
-                Duration.ofMillis(300), Duration.ofSeconds(10)));
+                Duration.ofSeconds(1), SLOW_FOR.plusSeconds(30)));
         quick.setHttpClientService(httpClientService);
         long start = System.nanoTime();
 
         assertThatThrownBy(() -> quick.get(base + "/slow", Map.of(), 1000)).isInstanceOf(java.io.InterruptedIOException.class);
-        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(4));
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(WITHIN);
     }
 
     @Test
@@ -260,9 +272,9 @@ class JahiaHttpFetcherTest {
 
         fetcher.cancelAll();
 
-        assertThatThrownBy(() -> call.get(4, TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class)
+        assertThatThrownBy(() -> call.get(WITHIN.toSeconds(), TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class)
                 .hasCauseInstanceOf(java.io.UncheckedIOException.class);
-        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(4));
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(WITHIN);
     }
 
     @Test
