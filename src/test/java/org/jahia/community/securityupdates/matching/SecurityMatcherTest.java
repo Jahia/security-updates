@@ -416,6 +416,56 @@ class SecurityMatcherTest {
     }
 
     @Nested
+    @DisplayName("bounded report")
+    class BoundedReport {
+
+        private SecurityFeed manyAdvisories(String component, int count) {
+            Advisory[] advisories = new Advisory[count];
+            for (int i = 0; i < count; i++) {
+                advisories[i] = advisory(component + String.format("-JSA-%05d", i), i == count - 1 ? Severity.CRITICAL : Severity.LOW,
+                        fix(component, GROUP, "9.0.0"));
+            }
+            return feed(advisories);
+        }
+
+        @Test
+        @DisplayName("a finding lists at most MAX_REFS_PER_FINDING advisories, the most severe first, and says so")
+        void referencesPerFindingAreCapped() {
+            MatchResult result = new SecurityMatcher(JAHIA).match(List.of(module("m", "1.0.0")),
+                    List.of(manyAdvisories("m", SecurityMatcher.MAX_REFS_PER_FINDING + 10)), ModuleCatalog.empty());
+
+            Finding finding = result.getFindings().get(0);
+            assertThat(finding.getAdvisories()).hasSize(SecurityMatcher.MAX_REFS_PER_FINDING);
+            assertThat(finding.getAdvisories().get(0).getSeverity()).isEqualTo(Severity.CRITICAL);
+            assertThat(finding.getSeverity()).isEqualTo(Severity.CRITICAL);
+            assertThat(result.getProblems()).singleElement().satisfies(p -> {
+                assertThat(p.getKind()).isEqualTo(StoreErrorKind.NOT_UNDERSTOOD);
+                assertThat(p.getDetail()).isEqualTo(org.jahia.community.securityupdates.model.StoreErrorDetail.ENTRIES_SKIPPED);
+            });
+        }
+
+        @Test
+        @DisplayName("the whole report lists about MAX_REPORT_REFS advisory references, at least one per finding")
+        void referencesPerReportAreCapped() {
+            int modules = SecurityMatcher.MAX_REPORT_REFS / SecurityMatcher.MAX_REFS_PER_FINDING + 2;
+            List<InstalledComponent> installed = new java.util.ArrayList<>();
+            List<SecurityFeed> feeds = new java.util.ArrayList<>();
+            for (int i = 0; i < modules; i++) {
+                installed.add(module("m" + i, "1.0.0"));
+                feeds.add(manyAdvisories("m" + i, SecurityMatcher.MAX_REFS_PER_FINDING));
+            }
+
+            MatchResult result = new SecurityMatcher(JAHIA).match(installed, feeds, ModuleCatalog.empty());
+
+            assertThat(result.getFindings()).hasSize(modules);
+            assertThat(result.getFindings().stream().mapToInt(f -> f.getAdvisories().size()).sum())
+                    .isEqualTo(SecurityMatcher.MAX_REPORT_REFS + 2);
+            assertThat(result.getFindings()).allSatisfy(f -> assertThat(f.getAdvisories()).isNotEmpty());
+            assertThat(result.getProblems()).isNotEmpty();
+        }
+    }
+
+    @Nested
     @DisplayName("advisories published by several stores")
     class SeveralStores {
 

@@ -12,6 +12,7 @@ import org.jahia.community.securityupdates.model.ModuleCatalog;
 import org.jahia.community.securityupdates.model.SecurityFeed;
 import org.jahia.community.securityupdates.model.Severity;
 import org.jahia.community.securityupdates.model.StoreError;
+import org.jahia.community.securityupdates.model.StoreErrorDetail;
 import org.jahia.community.securityupdates.model.StoreErrorKind;
 
 import java.util.ArrayList;
@@ -48,6 +49,10 @@ public final class SecurityMatcher {
     /** A CVE, or a Jahia vulnerability identifier: JSA-YYYY-NNNN with an optional numeric suffix (JSA-2026-0036.1066). */
     private static final Pattern CVE = Pattern.compile("CVE-\\d{4}-\\d{4,}|JSA-\\d{4}-\\d{4}(\\.\\d+)?");
     private static final String HTTPS = "https://";
+    /** Most advisory references listed in one finding (the most severe first); the finding still covers them all. */
+    static final int MAX_REFS_PER_FINDING = 50;
+    /** Most advisory references listed in a whole report, beyond the first one of each finding. */
+    static final int MAX_REPORT_REFS = 2_000;
     /** Longest id of an owner report, which joins its references. */
     static final int MAX_OWNER_ID = 200;
     private static final String ELLIPSIS = "...";
@@ -95,7 +100,31 @@ public final class SecurityMatcher {
             }
         }
         findings.sort(FINDING_ORDER);
-        return new MatchResult(findings, problems);
+        List<Finding> bounded = bounded(findings);
+        if (!bounded.equals(findings)) {
+            problems.add(new StoreError(null, StoreErrorKind.NOT_UNDERSTOOD, StoreErrorDetail.ENTRIES_SKIPPED,
+                    "Some advisory references are not listed (at most " + MAX_REFS_PER_FINDING + " per finding and about "
+                            + MAX_REPORT_REFS + " in all); the recommended versions cover them all"));
+        }
+        return new MatchResult(bounded, problems);
+    }
+
+    /**
+     * Bounds what feeds can push into a report: each finding lists at most {@link #MAX_REFS_PER_FINDING} references
+     * (the most severe first), and the report about {@link #MAX_REPORT_REFS}, keeping at least one per finding.
+     */
+    private static List<Finding> bounded(List<Finding> findings) {
+        List<Finding> result = new ArrayList<>(findings.size());
+        int remaining = MAX_REPORT_REFS;
+        for (Finding finding : findings) {
+            List<AdvisoryRef> refs = finding.getAdvisories();
+            int keep = Math.max(1, Math.min(Math.min(refs.size(), MAX_REFS_PER_FINDING), remaining));
+            remaining = Math.max(0, remaining - keep);
+            result.add(keep >= refs.size() ? finding : new Finding(finding.getComponent(), finding.getGroupId(),
+                    finding.getInstalledVersion(), finding.getRecommendedVersion(), finding.getCompatibility(),
+                    finding.getRequiredJahiaVersion(), finding.getSeverity(), finding.getSource(), refs.subList(0, keep)));
+        }
+        return result;
     }
 
     /**
