@@ -5,6 +5,11 @@ query getSecurityUpdatesBanner {
             count
             minimumSeverity
             components
+            backgroundColor
+            textColor
+            dismissPolicy
+            dismissHours
+            username
         }
     }
 }

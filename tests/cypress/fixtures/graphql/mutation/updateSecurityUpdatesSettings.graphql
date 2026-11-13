@@ -1,0 +1,18 @@
+mutation updateSecurityUpdatesSettings($input: InputSecurityUpdatesSettingsValues!) {
+    securityUpdates {
+        updateSettings(input: $input) {
+            ok
+            errors {
+                field
+                code
+                message
+            }
+            settings {
+                refreshIntervalHours
+                bannerBackgroundColor
+                bannerTextColor
+                bannerDismissPolicy
+            }
+        }
+    }
+}
