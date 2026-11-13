@@ -239,7 +239,8 @@ describe('Security updates settings', () => {
         cy.get('[role="alert"]').should('contain', 'nothing was saved')
         ;['refreshIntervalHours', 'defaultStoreUrl', 'bannerBackgroundColor', 'bannerTextColor'].forEach((name) => {
             cy.get(field(name)).should('have.attr', 'aria-invalid', 'true')
-            cy.get(`${field(name)}-error`).should('be.visible')
+            // The form is taller than the admin viewport: scroll as a user would before checking visibility.
+            cy.get(`${field(name)}-error`).scrollIntoView().should('be.visible')
         })
         cy.get(`${field('bannerTextColor')}-error`).should('contain', '1.26:1')
         cy.focused().should('have.id', 'security-updates-setting-refreshIntervalHours')
@@ -354,14 +355,22 @@ describe('Security updates settings', () => {
         }
         cy.apolloClient({ username: DENIED_USER, password: PASSWORD })
         cy.apollo({ query: getSettings, errorPolicy: 'all' }).then((result: never) => {
-            expect(errorsOf(result).map((e) => e.message).join(' ')).to.contain('Permission denied')
+            expect(
+                errorsOf(result)
+                    .map((e) => e.message)
+                    .join(' '),
+            ).to.contain('Permission denied')
         })
         cy.apollo({
             mutation: updateSettings,
             variables: { input: inputWith({ refreshIntervalHours: 1 }) },
             errorPolicy: 'all',
         }).then((result: never) => {
-            expect(errorsOf(result).map((e) => e.message).join(' ')).to.contain('Permission denied')
+            expect(
+                errorsOf(result)
+                    .map((e) => e.message)
+                    .join(' '),
+            ).to.contain('Permission denied')
         })
 
         cy.apolloClient()
