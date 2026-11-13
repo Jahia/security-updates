@@ -21,4 +21,18 @@ describe('locales', () => {
         ['COMPATIBLE', 'INCOMPATIBLE', 'UNKNOWN', 'JAHIA_UPGRADE'].forEach(c => expect(en.page.compatibility[c]).toBeTruthy());
         ['ADVISORY', 'OWNER_REPORTED'].forEach(s => expect(en.page.source[s]).toBeTruthy());
     });
+
+    test.each(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])('the banner states the %s threshold in both languages', severity => {
+        expect(en.banner.threshold[severity]).toBeTruthy();
+        expect(fr.banner.threshold[severity]).toBeTruthy();
+    });
+
+    test('the banner message no longer speaks of Jahia advisories only and states the threshold', () => {
+        [en, fr].forEach(locale => {
+            expect(locale.banner.message).toContain('{{count}}');
+            expect(locale.banner.message).toContain('{{threshold}}');
+        });
+        expect(en.banner.message).not.toMatch(/advisor/i);
+        expect(fr.banner.message).not.toMatch(/bulletin/i);
+    });
 });

@@ -1,6 +1,5 @@
 import {
     adminUrl,
-    countUrgentAdvisories,
     filterFindings,
     formatDateTime,
     safeHttpsUrl,
@@ -60,18 +59,6 @@ describe('safeHttpsUrl', () => {
         [42, null]
     ])('%s -> %s', (url, expected) => {
         expect(safeHttpsUrl(url)).toBe(expected);
-    });
-});
-
-describe('countUrgentAdvisories', () => {
-    test('counts high and critical findings from Jahia advisories only', () => {
-        expect(countUrgentAdvisories([
-            finding('a', 'CRITICAL'),
-            finding('b', 'HIGH'),
-            finding('c', 'MEDIUM'),
-            finding('d', 'CRITICAL', 'OWNER_REPORTED')
-        ])).toBe(2);
-        expect(countUrgentAdvisories(null)).toBe(0);
     });
 });
 

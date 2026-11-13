@@ -1,11 +1,13 @@
-import {adminUrl, countUrgentAdvisories, graphqlUrl} from '../SecurityUpdates/securityUpdatesUtils';
+import {adminUrl, graphqlUrl} from '../SecurityUpdates/securityUpdatesUtils';
 
 export const BANNER_ID = 'security-updates-banner';
 export const DISMISS_KEY = 'security-updates-banner-dismissed';
 const STYLE_ID = 'security-updates-banner-style';
 
 const PERMISSION_QUERY = 'query SecurityUpdatesBannerPermission { jcr { nodeByPath(path: "/") { hasPermission(permissionName: "adminTemplates") } } }';
-const REPORT_QUERY = 'query SecurityUpdatesBannerReport { securityUpdates { report { findings { component severity source } } } }';
+// The server decides (settings bannerEnabled, bannerMinimumSeverity, bannerIncludeOwnerReports): the client only renders.
+const BANNER_QUERY = 'query SecurityUpdatesBanner { securityUpdates { banner { visible count minimumSeverity components } } }';
+const SEVERITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
 // Colours: white on #1b1b1b is 17:1; the focus ring is #ffd400 on #1b1b1b (12:1). The banner never relies on
 // colour alone: the message states what it is about.
@@ -65,30 +67,33 @@ const ensureStyle = () => {
     }
 };
 
-// Identifies the set of urgent findings, so that a dismissed notice comes back when another component is concerned.
-const urgentKey = findings => (findings || [])
-    .filter(f => f.source === 'ADVISORY' && (f.severity === 'CRITICAL' || f.severity === 'HIGH'))
-    .map(f => f.component)
-    .sort()
-    .join('|');
-
-const render = (t, count, key) => {
+const render = (t, {count, minimumSeverity}, key) => {
     ensureStyle();
     const banner = document.createElement('div');
     banner.id = BANNER_ID;
     banner.setAttribute('role', 'region');
     banner.setAttribute('aria-label', t('banner.label'));
+    banner.setAttribute('data-sel-role', 'security-updates-banner');
+    banner.setAttribute('data-count', String(count));
 
     const message = document.createElement('p');
-    message.textContent = t('banner.message', {count});
+    const severity = SEVERITIES.includes(minimumSeverity) ? minimumSeverity : 'HIGH';
+    // TextContent never interprets markup, so i18next's HTML escaping is not wanted here
+    message.textContent = t('banner.message', {
+        count,
+        threshold: t(`banner.threshold.${severity}`),
+        interpolation: {escapeValue: false}
+    });
 
     const link = document.createElement('a');
     link.href = adminUrl('securityUpdates');
     link.textContent = t('banner.link');
+    link.setAttribute('data-sel-role', 'security-updates-banner-link');
 
     const dismiss = document.createElement('button');
     dismiss.type = 'button';
     dismiss.textContent = t('banner.dismiss');
+    dismiss.setAttribute('data-sel-role', 'security-updates-banner-dismiss');
 
     const close = () => {
         writeDismissed(key);
@@ -107,7 +112,7 @@ const render = (t, count, key) => {
 };
 
 /**
- * Shows a notice to users with adminTemplates when Jahia advisories of high or critical severity apply.
+ * Shows a notice to users with adminTemplates when the server says so (Query.securityUpdates.banner).
  * Never throws: on any error it shows nothing.
  *
  * @param {{t: function, fetchImpl?: function}} options translation function and fetch implementation
@@ -124,15 +129,14 @@ export const showSecurityBanner = async ({t, fetchImpl = window.fetch && window.
             return false;
         }
 
-        const data = await postGraphql(fetchImpl, REPORT_QUERY);
-        const findings = data.securityUpdates?.report?.findings;
-        const count = countUrgentAdvisories(findings);
-        const key = urgentKey(findings);
-        if (count === 0 || readDismissed() === key || document.getElementById(BANNER_ID)) {
+        const data = await postGraphql(fetchImpl, BANNER_QUERY);
+        const banner = data.securityUpdates.banner;
+        const key = (banner.components || []).join('|');
+        if (!banner.visible || readDismissed() === key || document.getElementById(BANNER_ID)) {
             return false;
         }
 
-        render(t, count, key);
+        render(t, banner, key);
         return true;
     } catch {
         return false;

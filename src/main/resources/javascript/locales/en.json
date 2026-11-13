@@ -72,7 +72,13 @@
   },
   "banner": {
     "label": "Security updates",
-    "message": "High or critical Jahia security advisories concerning this Jahia: {{count}}.",
+    "message": "Security updates of {{threshold}} concern this Jahia: {{count}}.",
+    "threshold": {
+      "LOW": "low severity or above",
+      "MEDIUM": "medium severity or above",
+      "HIGH": "high severity or above",
+      "CRITICAL": "critical severity"
+    },
     "link": "View security updates",
     "dismiss": "Dismiss"
   }

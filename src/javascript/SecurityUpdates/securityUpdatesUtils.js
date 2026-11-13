@@ -29,10 +29,6 @@ export const safeHttpsUrl = url => {
     }
 };
 
-export const countUrgentAdvisories = findings => (findings || [])
-    .filter(f => f.source === 'ADVISORY' && (f.severity === 'CRITICAL' || f.severity === 'HIGH'))
-    .length;
-
 export const formatDateTime = (iso, locale) => {
     if (!iso) {
         return null;

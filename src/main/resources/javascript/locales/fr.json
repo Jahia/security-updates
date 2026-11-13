@@ -72,7 +72,13 @@
   },
   "banner": {
     "label": "Mises à jour de sécurité",
-    "message": "Bulletins de sécurité Jahia de gravité élevée ou critique concernant ce Jahia : {{count}}.",
+    "message": "Mises à jour de sécurité de {{threshold}} concernant ce Jahia : {{count}}.",
+    "threshold": {
+      "LOW": "gravité faible ou supérieure",
+      "MEDIUM": "gravité moyenne ou supérieure",
+      "HIGH": "gravité élevée ou supérieure",
+      "CRITICAL": "gravité critique"
+    },
     "link": "Voir les mises à jour de sécurité",
     "dismiss": "Fermer"
   }
