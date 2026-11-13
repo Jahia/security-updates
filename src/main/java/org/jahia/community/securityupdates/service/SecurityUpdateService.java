@@ -10,6 +10,7 @@ import org.jahia.community.securityupdates.feed.StoreUrls;
 import org.jahia.community.securityupdates.matching.MatchResult;
 import org.jahia.community.securityupdates.matching.SecurityMatcher;
 import org.jahia.community.securityupdates.model.AdvisoryRef;
+import org.jahia.community.securityupdates.model.BannerDecision;
 import org.jahia.community.securityupdates.model.Finding;
 import org.jahia.community.securityupdates.model.InstalledComponent;
 import org.jahia.community.securityupdates.model.ModuleCatalog;
@@ -131,12 +132,12 @@ public class SecurityUpdateService {
 
     @Activate
     public void activate(SecurityUpdatesConfig config) {
-        apply(Settings.from(config));
+        apply(Settings.from(config, logger::warn));
     }
 
     @Modified
     public void modified(SecurityUpdatesConfig config) {
-        apply(Settings.from(config));
+        apply(Settings.from(config, logger::warn));
     }
 
     /**
@@ -189,6 +190,14 @@ public class SecurityUpdateService {
     public SecurityReport getReport() {
         SecurityReport current = report;
         return current != null ? current : SecurityReport.notChecked(jahiaVersion.get());
+    }
+
+    /**
+     * @return whether the notice is shown, decided from the current report and the current settings (a
+     * configuration change applies at once, without waiting for a check)
+     */
+    public BannerDecision getBanner() {
+        return BannerPolicy.decide(getReport(), settings.getBanner());
     }
 
     /**

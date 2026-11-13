@@ -3,6 +3,7 @@ package org.jahia.community.securityupdates.service;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * Validated, immutable form of {@link SecurityUpdatesConfig}.
@@ -19,9 +20,16 @@ public final class Settings {
     private final boolean useForgeSettings;
     private final List<String> extraFeedUrls;
     private final String defaultStoreUrl;
+    private final BannerSettings banner;
 
     Settings(boolean enabled, int refreshIntervalHours, boolean useForgeSettings, String extraFeedUrls,
              String defaultStoreUrl) {
+        this(enabled, refreshIntervalHours, useForgeSettings, extraFeedUrls, defaultStoreUrl, BannerSettings.defaults());
+    }
+
+    Settings(boolean enabled, int refreshIntervalHours, boolean useForgeSettings, String extraFeedUrls,
+             String defaultStoreUrl, BannerSettings banner) {
+        this.banner = banner;
         this.enabled = enabled;
         this.refreshIntervalHours = Math.max(MIN_REFRESH_INTERVAL_HOURS,
                 Math.min(MAX_REFRESH_INTERVAL_HOURS, refreshIntervalHours));
@@ -30,9 +38,16 @@ public final class Settings {
         this.defaultStoreUrl = defaultStoreUrl == null ? "" : defaultStoreUrl.trim();
     }
 
-    static Settings from(SecurityUpdatesConfig config) {
+    static Settings from(SecurityUpdatesConfig config, Consumer<String> warnings) {
+        BannerSettings banner = new BannerSettings(config.bannerEnabled(),
+                BannerSettings.parseMinimumSeverity(config.bannerMinimumSeverity(), warnings),
+                config.bannerIncludeOwnerReports());
         return new Settings(config.enabled(), config.refreshIntervalHours(), config.useForgeSettings(),
-                config.extraFeedUrls(), config.defaultStoreUrl());
+                config.extraFeedUrls(), config.defaultStoreUrl(), banner);
+    }
+
+    public BannerSettings getBanner() {
+        return banner;
     }
 
     static Settings defaults() {

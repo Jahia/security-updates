@@ -330,6 +330,25 @@ class SecurityUpdateServiceTest {
         }
     }
 
+    @Test
+    @DisplayName("the banner follows the current settings, without waiting for a check")
+    void bannerFollowsSettings() {
+        service.apply(Settings.defaults());
+        storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
+        service.refreshNow();
+        assertThat(service.getBanner().isVisible()).isTrue();
+        assertThat(service.getBanner().getCount()).isEqualTo(1);
+        assertThat(service.getBanner().getComponents()).containsExactly("graphql-dxm-provider");
+        int fetches = fetcher.requested.size();
+
+        service.apply(new Settings(true, 24, true, "", DEFAULT_STORE,
+                new BannerSettings(true, org.jahia.community.securityupdates.model.Severity.CRITICAL, true)));
+
+        assertThat(service.getBanner().isVisible()).isFalse();
+        assertThat(service.getBanner().getCount()).isZero();
+        assertThat(fetcher.requested).hasSize(fetches);
+    }
+
     @Nested
     @DisplayName("completeness")
     class Completeness {

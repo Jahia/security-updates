@@ -46,6 +46,10 @@ class DefaultConfigurationTest {
         assertThat(properties.getProperty("useForgeSettings")).isEqualTo(String.valueOf(defaults.isUseForgeSettings()));
         assertThat(properties.getProperty("extraFeedUrls")).isEmpty();
         assertThat(properties.getProperty("defaultStoreUrl")).isEqualTo(defaults.getDefaultStoreUrl());
+        assertThat(properties.getProperty("bannerEnabled")).isEqualTo(String.valueOf(defaults.getBanner().isEnabled()));
+        assertThat(properties.getProperty("bannerMinimumSeverity")).isEqualTo(defaults.getBanner().getMinimumSeverity().name());
+        assertThat(properties.getProperty("bannerIncludeOwnerReports"))
+                .isEqualTo(String.valueOf(defaults.getBanner().isIncludeOwnerReports()));
     }
 
     @Test
@@ -55,5 +59,25 @@ class DefaultConfigurationTest {
         assertThat(new Settings(true, 99_999, true, "", "").getRefreshIntervalHours()).isEqualTo(Settings.MAX_REFRESH_INTERVAL_HOURS);
         assertThat(new Settings(true, 24, true, "a, b\nc,,", null).getExtraFeedUrls()).containsExactly("a", "b", "c");
         assertThat(new Settings(true, 24, true, null, null).getDefaultStoreUrl()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("metatype labels: same keys in en and fr, accents readable by Properties.load (ISO-8859-1)")
+    void metatypeLabels() throws IOException {
+        Properties en = new Properties();
+        Properties fr = new Properties();
+        try (InputStream in = getClass().getResourceAsStream("/OSGI-INF/l10n/security-updates/config.properties")) {
+            en.load(in);
+        }
+        try (InputStream in = getClass().getResourceAsStream("/OSGI-INF/l10n/security-updates/config_fr.properties")) {
+            fr.load(in);
+        }
+
+        assertThat(fr.stringPropertyNames()).isEqualTo(en.stringPropertyNames());
+        assertThat(fr.getProperty("severity.HIGH")).isEqualTo("\u00c9lev\u00e9e");
+        for (Method method : SecurityUpdatesConfig.class.getDeclaredMethods()) {
+            assertThat(en.getProperty(method.getName())).as(method.getName()).isNotBlank();
+            assertThat(en.getProperty(method.getName() + ".desc")).as(method.getName()).isNotBlank();
+        }
     }
 }

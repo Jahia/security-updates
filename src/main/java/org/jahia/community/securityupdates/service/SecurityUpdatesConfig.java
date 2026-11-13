@@ -2,6 +2,7 @@ package org.jahia.community.securityupdates.service;
 
 import org.osgi.service.metatype.annotations.AttributeDefinition;
 import org.osgi.service.metatype.annotations.ObjectClassDefinition;
+import org.osgi.service.metatype.annotations.Option;
 
 /**
  * Configuration of the security updates check, PID {@code org.jahia.community.securityupdates}. Labels are
@@ -28,4 +29,17 @@ public @interface SecurityUpdatesConfig {
 
     @AttributeDefinition(name = "%defaultStoreUrl", description = "%defaultStoreUrl.desc")
     String defaultStoreUrl() default Settings.DEFAULT_STORE_URL;
+
+    @AttributeDefinition(name = "%bannerEnabled", description = "%bannerEnabled.desc")
+    boolean bannerEnabled() default true;
+
+    @AttributeDefinition(name = "%bannerMinimumSeverity", description = "%bannerMinimumSeverity.desc", options = {
+            @Option(label = "%severity.LOW", value = "LOW"),
+            @Option(label = "%severity.MEDIUM", value = "MEDIUM"),
+            @Option(label = "%severity.HIGH", value = "HIGH"),
+            @Option(label = "%severity.CRITICAL", value = "CRITICAL")})
+    String bannerMinimumSeverity() default "HIGH";
+
+    @AttributeDefinition(name = "%bannerIncludeOwnerReports", description = "%bannerIncludeOwnerReports.desc")
+    boolean bannerIncludeOwnerReports() default true;
 }

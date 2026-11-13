@@ -96,6 +96,35 @@ class SecurityUpdatesGraphQLTest {
     }
 
     @Test
+    @DisplayName("exposes the banner decision of the service")
+    void banner() throws NoSuchMethodException {
+        SecurityUpdateService service = mock(SecurityUpdateService.class);
+        when(service.getBanner()).thenReturn(new org.jahia.community.securityupdates.model.BannerDecision(
+                true, 3, Severity.HIGH, List.of("jahia-core", "security-updates", "security-updates")));
+        ServiceLocator.override(() -> service);
+
+        GqlBanner banner = new SecurityUpdatesQuery().getBanner();
+
+        assertThat(banner.isVisible()).isTrue();
+        assertThat(banner.getCount()).isEqualTo(3);
+        assertThat(banner.getMinimumSeverity()).isEqualTo(Severity.HIGH);
+        assertThat(banner.getComponents()).containsExactly("jahia-core", "security-updates", "security-updates");
+        assertPermission(SecurityUpdatesQuery.class.getMethod("getBanner"));
+        assertThat(GqlBanner.class.getAnnotation(GraphQLName.class).value()).isEqualTo("SecurityUpdatesBanner");
+    }
+
+    @Test
+    @DisplayName("without the service, no banner")
+    void bannerWithoutService() {
+        ServiceLocator.override(() -> null);
+
+        GqlBanner banner = new SecurityUpdatesQuery().getBanner();
+
+        assertThat(banner.isVisible()).isFalse();
+        assertThat(banner.getCount()).isZero();
+    }
+
+    @Test
     @DisplayName("the refresh mutation runs an on-demand refresh")
     void mutation() {
         SecurityUpdateService service = mock(SecurityUpdateService.class);
