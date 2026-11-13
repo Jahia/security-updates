@@ -26,6 +26,24 @@ class VersionsTest {
         assertThat(Versions.isWellFormed(version)).isFalse();
     }
 
+    /** The pattern before it was simplified (Sonar S5998): the new one must accept exactly the same strings. */
+    private static final java.util.regex.Pattern LEGACY =
+            java.util.regex.Pattern.compile("\\d+(\\.\\d+)*([.\\-_+][0-9A-Za-z][0-9A-Za-z.\\-_+]*)?");
+
+    @ParameterizedTest(name = "[{0}] is judged as before")
+    @ValueSource(strings = {"1", "1.0", "1.2.3.4a", "1.0.0+build.5", "1.0..1", "1..0", "1.-", "1.0-", "1_a", "1+", "1.a.b",
+            "12.34.56.78.90", "1.0.0-rc.1+meta", "1.0.", ".1", "1.0.0-SNAPSHOT", "1a", "1.0a", "1-0", "0.0.0.0.0.0.0.0.0"})
+    void acceptsTheSameVersionsAsTheLegacyPattern(String version) {
+        boolean legacy = LEGACY.matcher(version).matches();
+
+        assertThat(Versions.isWellFormed(version)).isEqualTo(legacy);
+    }
+
+    @Test
+    void qualifierMayFollowAPlusSign() {
+        assertThat(Versions.isWellFormed("1.0.0+build")).isTrue();
+    }
+
     @Test
     void rejectsOverlongVersion() {
         assertThat(Versions.isWellFormed("1." + "0".repeat(100))).isFalse();

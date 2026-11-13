@@ -19,10 +19,11 @@ public final class Versions {
     private static final int MAX_SEGMENT_DIGITS = 9;
     private static final int CORE_LINE_SEGMENTS = 3;
     /**
-     * A version starts with a number; dots separate non-empty segments; a qualifier may follow after
-     * {@code -}, {@code .} or {@code _}.
+     * A version starts with a number; what follows, if anything, starts with {@code .}, {@code -}, {@code _} or
+     * {@code +}, then a letter or digit, then letters, digits and those separators. Further numeric segments
+     * ({@code .2.3}) are a case of that tail. No repeated group, so matching never recurses (Sonar S5998).
      */
-    private static final Pattern WELL_FORMED = Pattern.compile("\\d+(\\.\\d+)*([.\\-_+][0-9A-Za-z][0-9A-Za-z.\\-_+]*)?");
+    private static final Pattern WELL_FORMED = Pattern.compile("\\d++(?:[.\\-_+][0-9A-Za-z][0-9A-Za-z.\\-_+]*+)?+");
 
     private Versions() {
     }
