@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -45,7 +46,10 @@ import java.util.function.Supplier;
  *     restart the schedule. Disabling the check stops the thread.</li>
  *     <li>One check at a time: an on-demand check ({@link #refresh()}) is started in the background and the call
  *     returns at once; it is not started while a check runs, nor within {@code onDemandMinIntervalSeconds} of the
- *     start of the previous check. A scheduled check due while another runs is skipped.</li>
+ *     later of the start and the end of the previous check. A scheduled check due while another runs is skipped,
+ *     and one check runs as soon as the running one ends.</li>
+ *     <li>A check whose stores, interval or enabled state changed while it ran publishes nothing (its report
+ *     describes settings no longer in effect); one check runs as soon as it ends.</li>
  *     <li>The report, the settings and the schedule state change under one lock; the network is never read under
  *     it. Deactivation aborts the requests in flight and the check stops before the next store.</li>
  *     <li>A report whose last check is older than twice the refresh interval is "stale": its status is at best
@@ -85,6 +89,8 @@ public class SecurityUpdateService {
     private Instant scheduledSince;
     private Instant nextCheckAt;
     private boolean running;
+    /** A check is to run as soon as the running one ends: a scheduled check was skipped, or the schedule changed. */
+    private boolean rerunNeeded;
     private Instant lastStart;
     private Instant lastEnd;
 
@@ -143,7 +149,7 @@ public class SecurityUpdateService {
             boolean scheduledBefore = scheduled != null;
             settings = newSettings;
             if (report == null || report.getStatus() == ReportStatus.DISABLED) {
-                report = SecurityReport.notChecked(jahiaVersion.get());
+                report = notCheckedReport();
             }
             if (!newSettings.isEnabled()) {
                 cancelSchedule();
@@ -153,6 +159,7 @@ public class SecurityUpdateService {
                 logger.info("Security updates check disabled by configuration");
             } else if (!scheduledBefore || !previous.sameSchedule(newSettings)) {
                 schedule(newSettings);
+                rerunNeeded = running;
             }
         }
         if (toStop != null) {
@@ -218,37 +225,12 @@ public class SecurityUpdateService {
      * @return the current report; {@code inProgress} is true when a check runs
      */
     public ReportView refresh() {
-        ScheduledExecutorService target;
         synchronized (lock) {
-            target = executor != null && begin(true) ? executor : null;
-        }
-        if (target != null) {
-            try {
-                target.execute(() -> runSafely(false));
-            } catch (RejectedExecutionException e) {
-                logger.warn("The security updates check could not be started: {}", e.getMessage());
-                synchronized (lock) {
-                    running = false;
-                }
+            if (executor != null && begin(true)) {
+                startInBackground();
             }
         }
         return getReportView();
-    }
-
-    /**
-     * Runs a check now, in the calling thread, unless one is running (tests and the scheduled task).
-     *
-     * @return the resulting (or current) report
-     */
-    SecurityReport refreshNow() {
-        boolean started;
-        synchronized (lock) {
-            started = begin(false);
-        }
-        if (started) {
-            runCheck(false);
-        }
-        return getReport();
     }
 
     static ScheduledExecutorService newExecutor() {
@@ -285,13 +267,33 @@ public class SecurityUpdateService {
         scheduledSince = null;
     }
 
-    /** Aborts the requests in flight, then stops the thread; waits for it only on deactivation. */
+    /**
+     * Lock held, {@link #begin} returned true. Queues the check started by {@code begin} on the executor (a call
+     * that does not block); the check is no longer running when the executor refuses it.
+     */
+    private void startInBackground() {
+        try {
+            executor.execute(() -> runSafely(false));
+        } catch (RejectedExecutionException e) {
+            logger.warn("The security updates check could not be started: {}", e.getMessage());
+            running = false;
+        }
+    }
+
+    /**
+     * Aborts the requests in flight, then stops the thread; waits for it only on deactivation. A check queued but
+     * not started never runs: it is then no longer running, so that a later check can start.
+     */
     private void stop(ScheduledExecutorService toStop, boolean wait) {
         HttpFetcher fetcher = httpFetcher;
         if (fetcher != null) {
             fetcher.cancelAll();
         }
-        toStop.shutdownNow();
+        if (droppedACheck(toStop.shutdownNow())) {
+            synchronized (lock) {
+                running = false;
+            }
+        }
         if (!wait) {
             return;
         }
@@ -302,6 +304,16 @@ public class SecurityUpdateService {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    /** @return true when a task never run is not the cancelled periodic schedule, so a check queued on demand */
+    private static boolean droppedACheck(List<Runnable> dropped) {
+        for (Runnable task : dropped) {
+            if (!(task instanceof Future) || !((Future<?>) task).isCancelled()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -334,6 +346,11 @@ public class SecurityUpdateService {
         boolean started;
         synchronized (lock) {
             started = begin(false);
+            if (!started && running && scheduled != null) {
+                // skipped: one check runs when the running one ends, and the next scheduled one is an interval away
+                rerunNeeded = true;
+                nextCheckAt = clock.instant().plusSeconds(settings.getRefreshIntervalHours() * SECONDS_PER_HOUR);
+            }
         }
         if (started) {
             runSafely(true);
@@ -367,7 +384,7 @@ public class SecurityUpdateService {
         } catch (RuntimeException e) {
             logger.error("The security updates check failed unexpectedly", e);
         } finally {
-            publish(next != null || stopped ? next : failedReport(previous, start), scheduledRun);
+            publish(next != null || stopped ? next : failedReport(previous, start), current, scheduledRun);
         }
     }
 
@@ -382,16 +399,27 @@ public class SecurityUpdateService {
         return new ReportAssembler.Sources(httpFetcher, forgeSettingsReader, installedComponentsProvider, jahiaVersion.get());
     }
 
-    private void publish(SecurityReport next, boolean scheduledRun) {
+    /**
+     * Ends a check: keeps its report unless the check was stopped, or the check settings changed while it ran (it
+     * describes settings no longer in effect), then starts the check asked for while it ran, if any.
+     *
+     * @param settingsUsed the settings the check ran with
+     */
+    private void publish(SecurityReport next, Settings settingsUsed, boolean scheduledRun) {
         synchronized (lock) {
             running = false;
             lastEnd = clock.instant();
-            // a check that was stopped, or that ends after the check was disabled, publishes nothing
-            if (next != null && !closed.get() && settings.isEnabled()) {
+            boolean current = settings.sameSchedule(settingsUsed);
+            if (next != null && current && !closed.get()) {
                 report = next;
             }
-            if (scheduledRun && scheduled != null) {
+            if (scheduledRun && current && scheduled != null) {
                 nextCheckAt = clock.instant().plusSeconds(settings.getRefreshIntervalHours() * SECONDS_PER_HOUR);
+            }
+            boolean rerun = rerunNeeded;
+            rerunNeeded = false;
+            if (rerun && executor != null && begin(false)) {
+                startInBackground();
             }
         }
     }
@@ -416,6 +444,13 @@ public class SecurityUpdateService {
         ReportStatus status = current.getStatus() == ReportStatus.OK ? ReportStatus.PARTIAL : current.getStatus();
         return new SecurityReport(status, current.getCheckedAt(), current.getLastSuccess(), current.getJahiaVersion(), errors,
                 current.getFindings());
+    }
+
+    /** Lock held. A report before any check of the current settings, keeping the time of the last success. */
+    private SecurityReport notCheckedReport() {
+        SecurityReport previous = report;
+        return new SecurityReport(ReportStatus.NOT_CHECKED, null, previous == null ? null : previous.getLastSuccess(),
+                jahiaVersion.get(), Collections.emptyList(), Collections.emptyList());
     }
 
     /** Lock held. */

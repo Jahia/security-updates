@@ -85,7 +85,7 @@ class SecurityUpdateServiceTest {
             service.apply(Settings.defaults());
             fixture.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
 
-            SecurityReport report = service.refreshNow();
+            SecurityReport report = fixture.check(service);
 
             assertThat(report.getStatus()).isEqualTo(ReportStatus.OK);
             assertThat(report.getCheckedAt()).isEqualTo(fixture.clock.instant());
@@ -105,7 +105,7 @@ class SecurityUpdateServiceTest {
             service.apply(Settings.defaults());
             fixture.storeServes(PRIVATE_STORE, FEED_WITH_FINDING);
 
-            SecurityReport report = service.refreshNow();
+            SecurityReport report = fixture.check(service);
 
             assertThat(report.getStatus()).isEqualTo(ReportStatus.OK);
             assertThat(fixture.fetcher.requested).allMatch(url -> url.startsWith(PRIVATE_STORE));
@@ -118,7 +118,7 @@ class SecurityUpdateServiceTest {
             service.apply(settings(true, false, "", DEFAULT_STORE));
             fixture.storeServes(DEFAULT_STORE, EMPTY_FEED);
 
-            assertThat(service.refreshNow().getStatus()).isEqualTo(ReportStatus.OK);
+            assertThat(fixture.check(service).getStatus()).isEqualTo(ReportStatus.OK);
             assertThat(fixture.forges.reads).hasValue(0);
         }
 
@@ -129,7 +129,7 @@ class SecurityUpdateServiceTest {
             service.apply(Settings.defaults());
             fixture.storeServes(DEFAULT_STORE, EMPTY_FEED);
 
-            SecurityReport report = service.refreshNow();
+            SecurityReport report = fixture.check(service);
 
             assertThat(fixture.fetcher.requested).contains(DEFAULT_STORE + StoreClient.SECURITY_FEED_PATH);
             assertThat(report.getErrors()).singleElement().satisfies(e -> {
@@ -146,7 +146,7 @@ class SecurityUpdateServiceTest {
             fixture.storeServes(DEFAULT_STORE, EMPTY_FEED);
             fixture.fetcher.answer(MIRROR_FEED, new HttpResult(200, SECOND_FEED));
 
-            SecurityReport report = service.refreshNow();
+            SecurityReport report = fixture.check(service);
 
             assertThat(report.getStatus()).isEqualTo(ReportStatus.OK);
             assertThat(report.getFindings()).extracting(Finding::getComponent).containsExactly("jcontent");
@@ -157,7 +157,7 @@ class SecurityUpdateServiceTest {
         void noStore() {
             service.apply(settings(true, true, "", ""));
 
-            SecurityReport report = service.refreshNow();
+            SecurityReport report = fixture.check(service);
 
             assertThat(report.getStatus()).isEqualTo(ReportStatus.UNAVAILABLE);
             assertThat(report.getErrors()).extracting(StoreError::getKind).containsExactly(StoreErrorKind.NO_STORE);
@@ -170,7 +170,7 @@ class SecurityUpdateServiceTest {
             service.apply(Settings.defaults());
             fixture.storeServes(PRIVATE_STORE, EMPTY_FEED);
 
-            service.refreshNow();
+            fixture.check(service);
 
             assertThat(fixture.fetcher.requested).hasSize(2);
         }
@@ -185,7 +185,7 @@ class SecurityUpdateServiceTest {
             fixture.storeServes(PRIVATE_STORE, shadow);
             fixture.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
 
-            SecurityReport report = service.refreshNow();
+            SecurityReport report = fixture.check(service);
 
             assertThat(fixture.fetcher.requested.get(0)).startsWith(DEFAULT_STORE);
             assertThat(report.getFindings()).singleElement().satisfies(f -> {
@@ -204,7 +204,7 @@ class SecurityUpdateServiceTest {
             fixture.forges.stores = stores;
             service.apply(Settings.defaults());
 
-            SecurityReport report = service.refreshNow();
+            SecurityReport report = fixture.check(service);
 
             assertThat(fixture.fetcher.requested).noneMatch(url -> url.startsWith("https://s20.") || url.startsWith("https://s21."));
             assertThat(report.getErrors()).anySatisfy(e -> assertThat(e.getMessage()).contains("20"));
@@ -221,7 +221,7 @@ class SecurityUpdateServiceTest {
             service.apply(Settings.defaults());
             fixture.storeAnswers(DEFAULT_STORE, 404);
 
-            SecurityReport report = service.refreshNow();
+            SecurityReport report = fixture.check(service);
 
             assertThat(report.getStatus()).isEqualTo(ReportStatus.UNAVAILABLE);
             assertThat(report.getFindings()).isEmpty();
@@ -235,7 +235,7 @@ class SecurityUpdateServiceTest {
             service.apply(Settings.defaults());
             fixture.storeAnswers(DEFAULT_STORE, 503);
 
-            SecurityReport report = service.refreshNow();
+            SecurityReport report = fixture.check(service);
 
             assertThat(report.getStatus()).isEqualTo(ReportStatus.UNAVAILABLE);
             assertThat(report.getErrors()).singleElement().satisfies(e -> {
@@ -251,7 +251,7 @@ class SecurityUpdateServiceTest {
             service.apply(Settings.defaults());
             fixture.storeServes(DEFAULT_STORE, "{\"schemaVersion\":2,\"advisories\":[]}");
 
-            SecurityReport report = service.refreshNow();
+            SecurityReport report = fixture.check(service);
 
             assertThat(report.getStatus()).isEqualTo(ReportStatus.UNAVAILABLE);
             assertThat(report.getErrors()).extracting(StoreError::getKind).containsExactly(StoreErrorKind.NOT_UNDERSTOOD);
@@ -263,12 +263,12 @@ class SecurityUpdateServiceTest {
             service.apply(Settings.defaults());
             fixture.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
             Instant firstCheck = fixture.clock.instant();
-            service.refreshNow();
+            fixture.check(service);
 
             fixture.clock.advance(Duration.ofHours(24));
             fixture.storeAnswers(DEFAULT_STORE, 503);
             fixture.fetcher.answer(DEFAULT_STORE + StoreClient.MODULE_LIST_PATH, new IOException("down"));
-            SecurityReport report = service.refreshNow();
+            SecurityReport report = fixture.check(service);
 
             assertThat(report.getStatus()).isEqualTo(ReportStatus.PARTIAL);
             assertThat(report.getFindings()).extracting(Finding::getComponent).containsExactly("graphql-dxm-provider");
@@ -286,7 +286,7 @@ class SecurityUpdateServiceTest {
             fixture.storeAnswers(PRIVATE_STORE, 404);
             fixture.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
 
-            SecurityReport report = service.refreshNow();
+            SecurityReport report = fixture.check(service);
 
             assertThat(report.getStatus()).isEqualTo(ReportStatus.PARTIAL);
             assertThat(report.getFindings()).hasSize(1);
@@ -299,7 +299,7 @@ class SecurityUpdateServiceTest {
             fixture.forges.stores = List.of(StoreTarget.store("http://store.example.org", "jdoe", "secret"));
             service.apply(Settings.defaults());
 
-            SecurityReport report = service.refreshNow();
+            SecurityReport report = fixture.check(service);
 
             assertThat(fixture.fetcher.requested).isEmpty();
             assertThat(report.getStatus()).isEqualTo(ReportStatus.UNAVAILABLE);
@@ -312,12 +312,12 @@ class SecurityUpdateServiceTest {
             fixture.forges.stores = List.of(StoreTarget.store(PRIVATE_STORE, null, null));
             service.apply(Settings.defaults());
             fixture.storeServes(PRIVATE_STORE, FEED_WITH_FINDING);
-            service.refreshNow();
+            fixture.check(service);
 
             fixture.forges.stores = List.of(StoreTarget.store(DEFAULT_STORE, null, null));
             fixture.storeAnswers(DEFAULT_STORE, 404);
             fixture.clock.advance(Duration.ofHours(1));
-            SecurityReport report = service.refreshNow();
+            SecurityReport report = fixture.check(service);
 
             assertThat(report.getFindings()).isEmpty();
             assertThat(report.getStatus()).isEqualTo(ReportStatus.UNAVAILABLE);
@@ -328,11 +328,11 @@ class SecurityUpdateServiceTest {
         void unexpectedFailure() {
             service.apply(Settings.defaults());
             fixture.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
-            service.refreshNow();
+            fixture.check(service);
 
             when(fixture.installed.installedModules()).thenThrow(new IllegalStateException("registry not ready"));
             fixture.clock.advance(Duration.ofHours(1));
-            SecurityReport report = service.refreshNow();
+            SecurityReport report = fixture.check(service);
 
             assertThat(report.getFindings()).hasSize(1);
             assertThat(report.getStatus()).isEqualTo(ReportStatus.PARTIAL);
@@ -353,7 +353,7 @@ class SecurityUpdateServiceTest {
             service.apply(Settings.defaults());
             fixture.storeServes(DEFAULT_STORE, EMPTY_FEED);
 
-            SecurityReport report = service.refreshNow();
+            SecurityReport report = fixture.check(service);
 
             assertThat(report.getStatus()).isEqualTo(ReportStatus.PARTIAL);
             assertThat(report.getErrors()).extracting(StoreError::getKind).containsExactly(StoreErrorKind.MALFORMED_VERSION);
@@ -366,7 +366,7 @@ class SecurityUpdateServiceTest {
             odd.apply(Settings.defaults());
             fixture.storeServes(DEFAULT_STORE, EMPTY_FEED);
 
-            assertThat(odd.refreshNow().getStatus()).isEqualTo(ReportStatus.PARTIAL);
+            assertThat(fixture.check(odd).getStatus()).isEqualTo(ReportStatus.PARTIAL);
         }
 
         @Test
@@ -376,7 +376,7 @@ class SecurityUpdateServiceTest {
             String feed = FEED_WITH_FINDING.replace("\"advisories\":[", "\"advisories\":[\"not an object\",");
             fixture.storeServes(DEFAULT_STORE, feed);
 
-            SecurityReport report = service.refreshNow();
+            SecurityReport report = fixture.check(service);
 
             assertThat(report.getStatus()).isEqualTo(ReportStatus.PARTIAL);
             assertThat(report.getFindings()).hasSize(1);
@@ -394,18 +394,18 @@ class SecurityUpdateServiceTest {
         void warnsOncePerNewFinding() {
             service.apply(Settings.defaults());
             fixture.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
-            service.refreshNow();
-            service.refreshNow();
+            fixture.check(service);
+            fixture.check(service);
             assertThat(fixture.warned).hasSize(1);
 
             fixture.fetcher.answer(DEFAULT_STORE + StoreClient.SECURITY_FEED_PATH, new HttpResult(200, BOTH_FEED));
-            service.refreshNow();
+            fixture.check(service);
             assertThat(fixture.warned).extracting(Finding::getComponent).containsExactly("graphql-dxm-provider", "jcontent");
 
             fixture.fetcher.answer(DEFAULT_STORE + StoreClient.SECURITY_FEED_PATH, new HttpResult(200, SECOND_FEED));
-            service.refreshNow();
+            fixture.check(service);
             fixture.fetcher.answer(DEFAULT_STORE + StoreClient.SECURITY_FEED_PATH, new HttpResult(200, BOTH_FEED));
-            service.refreshNow();
+            fixture.check(service);
             assertThat(fixture.warned).extracting(Finding::getComponent)
                     .containsExactly("graphql-dxm-provider", "jcontent", "graphql-dxm-provider");
         }
@@ -440,7 +440,7 @@ class SecurityUpdateServiceTest {
         void bannerFollowsSettings() {
             service.apply(Settings.defaults());
             fixture.storeServes(DEFAULT_STORE, "{\"schemaVersion\":1,\"advisories\":[" + ADVISORY_GRAPHQL + "]}");
-            service.refreshNow();
+            fixture.check(service);
             assertThat(service.getBanner().isVisible()).isTrue();
             assertThat(service.getBanner().getCount()).isEqualTo(1);
             assertThat(service.getBanner().getComponents()).containsExactly("graphql-dxm-provider");

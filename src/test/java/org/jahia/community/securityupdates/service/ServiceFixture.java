@@ -7,6 +7,7 @@ import org.jahia.community.securityupdates.feed.HttpResult;
 import org.jahia.community.securityupdates.feed.StoreClient;
 import org.jahia.community.securityupdates.model.Finding;
 import org.jahia.community.securityupdates.model.InstalledComponent;
+import org.jahia.community.securityupdates.model.SecurityReport;
 
 import java.io.IOException;
 import java.time.Clock;
@@ -29,7 +30,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -63,13 +63,18 @@ final class ServiceFixture {
     final ScheduledFuture<?> future = mock(ScheduledFuture.class);
     final List<Runnable> submitted = new CopyOnWriteArrayList<>();
     final List<Finding> warned = new CopyOnWriteArrayList<>();
+    /** The task of the last schedule, run by {@link #check}. */
+    final AtomicReference<Runnable> scheduledTask = new AtomicReference<>();
     final MutableClock clock = new MutableClock(Instant.parse("2026-11-13T10:00:00Z"));
 
     ServiceFixture() {
         when(installed.installedModules()).thenReturn(List.of(
                 new InstalledComponent("graphql-dxm-provider", "org.jahia.modules", "3.4.0"),
                 new InstalledComponent("jcontent", "org.jahia.modules", "3.4.0")));
-        doReturn(future).when(executor).scheduleWithFixedDelay(any(Runnable.class), anyLong(), anyLong(), any(TimeUnit.class));
+        doAnswer(invocation -> {
+            scheduledTask.set(invocation.getArgument(0));
+            return future;
+        }).when(executor).scheduleWithFixedDelay(any(Runnable.class), anyLong(), anyLong(), any(TimeUnit.class));
         doAnswer(invocation -> submitted.add(invocation.getArgument(0))).when(executor).execute(any(Runnable.class));
     }
 
@@ -83,6 +88,20 @@ final class ServiceFixture {
         service.setForgeSettingsReader(forges);
         service.setInstalledComponentsProvider(installed);
         return service;
+    }
+
+    /**
+     * Runs the scheduled task now, in the calling thread, as the executor would when the check is due (no on-demand
+     * rate limit applies), unless nothing is scheduled.
+     *
+     * @return the report after the check
+     */
+    SecurityReport check(SecurityUpdateService service) {
+        Runnable task = scheduledTask.get();
+        if (task != null) {
+            task.run();
+        }
+        return service.getReport();
     }
 
     /** Runs the tasks submitted to the executor (on-demand checks). */
