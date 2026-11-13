@@ -80,10 +80,13 @@ describe('Security updates settings', () => {
     const readSettings = () =>
         cy
             .apollo({ query: getSettings, fetchPolicy: 'no-cache' })
-            .then(
-                (result: never) =>
-                    (result as { data: { securityUpdates: { settings: Settings } } }).data.securityUpdates.settings,
-            )
+            .then((result: never) => {
+                // Apollo adds __typename to every object; the comparisons are about the settings only.
+                const { __typename, ...settings } = (
+                    result as { data: { securityUpdates: { settings: Settings & { __typename?: string } } } }
+                ).data.securityUpdates.settings
+                return settings as Settings
+            })
 
     const readBanner = () =>
         cy
