@@ -18,6 +18,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Notice for `adminTemplates` users in the Jahia UI, decided server-side
   (`Query.securityUpdates.banner`): counts the findings at or above a configurable severity, from Jahia
   advisories and, optionally, owner reports; dismissible per browser session.
+- Notice colours (`#RRGGBB`, contrast of at least 7:1) and dismissal policies (`SESSION`, `HOURS`,
+  `UNTIL_CHANGE`, `NEVER`), the stored dismissals keyed per Jahia user.
+- Settings section on the Security updates page, backed by `Query.securityUpdates.settings`,
+  `Mutation.securityUpdates.updateSettings` (full server-side validation, nothing written on error) and
+  `resetSettings`; saved through ConfigurationAdmin into the `karaf/etc` file.
 - OSGi configuration `org.jahia.community.securityupdates` (`enabled`, `refreshIntervalHours`,
   `useForgeSettings`, `extraFeedUrls`, `defaultStoreUrl`, `bannerEnabled`, `bannerMinimumSeverity`,
-  `bannerIncludeOwnerReports`).
+  `bannerIncludeOwnerReports`, `bannerBackgroundColor`, `bannerTextColor`, `bannerDismissPolicy`,
+  `bannerDismissHours`).

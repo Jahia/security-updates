@@ -28,8 +28,11 @@ fix security issues, from the Jahia Store security feed. Admin UI at
 | `feed.StoreUrls` | Absolute http(s), host, no user info / query / fragment |
 | `service.SecurityUpdateService` (DS, OCD) | Daemon-thread schedule, on-demand refresh (30 s rate limit), last-good data per store, status, WARN once per new finding |
 | `service.JahiaInstalledComponentsProvider` (DS) | Started modules from `JahiaTemplateManagerService.getTemplatePackageRegistry().getRegisteredModules()` |
-| `service.BannerPolicy` / `service.BannerSettings` | Pure banner decision from the current report and the `banner*` settings (invalid severity -> HIGH + one WARN) |
-| `graphql.*` | One namespace: `Query.securityUpdates { report banner }`, `Mutation.securityUpdates { refresh }` |
+| `service.BannerPolicy` / `service.BannerSettings` | Pure banner decision from the current report and the `banner*` settings (lenient: invalid severity -> HIGH, colours -> default pair, policy -> SESSION, each with one WARN) |
+| `service.Colors` | `#RRGGBB` parsing, WCAG contrast ratio (7:1 minimum) |
+| `service.SettingsValidator` | Strict validation of a full settings set (UI): per-field errors, nothing returned on error |
+| `service.SettingsStore` (DS) | Writes every key through `ConfigurationAdmin.getConfiguration(PID, "?").update(...)`, keeping `felix.fileinstall.filename` |
+| `graphql.*` | One namespace: `Query.securityUpdates { report banner settings }`, `Mutation.securityUpdates { refresh updateSettings(input) resetSettings }`; input type `InputSecurityUpdatesSettingsValues` |
 
 DS packages are listed one by one in `_dsannotations` (class patterns, `<package>.*`): add a new
 package there if it gets a `@Component`, or no `OSGI-INF/*.xml` is generated for it.
@@ -48,8 +51,14 @@ update" only for `OK` with no finding.
   checks `adminTemplates` (`jcr.nodeByPath("/").hasPermission`), then renders `securityUpdates.banner`
   as decided by the server; it never filters findings itself. Selectors: `#security-updates-banner`
   (`data-count`), `[data-sel-role="security-updates-banner-link"]`,
-  `[data-sel-role="security-updates-banner-dismiss"]`. Dismissal key: `components.join('|')` in
-  sessionStorage.
+  `[data-sel-role="security-updates-banner-dismiss"]`. Colours as CSS variables
+  `--security-updates-banner-bg/-fg`. Dismissal (`Banner/bannerDismissal.js`, pure): key
+  `components.join('|')`; SESSION in sessionStorage `security-updates-banner-dismissed`; HOURS and
+  UNTIL_CHANGE in localStorage `security-updates-banner-dismissed:<username>` as `{key, at}`; NEVER has no
+  button; storage failures fail open.
+- `src/javascript/Settings/`: the settings section (`SettingsForm.jsx`, field ids
+  `security-updates-setting-<key>`, errors `<id>-error`, help `<id>-help`), colour helpers
+  (`colorUtils.js`, same formula as `Colors.java`), form/input conversion (`settingsValues.js`).
 - `src/javascript/SecurityUpdates/`: page (`SecurityUpdates.jsx`), GraphQL documents, pure helpers
   (`securityUpdatesUtils.js`).
 - Locales: `src/main/resources/javascript/locales/{en,fr}.json` (same keys, checked by a test).
@@ -72,7 +81,8 @@ use a global Yarn Berry: it rewrites the v1 `yarn.lock`.
 - Jest: `src/javascript/**/__tests__`.
 - Cypress (Docker): `tests/` copied from `what-is-my-public-server-ip`; specs
   `01-securityUpdates.cy.ts` (API, honest status, page), `02-securityUpdates-Permissions.cy.ts`
-  (`adminTemplates` gate), `03-securityUpdates-Findings.cy.ts` and `04-securityUpdates-Banner.cy.ts`
+  (`adminTemplates` gate), `03-securityUpdates-Findings.cy.ts`, `04-securityUpdates-Banner.cy.ts` and
+  `05-securityUpdates-Settings.cy.ts`
   (against the `storefixture` nginx service, files in `tests/storefixture/contents/`; settings switched
   by the provisioning fixtures in `tests/cypress/fixtures/security-updates/`, each of which also points
   the module at the fixture store). `tests/.env.example` must be provided before running.
@@ -86,3 +96,8 @@ use a global Yarn Berry: it rewrites the v1 `yarn.lock`.
 - `org.json` is imported with a wide range on purpose (bnd would pin the build-time version).
 - Metatype labels (`OSGI-INF/l10n/**.properties`) are read as ISO-8859-1: write accents as `\uXXXX`
   (a test checks it).
+- The default `.cfg` must keep its first line `# default configuration - won't be overridden`: the module
+  extender then leaves an existing `karaf/etc` file alone, and FileInstall writes UI changes back into it.
+- A new configuration key needs: the OCD method, the `.cfg` line, en/fr labels, `SettingsKeys`,
+  `Settings.toValues`, `SettingsValidator`, `GqlSettings`/`GqlSettingsInput`, the form and its locales
+  (`DefaultConfigurationTest` and the locale tests catch most omissions).

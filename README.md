@@ -36,11 +36,11 @@ once every 30 seconds).
 
 ## Banner
 
-Users with `adminTemplates` also get a small dismissible notice, on every page of the Jahia UI (the
-`/jahia/...` app shell), for example "Security updates of high severity or above concern this Jahia: 3.",
-with a link to the Security updates page.
+Users with `adminTemplates` also get a small notice, on every page of the Jahia UI (the `/jahia/...` app
+shell), for example "Security updates of high severity or above concern this Jahia: 3.", with a link to
+the Security updates page.
 
-The server decides whether it is shown, from the current report and three settings (see
+The server decides whether it is shown, from the current report and the `banner*` settings (see
 [Configuration](#configuration)), and exposes the decision as `Query.securityUpdates.banner`:
 
 - `count` is the number of finding rows whose severity is at least `bannerMinimumSeverity` and whose
@@ -48,12 +48,30 @@ The server decides whether it is shown, from the current report and three settin
   unknown severity is never counted.
 - `components` lists the component of each counted row, sorted (one entry per row).
 - `visible` is `bannerEnabled && count > 0`.
+- `backgroundColor`, `textColor`, `dismissPolicy`, `dismissHours` are the validated presentation settings,
+  and `username` the current Jahia user (for the per-user dismissal key).
 
 A configuration change applies on the next query, without waiting for a check. The browser only renders
-the decision: it never filters findings itself. Dismissing the notice (button or Escape) hides it for
-the browser session; it comes back when the set of counted components changes. Any error (network,
-permission, unexpected answer) leaves the UI unchanged. Users without `adminTemplates` never get it:
-the banner query is not even sent for them.
+the decision: it never filters findings itself. Any error (network, permission, unexpected answer) leaves
+the UI unchanged. Users without `adminTemplates` never get it: the banner query is not even sent for them.
+
+**Colours.** The background and text colours are configurable (`#RRGGBB`); their contrast ratio must be at
+least 7:1 (WCAG 2.2 AAA, relative luminance formula). The link, the button border and the 3px focus ring
+use the text colour, so they keep that contrast against the background (the focus ring needs 3:1).
+
+**Dismissal** (`bannerDismissPolicy`; button or Escape):
+
+| Policy | Hidden until | Stored in |
+|---|---|---|
+| `SESSION` (default) | the browser session ends | `sessionStorage["security-updates-banner-dismissed"]` = components key |
+| `HOURS` | `bannerDismissHours` hours have passed | `localStorage["security-updates-banner-dismissed:<user>"]` = `{"key", "at"}` |
+| `UNTIL_CHANGE` | the counted components change | `localStorage["security-updates-banner-dismissed:<user>"]` = `{"key", "at"}` |
+| `NEVER` | (no Dismiss button) | nothing |
+
+The components key is the sorted `components` list joined with `|`: with every policy but `NEVER`, the
+notice comes back as soon as it changes. The local storage key names the Jahia user, so a shared browser
+does not hide the notice from another administrator. Any storage failure (blocked, full, corrupt record)
+shows the notice.
 
 ## Data sources
 
@@ -139,10 +157,42 @@ or in the OSGi configuration UI (labels in English and French). The shipped file
 | `bannerEnabled` | `true` | Show the notice in the Jahia UI (see [Banner](#banner)). The page is not affected. |
 | `bannerMinimumSeverity` | `HIGH` | Lowest severity the notice counts: `LOW`, `MEDIUM`, `HIGH` or `CRITICAL`. Any other value means `HIGH`, with one WARN in the log. |
 | `bannerIncludeOwnerReports` | `true` | Count owner-reported findings in the notice, not only Jahia advisories. |
+| `bannerBackgroundColor` | `#1B1B1B` | Notice background, `#RRGGBB`. |
+| `bannerTextColor` | `#FFFFFF` | Notice text (also link, button and focus ring), `#RRGGBB`. An invalid colour, or a pair below 7:1, means the default pair, with one WARN. |
+| `bannerDismissPolicy` | `SESSION` | `SESSION`, `HOURS`, `UNTIL_CHANGE` or `NEVER` (see [Banner](#banner)). Any other value means `SESSION`, with one WARN. |
+| `bannerDismissHours` | `24` | Hours a dismissal lasts with `HOURS` (1 to 720). |
+
+### Settings UI
+
+The Security updates page has a **Settings** section that edits every key above: checkboxes, number
+inputs, selects, colour pickers paired with hex fields, a help text per field, and a live preview of the
+notice with the computed contrast ratio. **Save settings** sends the whole set; **Reset to defaults**
+writes the default values. Every rule is checked server-side (the configuration fallbacks above, plus the
+store URL rules, the 1-720 ranges and the 7:1 contrast): an invalid set is refused with an error per
+field, and nothing is written. Errors are shown next to each field (`aria-invalid`, `aria-describedby`),
+summarised in an alert, and the first invalid field gets the focus.
+
+The settings are written through `ConfigurationAdmin` (configuration `org.jahia.community.securityupdates`,
+location `?`, every key at once, keeping `felix.fileinstall.filename`). How it persists, from the Jahia
+sources (`jahia-private`):
+
+- Felix FileInstall (`org.apache.felix.fileinstall` 3.7.4-jahia1, `ConfigInstaller.doConfigurationEvent`)
+  writes a CM update back to the file named by `felix.fileinstall.filename`, through its
+  `TypedProperties`, which keeps the comments and the first line of the existing file.
+- The module extender (`jahiamodule-extender` `Activator.checkConfigurations`) copies the module's
+  `META-INF/configurations/*.cfg` to `karaf/etc` only when the file does not exist there, or when the module's
+  file has no line starting with `# default configuration`. The shipped file has that marker, so a
+  redeployment or a restart keeps the saved values.
+- The config manager (`config-manager` `ConfigServiceImpl`) classifies such a file as `MODULE_DEFAULT`,
+  and stores `karaf/etc` in the JCR on each configuration event when its auto-save is on (restored with
+  the `USER` files on demand).
+
+When no configuration exists yet, the module writes the `.cfg` itself (with the marker) and points
+FileInstall at it.
 
 ## GraphQL API
 
-One field on `Query` and one on `Mutation`, both requiring `adminTemplates`:
+One field on `Query` and one on `Mutation`; every nested field requires `adminTemplates`:
 
 ```graphql
 query {
@@ -167,14 +217,33 @@ query {
 
 query {
   securityUpdates {
-    banner { visible count minimumSeverity components }
+    banner { visible count minimumSeverity components backgroundColor textColor dismissPolicy dismissHours username }
+    settings { enabled refreshIntervalHours useForgeSettings defaultStoreUrl extraFeedUrls bannerEnabled
+               bannerMinimumSeverity bannerIncludeOwnerReports bannerBackgroundColor bannerTextColor
+               bannerDismissPolicy bannerDismissHours contrastRatio }
   }
 }
 
 mutation {
   securityUpdates { refresh { status checkedAt findings { component severity } } }
 }
+
+# The input type is InputSecurityUpdatesSettingsValues (graphql-java-annotations prefixes input types with "Input").
+# Every field is required; enumerations and colours are strings, validated server-side.
+mutation ($input: InputSecurityUpdatesSettingsValues!) {
+  securityUpdates {
+    updateSettings(input: $input) { ok errors { field code message } settings { refreshIntervalHours } }
+  }
+}
+
+mutation {
+  securityUpdates { resetSettings { ok settings { bannerDismissPolicy } } }
+}
 ```
+
+`updateSettings` error codes: `MISSING`, `INVALID_BOOLEAN`, `INVALID_NUMBER`, `OUT_OF_RANGE`, `INVALID_URL`,
+`INVALID_VALUE`, `INVALID_COLOR`, `LOW_CONTRAST`, and `WRITE_FAILED` (field null) when the configuration
+cannot be written.
 
 `refresh` runs a check unless the last one is less than 30 seconds old. Advisory `url`s are returned
 only when they start with `https://`.
