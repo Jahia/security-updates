@@ -1,4 +1,0 @@
-- editConfiguration: "org.jahia.community.securityupdates"
-  properties:
-    useForgeSettings: "false"
-    defaultStoreUrl: "http://storefixture"
