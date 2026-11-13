@@ -53,12 +53,43 @@ class DefaultConfigurationTest {
     }
 
     @Test
-    @DisplayName("settings clamp the interval and split the extra feed URLs")
-    void settingsValidation() {
-        assertThat(new Settings(true, 0, true, "", "").getRefreshIntervalHours()).isEqualTo(Settings.MIN_REFRESH_INTERVAL_HOURS);
-        assertThat(new Settings(true, 99_999, true, "", "").getRefreshIntervalHours()).isEqualTo(Settings.MAX_REFRESH_INTERVAL_HOURS);
-        assertThat(new Settings(true, 24, true, "a, b\nc,,", null).getExtraFeedUrls()).containsExactly("a", "b", "c");
-        assertThat(new Settings(true, 24, true, null, null).getDefaultStoreUrl()).isEmpty();
+    @DisplayName("every value of the shipped file is the default, read without warning")
+    void everyValueIsTheDefault() throws IOException {
+        Properties properties = new Properties();
+        properties.load(new StringReader(content()));
+        java.util.List<String> warnings = new java.util.ArrayList<>();
+        java.util.Map<String, Object> map = new java.util.HashMap<>();
+        properties.stringPropertyNames().forEach(key -> map.put(key, properties.getProperty(key)));
+
+        Settings shipped = Settings.fromProperties(map, warnings::add);
+
+        assertThat(shipped.toValues()).isEqualTo(Settings.defaults().toValues());
+        assertThat(shipped.getOnDemandMinInterval()).isEqualTo(Settings.defaults().getOnDemandMinInterval());
+        assertThat(warnings).isEmpty();
+        for (String key : SettingsKeys.ALL) {
+            assertThat(properties.getProperty(key)).as(key).isEqualTo(Settings.defaults().toValues().get(key));
+        }
+    }
+
+    @Test
+    @DisplayName("the settings UI keys are the OCD keys except the hidden on-demand interval")
+    void uiKeysAreTheOcdKeys() {
+        assertThat(Arrays.stream(SecurityUpdatesConfig.class.getDeclaredMethods()).map(Method::getName)
+                .filter(name -> !Settings.ON_DEMAND_MIN_INTERVAL_SECONDS.equals(name)))
+                .containsExactlyInAnyOrderElementsOf(SettingsKeys.ALL);
+    }
+
+    @Test
+    @DisplayName("the shipped file and the metatype descriptions require https and do not name the JCR path")
+    void httpsOnlyWording() throws IOException {
+        Properties en = new Properties();
+        try (InputStream in = getClass().getResourceAsStream("/OSGI-INF/l10n/security-updates/config.properties")) {
+            en.load(in);
+        }
+        assertThat(content()).doesNotContain("http(s)").doesNotContain("/settings/forgesSettings");
+        assertThat(en.getProperty("extraFeedUrls.desc")).contains("https").doesNotContain("http(s)");
+        assertThat(en.getProperty("defaultStoreUrl.desc")).contains("https");
+        assertThat(en.getProperty("useForgeSettings.desc")).doesNotContain("/settings/forgesSettings");
     }
 
     @Test

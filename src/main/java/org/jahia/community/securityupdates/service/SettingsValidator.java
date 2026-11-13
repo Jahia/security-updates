@@ -19,7 +19,9 @@ import java.util.Optional;
  *     <li>every key of {@link SettingsKeys#ALL} is present;</li>
  *     <li>booleans are {@code true} or {@code false};</li>
  *     <li>{@code refreshIntervalHours} and {@code bannerDismissHours} are integers from 1 to 720;</li>
- *     <li>{@code defaultStoreUrl} (may be empty) and every URL of {@code extraFeedUrls} pass {@link StoreUrls};</li>
+ *     <li>{@code defaultStoreUrl} (may be empty) and every URL of {@code extraFeedUrls} pass {@link StoreUrls}
+ *     ({@code NOT_HTTPS} for a plain http URL, {@code INVALID_URL} otherwise); at most
+ *     {@value Settings#MAX_EXTRA_FEED_URLS} extra feed URLs ({@code TOO_MANY}), separated by commas or white space;</li>
  *     <li>{@code bannerMinimumSeverity} is LOW, MEDIUM, HIGH or CRITICAL; {@code bannerDismissPolicy} a
  *     {@link DismissPolicy};</li>
  *     <li>colours are {@code #RRGGBB} and their contrast ratio is at least 7:1.</li>
@@ -31,6 +33,10 @@ public final class SettingsValidator {
     static final int MAX_HOURS = 720;
     private static final String TRUE = "true";
     private static final String FALSE = "false";
+    private static final String INVALID_URL = "INVALID_URL";
+    private static final String INVALID_URL_MESSAGE = "Must be an absolute https URL without credentials, query or fragment";
+    private static final String NOT_HTTPS = "NOT_HTTPS";
+    private static final String NOT_HTTPS_MESSAGE = "Must be an https URL: plain http is refused";
 
     private SettingsValidator() {
     }
@@ -94,8 +100,14 @@ public final class SettingsValidator {
         if (normalized.isPresent()) {
             values.put(SettingsKeys.DEFAULT_STORE_URL, normalized.get());
         } else {
-            errors.add(new FieldError(SettingsKeys.DEFAULT_STORE_URL, "INVALID_URL", invalidUrlMessage()));
+            errors.add(urlError(SettingsKeys.DEFAULT_STORE_URL, url));
         }
+    }
+
+    private static FieldError urlError(String key, String url) {
+        return StoreUrls.isPlainHttp(url)
+                ? new FieldError(key, NOT_HTTPS, NOT_HTTPS_MESSAGE)
+                : new FieldError(key, INVALID_URL, INVALID_URL_MESSAGE);
     }
 
     private static void extraFeedUrls(Map<String, String> input, Map<String, String> values, List<FieldError> errors) {
@@ -106,16 +118,17 @@ public final class SettingsValidator {
             }
             Optional<String> normalized = StoreUrls.normalize(part);
             if (normalized.isEmpty()) {
-                errors.add(new FieldError(SettingsKeys.EXTRA_FEED_URLS, "INVALID_URL", invalidUrlMessage()));
+                errors.add(urlError(SettingsKeys.EXTRA_FEED_URLS, part));
                 return;
             }
             urls.add(normalized.get());
         }
+        if (urls.size() > Settings.MAX_EXTRA_FEED_URLS) {
+            errors.add(new FieldError(SettingsKeys.EXTRA_FEED_URLS, "TOO_MANY",
+                    "At most " + Settings.MAX_EXTRA_FEED_URLS + " extra feed URLs"));
+            return;
+        }
         values.put(SettingsKeys.EXTRA_FEED_URLS, String.join(", ", urls));
-    }
-
-    private static String invalidUrlMessage() {
-        return "Must be an absolute http(s) URL without credentials, query or fragment";
     }
 
     private static void minimumSeverity(Map<String, String> input, Map<String, String> values, List<FieldError> errors) {

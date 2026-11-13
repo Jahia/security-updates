@@ -58,4 +58,8 @@ public @interface SecurityUpdatesConfig {
 
     @AttributeDefinition(name = "%bannerDismissHours", description = "%bannerDismissHours.desc", min = "1", max = "720")
     int bannerDismissHours() default BannerSettings.DEFAULT_DISMISS_HOURS;
+
+    @AttributeDefinition(name = "%onDemandMinIntervalSeconds", description = "%onDemandMinIntervalSeconds.desc", min = "0",
+            max = "3600")
+    int onDemandMinIntervalSeconds() default Settings.DEFAULT_ON_DEMAND_MIN_INTERVAL_SECONDS;
 }

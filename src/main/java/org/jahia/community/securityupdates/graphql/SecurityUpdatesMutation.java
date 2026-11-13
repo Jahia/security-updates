@@ -66,7 +66,7 @@ public class SecurityUpdatesMutation {
             if (store == null) {
                 throw new IOException("Settings store not available");
             }
-            store.save(values);
+            store.save(values, ServiceLocator.username());
             return GqlSettingsResult.saved(values);
         } catch (IOException | RuntimeException e) {
             logger.error("Could not save the security updates settings", e);

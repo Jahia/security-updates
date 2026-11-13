@@ -82,7 +82,7 @@ class SecurityUpdatesSettingsGraphQLTest {
         assertThat(result.getSettings().getRefreshIntervalHours()).isEqualTo(6);
         assertThat(result.getSettings().getDefaultStoreUrl()).isEqualTo("https://store.jahia.com");
         ArgumentCaptor<Map<String, String>> written = ArgumentCaptor.forClass(Map.class);
-        verify(store).save(written.capture());
+        verify(store).save(written.capture(), any());
         assertThat(written.getValue()).hasSize(12).containsEntry("bannerDismissPolicy", "HOURS").containsEntry("bannerDismissHours", "12");
     }
 
@@ -99,7 +99,7 @@ class SecurityUpdatesSettingsGraphQLTest {
             assertThat(e.getCode()).isNotBlank();
             assertThat(e.getMessage()).isNotBlank();
         });
-        verify(store, never()).save(anyMap());
+        verify(store, never()).save(anyMap(), any());
     }
 
     @Test
@@ -118,7 +118,7 @@ class SecurityUpdatesSettingsGraphQLTest {
     @Test
     @DisplayName("a write failure is reported without details")
     void writeFailure() throws IOException {
-        doThrow(new IOException("/var/jahia/karaf/etc is read-only")).when(store).save(any());
+        doThrow(new IOException("/var/jahia/karaf/etc is read-only")).when(store).save(any(), any());
 
         GqlSettingsResult result = new SecurityUpdatesMutation().updateSettings(input("#1B1B1B", "#FFFFFF", 24, ""));
 
@@ -138,7 +138,7 @@ class SecurityUpdatesSettingsGraphQLTest {
 
         assertThat(result.isOk()).isTrue();
         ArgumentCaptor<Map<String, String>> written = ArgumentCaptor.forClass(Map.class);
-        verify(store).save(written.capture());
+        verify(store).save(written.capture(), any());
         assertThat(written.getValue()).isEqualTo(SettingsTestSupport.defaults().toValues());
         assertThat(result.getSettings().getBannerDismissPolicy()).isEqualTo(DismissPolicy.SESSION);
     }

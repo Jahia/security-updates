@@ -64,6 +64,9 @@ class SettingsValidatorTest {
             "defaultStoreUrl, ftp://store.example.org, INVALID_URL",
             "defaultStoreUrl, https://user:pw@store.example.org, INVALID_URL",
             "extraFeedUrls, 'https://ok.example.org/f.json, not a url', INVALID_URL",
+            "defaultStoreUrl, http://store.example.org, NOT_HTTPS",
+            "extraFeedUrls, 'https://ok.example.org/f.json, http://plain.example.org/f.json', NOT_HTTPS",
+            "defaultStoreUrl, https://störe.example.org, INVALID_URL",
             "bannerMinimumSeverity, UNKNOWN, INVALID_VALUE",
             "bannerMinimumSeverity, SEVERE, INVALID_VALUE",
             "bannerDismissPolicy, FOREVER, INVALID_VALUE",
@@ -155,6 +158,36 @@ class SettingsValidatorTest {
         assertThat(result.getErrors()).isEmpty();
         assertThat(result.getValues()).containsEntry(SettingsKeys.DEFAULT_STORE_URL, "")
                 .containsEntry(SettingsKeys.EXTRA_FEED_URLS, "");
+    }
+
+    @Test
+    @DisplayName("at most 10 extra feed URLs are accepted")
+    void tooManyExtraFeedUrls() {
+        Map<String, String> input = valid();
+        StringBuilder urls = new StringBuilder();
+        for (int i = 0; i < Settings.MAX_EXTRA_FEED_URLS; i++) {
+            urls.append("https://f").append(i).append(".example.org/f.json ");
+        }
+        input.put(SettingsKeys.EXTRA_FEED_URLS, urls.toString());
+        assertThat(SettingsValidator.validate(input).isValid()).isTrue();
+
+        input.put(SettingsKeys.EXTRA_FEED_URLS, urls + "https://one-more.example.org/f.json");
+
+        assertThat(SettingsValidator.validate(input).getErrors()).singleElement().satisfies(e -> {
+            assertThat(e.getField()).isEqualTo(SettingsKeys.EXTRA_FEED_URLS);
+            assertThat(e.getCode()).isEqualTo("TOO_MANY");
+            assertThat(e.getMessage()).contains("10");
+        });
+    }
+
+    @Test
+    @DisplayName("a plain http URL is refused with a message asking for https")
+    void plainHttpMessage() {
+        Map<String, String> input = valid();
+        input.put(SettingsKeys.DEFAULT_STORE_URL, "http://store.example.org");
+
+        assertThat(SettingsValidator.validate(input).getErrors()).singleElement()
+                .satisfies(e -> assertThat(e.getMessage()).contains("https"));
     }
 
     @Test

@@ -20,7 +20,6 @@ public final class BannerSettings {
     static final String DEFAULT_TEXT_COLOR = BannerDecision.DEFAULT_TEXT_COLOR;
     static final DismissPolicy DEFAULT_DISMISS_POLICY = BannerDecision.DEFAULT_DISMISS_POLICY;
     static final int DEFAULT_DISMISS_HOURS = BannerDecision.DEFAULT_DISMISS_HOURS;
-    private static final int MAX_SHOWN_VALUE = 40;
 
     private final boolean enabled;
     private final Severity minimumSeverity;
@@ -66,8 +65,8 @@ public final class BannerSettings {
         if (bg.isPresent() && fg.isPresent() && Colors.hasEnoughContrast(bg.get(), fg.get())) {
             return new String[]{bg.get(), fg.get()};
         }
-        warnings.accept("Invalid bannerBackgroundColor/bannerTextColor '" + shown(String.valueOf(background)) + "'/'"
-                + shown(String.valueOf(text)) + "' (expected #RRGGBB colours with a contrast ratio of at least 7:1): using "
+        warnings.accept("Invalid bannerBackgroundColor/bannerTextColor '" + Settings.shown(background) + "'/'"
+                + Settings.shown(text) + "' (expected #RRGGBB colours with a contrast ratio of at least 7:1): using "
                 + DEFAULT_BACKGROUND_COLOR + "/" + DEFAULT_TEXT_COLOR);
         return new String[]{DEFAULT_BACKGROUND_COLOR, DEFAULT_TEXT_COLOR};
     }
@@ -82,7 +81,7 @@ public final class BannerSettings {
         try {
             return DismissPolicy.valueOf(value.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            warnings.accept("Invalid bannerDismissPolicy '" + shown(value)
+            warnings.accept("Invalid bannerDismissPolicy '" + Settings.shown(value)
                     + "' (expected SESSION, HOURS, UNTIL_CHANGE or NEVER): using " + DEFAULT_DISMISS_POLICY);
             return DEFAULT_DISMISS_POLICY;
         }
@@ -99,21 +98,11 @@ public final class BannerSettings {
         }
         Severity severity = Severity.parse(value);
         if (severity == Severity.UNKNOWN) {
-            warnings.accept("Invalid bannerMinimumSeverity '" + shown(value) + "' (expected LOW, MEDIUM, HIGH or CRITICAL): using "
+            warnings.accept("Invalid bannerMinimumSeverity '" + Settings.shown(value) + "' (expected LOW, MEDIUM, HIGH or CRITICAL): using "
                     + DEFAULT_MINIMUM_SEVERITY);
             return DEFAULT_MINIMUM_SEVERITY;
         }
         return severity;
-    }
-
-    /** The configured value as it may appear in a log line: printable characters only, bounded. */
-    private static String shown(String value) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < value.length() && sb.length() < MAX_SHOWN_VALUE; i++) {
-            char c = value.charAt(i);
-            sb.append(Character.isISOControl(c) ? '?' : c);
-        }
-        return sb.toString();
     }
 
     public boolean isEnabled() {
