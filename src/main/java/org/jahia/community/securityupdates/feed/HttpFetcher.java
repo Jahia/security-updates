@@ -11,7 +11,7 @@ import java.util.Map;
 public interface HttpFetcher {
 
     /**
-     * @param url      an absolute http(s) URL
+     * @param url      an absolute https URL
      * @param headers  request headers; may hold credentials, which must never be logged
      * @param maxBytes the largest body accepted for a 200 response
      * @return the status and body; for a status other than 200 the body is truncated to a few kilobytes
@@ -19,4 +19,12 @@ public interface HttpFetcher {
      * @throws IOException               on any transport failure or timeout
      */
     HttpResult get(String url, Map<String, String> headers, int maxBytes) throws IOException;
+
+    /**
+     * Aborts the requests in flight, which then fail with an {@link IOException}. Used when the module stops,
+     * so that it does not wait for a slow store.
+     */
+    default void cancelAll() {
+        // nothing to cancel by default
+    }
 }

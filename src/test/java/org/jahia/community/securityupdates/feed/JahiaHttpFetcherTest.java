@@ -15,7 +15,13 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,10 +45,12 @@ class JahiaHttpFetcherTest {
     private HttpClientService httpClientService;
     private JahiaHttpFetcher fetcher;
     private final AtomicReference<String> lastAuthorization = new AtomicReference<>();
+    private final CountDownLatch slowRequestReceived = new CountDownLatch(1);
 
     @BeforeEach
     void setUp() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.setExecutor(Executors.newCachedThreadPool());
         server.createContext("/ok", exchange -> {
             lastAuthorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
             respond(exchange, 200, "{\"schemaVersion\":1}");
@@ -55,6 +63,15 @@ class JahiaHttpFetcherTest {
             }
         });
         server.createContext("/unavailable", exchange -> respond(exchange, 503, "{\"error\":\"" + "e".repeat(10_000) + "\"}"));
+        server.createContext("/slow", exchange -> {
+            slowRequestReceived.countDown();
+            try {
+                Thread.sleep(5_000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            respond(exchange, 200, "late");
+        });
         server.createContext("/redirect", exchange -> {
             exchange.getResponseHeaders().add("Location", base + "/ok");
             respond(exchange, 302, "");
@@ -130,7 +147,7 @@ class JahiaHttpFetcherTest {
 
     @Test
     @DisplayName("a closed port is an IOException")
-    void connectionRefused() throws IOException {
+    void connectionRefused() {
         server.stop(0);
         assertThatThrownBy(() -> fetcher.get(base + "/ok", Map.of(), 1000)).isInstanceOf(IOException.class);
     }
@@ -140,5 +157,50 @@ class JahiaHttpFetcherTest {
     void noService() {
         JahiaHttpFetcher unbound = new JahiaHttpFetcher();
         assertThatThrownBy(() -> unbound.get(base + "/ok", Map.of(), 1000)).isInstanceOf(IOException.class);
+    }
+
+    @Test
+    @DisplayName("a response that does not come within the response timeout fails as a timeout")
+    void responseTimeoutIsEnforced() {
+        JahiaHttpFetcher quick = new JahiaHttpFetcher(new JahiaHttpFetcher.Timeouts(Duration.ofSeconds(2),
+                Duration.ofMillis(300), Duration.ofSeconds(10)));
+        quick.setHttpClientService(httpClientService);
+        long start = System.nanoTime();
+
+        assertThatThrownBy(() -> quick.get(base + "/slow", Map.of(), 1000)).isInstanceOf(java.io.InterruptedIOException.class);
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(4));
+    }
+
+    @Test
+    @DisplayName("cancelAll aborts a request in flight, so that deactivation does not wait for the network")
+    void cancelAllAbortsInFlightRequests() throws Exception {
+        CompletableFuture<HttpResult> call = CompletableFuture.supplyAsync(() -> {
+            try {
+                return fetcher.get(base + "/slow", Map.of(), 1000);
+            } catch (IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+        });
+        assertThat(slowRequestReceived.await(5, TimeUnit.SECONDS)).isTrue();
+        long start = System.nanoTime();
+
+        fetcher.cancelAll();
+
+        assertThatThrownBy(() -> call.get(4, TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class)
+                .hasCauseInstanceOf(java.io.UncheckedIOException.class);
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(4));
+    }
+
+    @Test
+    @DisplayName("the default timeouts bound connection, response and the whole read")
+    void defaultTimeouts() {
+        assertThat(JahiaHttpFetcher.Timeouts.DEFAULT.getConnect()).isEqualTo(Duration.ofSeconds(10));
+        assertThat(JahiaHttpFetcher.Timeouts.DEFAULT.getResponse()).isEqualTo(Duration.ofSeconds(30));
+        assertThat(JahiaHttpFetcher.Timeouts.DEFAULT.getReadDeadline()).isEqualTo(Duration.ofSeconds(60));
+    }
+
+    @Test
+    void resultWithoutBodyHasAnEmptyBody() {
+        assertThat(new HttpResult(204, null).getBody()).isEmpty();
     }
 }

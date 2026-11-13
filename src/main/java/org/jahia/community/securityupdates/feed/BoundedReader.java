@@ -3,6 +3,7 @@ package org.jahia.community.securityupdates.feed;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -22,7 +23,8 @@ public final class BoundedReader {
      * @param deadlineNanos a {@link System#nanoTime()} value after which reading stops with an error
      * @param truncate      true to return the first {@code maxBytes} bytes of a longer body instead of failing
      * @throws ResponseTooLargeException when the body is longer than {@code maxBytes} and {@code truncate} is false
-     * @throws IOException               when the deadline passes or the stream fails
+     * @throws IOException               when the stream fails; a {@link SocketTimeoutException} when the deadline
+     *                                   passes (checked after each read, each read being bounded by the socket timeout)
      */
     public static String read(InputStream in, int maxBytes, long deadlineNanos, boolean truncate) throws IOException {
         if (in == null) {
@@ -33,7 +35,7 @@ public final class BoundedReader {
         int read;
         while ((read = in.read(buffer)) != -1) {
             if (System.nanoTime() - deadlineNanos > 0) {
-                throw new IOException("Response read deadline exceeded");
+                throw new SocketTimeoutException("Response read deadline exceeded");
             }
             int room = maxBytes - out.size();
             if (read > room) {

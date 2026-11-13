@@ -241,7 +241,7 @@ class SecurityUpdateServiceTest {
             assertThat(report.getStatus()).isEqualTo(ReportStatus.UNAVAILABLE);
             assertThat(report.getErrors()).singleElement().satisfies(e -> {
                 assertThat(e.getKind()).isEqualTo(StoreErrorKind.UNAVAILABLE);
-                assertThat(e.getMessage()).contains("503").contains("cannot build");
+                assertThat(e.getMessage()).contains("503").doesNotContain("cannot build");
             });
         }
 

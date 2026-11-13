@@ -3,13 +3,14 @@ package org.jahia.community.securityupdates.feed;
 import org.jahia.community.securityupdates.model.ModuleCatalog;
 import org.jahia.community.securityupdates.model.SecurityFeed;
 import org.jahia.community.securityupdates.model.StoreError;
+import org.jahia.community.securityupdates.model.StoreErrorDetail;
 import org.jahia.community.securityupdates.model.StoreErrorKind;
-import org.json.JSONObject;
-import org.json.JSONTokener;
+import org.jahia.services.notification.SsrfProtectionDnsResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -21,7 +22,8 @@ import java.util.Optional;
 
 /**
  * Reads the security feed and the module catalogue of one store, and turns every failure into a
- * {@link StoreError} rather than an exception. Never logs nor reports credentials.
+ * {@link StoreError} rather than an exception. Only https URLs are fetched. Error messages are made of this
+ * module's own words and status codes: they never repeat text received from a store, and never credentials.
  */
 public final class StoreClient {
 
@@ -32,18 +34,11 @@ public final class StoreClient {
     /** Largest security feed accepted. */
     public static final int MAX_FEED_BYTES = 2 * 1024 * 1024;
     /** Largest module catalogue accepted (store.jahia.com serves about 0.6 MB in 2026). */
-    public static final int MAX_CATALOG_BYTES = 16 * 1024 * 1024;
+    public static final int MAX_CATALOG_BYTES = 4 * 1024 * 1024;
 
     private static final Logger logger = LoggerFactory.getLogger(StoreClient.class);
-    private static final int MAX_STORE_MESSAGE = 200;
-    private static final String HTTPS = "https:";
-    private static final int SC_OK = 200;
-    private static final int SC_NOT_FOUND = 404;
-    private static final int SC_UNAUTHORIZED = 401;
-    private static final int SC_FORBIDDEN = 403;
-    private static final int SC_SERVICE_UNAVAILABLE = 503;
-    private static final int REDIRECT_MIN = 300;
-    private static final int REDIRECT_MAX = 399;
+    private static final String FEED = "Security feed: ";
+    private static final String MODULE_LIST = "Module list: ";
 
     private final HttpFetcher fetcher;
 
@@ -58,79 +53,111 @@ public final class StoreClient {
     public StoreFetchResult fetch(StoreTarget target) {
         Optional<String> url = StoreUrls.normalize(target.getUrl());
         if (url.isEmpty()) {
-            String shown = StoreUrls.display(target.getUrl());
-            logger.warn("Ignoring the security source {}: not an absolute http(s) URL without credentials, query or fragment", shown);
-            return new StoreFetchResult(shown, null, null, Collections.singletonList(new StoreError(shown,
-                    StoreErrorKind.INVALID_URL, "Not an absolute http(s) URL without credentials, query or fragment")));
+            return refused(target);
         }
         String base = url.get();
         List<StoreError> errors = new ArrayList<>();
-        boolean secure = base.regionMatches(true, 0, HTTPS, 0, HTTPS.length());
-        if (!target.isFeedOnly() && target.hasCredentials() && !secure) {
-            errors.add(new StoreError(base, StoreErrorKind.INVALID_URL,
-                    "The store credentials are not sent over plain http: configure an https store URL"));
-        }
-        Map<String, String> headers = headers(target, secure);
+        Map<String, String> headers = headers(target);
 
         String feedUrl = target.isFeedOnly() ? base : base + SECURITY_FEED_PATH;
-        SecurityFeed feed = readFeed(base, feedUrl, headers, errors);
-        ModuleCatalog catalog = target.isFeedOnly() ? null : readCatalog(base, headers, errors);
-        return new StoreFetchResult(base, feed, catalog, errors);
+        FeedOutcome feed = readFeed(base, feedUrl, headers, errors);
+        // a store that publishes no security feed gives no finding: its catalogue is not needed
+        ModuleCatalog catalog = target.isFeedOnly() || feed == FeedOutcome.NOT_PUBLISHED
+                ? null : readCatalog(base, headers, errors);
+        return new StoreFetchResult(base, feed.feed, catalog, errors);
     }
 
-    private SecurityFeed readFeed(String base, String feedUrl, Map<String, String> headers, List<StoreError> errors) {
+    private static StoreFetchResult refused(StoreTarget target) {
+        String shown = StoreUrls.display(target.getUrl());
+        StoreError error;
+        if (StoreUrls.isPlainHttp(target.getUrl())) {
+            logger.warn("Ignoring the security source {}: plain http is refused, configure an https URL", shown);
+            error = new StoreError(shown, StoreErrorKind.INVALID_URL, StoreErrorDetail.NOT_HTTPS,
+                    "Plain http is refused: configure an https URL");
+        } else {
+            logger.warn("Ignoring the security source {}: not an absolute https URL without credentials, query or fragment",
+                    shown);
+            error = new StoreError(shown, StoreErrorKind.INVALID_URL,
+                    "Not an absolute https URL without credentials, query or fragment");
+        }
+        return new StoreFetchResult(shown, null, null, Collections.singletonList(error));
+    }
+
+    /** The feed read, or why there is none. */
+    private static final class FeedOutcome {
+        static final FeedOutcome NOT_PUBLISHED = new FeedOutcome(null);
+        static final FeedOutcome FAILED = new FeedOutcome(null);
+
+        private final SecurityFeed feed;
+
+        private FeedOutcome(SecurityFeed feed) {
+            this.feed = feed;
+        }
+    }
+
+    private FeedOutcome readFeed(String base, String feedUrl, Map<String, String> headers, List<StoreError> errors) {
         HttpResult result;
         try {
             result = fetcher.get(feedUrl, headers, MAX_FEED_BYTES);
         } catch (IOException | RuntimeException e) {
-            errors.add(new StoreError(base, StoreErrorKind.UNAVAILABLE, "Security feed: " + transportMessage(e)));
+            errors.add(transportError(base, StoreErrorKind.UNAVAILABLE, FEED, e));
             logger.debug("Security feed of {} could not be read", base, e);
-            return null;
+            return FeedOutcome.FAILED;
         }
         int status = result.getStatus();
-        if (status == SC_NOT_FOUND) {
-            errors.add(new StoreError(base, StoreErrorKind.NOT_PUBLISHED,
-                    "The store does not publish a security feed (HTTP 404)"));
-            return null;
+        if (status == HttpStatus.NOT_FOUND) {
+            errors.add(new StoreError(base, StoreErrorKind.NOT_PUBLISHED, "The store does not publish a security feed (HTTP 404)"));
+            return FeedOutcome.NOT_PUBLISHED;
         }
-        if (status != SC_OK) {
-            errors.add(new StoreError(base, StoreErrorKind.UNAVAILABLE, "Security feed: " + statusMessage(result)));
-            return null;
+        if (status != HttpStatus.OK) {
+            errors.add(statusError(base, StoreErrorKind.UNAVAILABLE, FEED, status));
+            return FeedOutcome.FAILED;
         }
         try {
             SecurityFeed feed = SecurityFeedParser.parse(result.getBody());
             if (feed.getSkippedEntries() > 0) {
-                errors.add(new StoreError(base, StoreErrorKind.NOT_UNDERSTOOD, feed.getSkippedEntries()
-                        + " entries of the security feed could not be understood and were ignored"));
+                errors.add(new StoreError(base, StoreErrorKind.NOT_UNDERSTOOD, StoreErrorDetail.ENTRIES_SKIPPED,
+                        feed.getSkippedEntries() + " entries of the security feed could not be understood and were ignored"));
             }
-            return feed;
+            return new FeedOutcome(feed);
         } catch (FeedFormatException e) {
-            errors.add(new StoreError(base, StoreErrorKind.NOT_UNDERSTOOD, "Security feed not understood: " + e.getMessage()));
-            return null;
+            logger.debug("Security feed of {} not understood: {}", base, e.getMessage());
+            errors.add(new StoreError(base, StoreErrorKind.NOT_UNDERSTOOD, e.getDetail(), "Security feed not understood: "
+                    + e.getMessage()));
+            return FeedOutcome.FAILED;
         }
     }
 
     private ModuleCatalog readCatalog(String base, Map<String, String> headers, List<StoreError> errors) {
         try {
             HttpResult result = fetcher.get(base + MODULE_LIST_PATH, headers, MAX_CATALOG_BYTES);
-            if (result.getStatus() != SC_OK) {
-                errors.add(new StoreError(base, StoreErrorKind.CATALOGUE_UNAVAILABLE, "Module list: " + statusMessage(result)));
+            if (result.getStatus() != HttpStatus.OK) {
+                errors.add(statusError(base, StoreErrorKind.CATALOGUE_UNAVAILABLE, MODULE_LIST, result.getStatus()));
                 return null;
             }
-            return ModuleCatalogParser.parse(result.getBody());
+            ModuleCatalog catalog = ModuleCatalogParser.parse(result.getBody());
+            logger.debug("Module list of {}: {} entries skipped", base, catalog.getSkippedEntries());
+            if (catalog.isTruncated()) {
+                errors.add(new StoreError(base, StoreErrorKind.CATALOGUE_UNAVAILABLE, StoreErrorDetail.ENTRIES_SKIPPED,
+                        "Module list: only the first " + ModuleCatalogParser.MAX_ENTRIES + " modules were read"));
+            }
+            return catalog;
         } catch (IOException | RuntimeException e) {
-            errors.add(new StoreError(base, StoreErrorKind.CATALOGUE_UNAVAILABLE, "Module list: " + transportMessage(e)));
+            errors.add(transportError(base, StoreErrorKind.CATALOGUE_UNAVAILABLE, MODULE_LIST, e));
             logger.debug("Module list of {} could not be read", base, e);
         } catch (FeedFormatException e) {
-            errors.add(new StoreError(base, StoreErrorKind.CATALOGUE_UNAVAILABLE, "Module list not understood: " + e.getMessage()));
+            logger.debug("Module list of {} not understood: {}", base, e.getMessage());
+            errors.add(new StoreError(base, StoreErrorKind.CATALOGUE_UNAVAILABLE, e.getDetail(), "Module list not understood: "
+                    + e.getMessage()));
         }
         return null;
     }
 
-    private static Map<String, String> headers(StoreTarget target, boolean secure) {
+    /** Credentials go only to a store (never to an extra feed), and only over https, which is all that is fetched. */
+    private static Map<String, String> headers(StoreTarget target) {
         Map<String, String> headers = new LinkedHashMap<>();
         headers.put("Accept", "application/json");
-        if (!target.isFeedOnly() && target.hasCredentials() && secure) {
+        if (!target.isFeedOnly() && target.hasCredentials()) {
             String password = target.getPassword() == null ? "" : target.getPassword();
             String token = Base64.getEncoder().encodeToString(
                     (target.getUser() + ":" + password).getBytes(StandardCharsets.UTF_8));
@@ -139,37 +166,40 @@ public final class StoreClient {
         return headers;
     }
 
-    private static String statusMessage(HttpResult result) {
-        int status = result.getStatus();
-        if (status == SC_UNAUTHORIZED || status == SC_FORBIDDEN) {
-            return "access denied (HTTP " + status + "): check the store credentials";
+    private static StoreError statusError(String base, StoreErrorKind kind, String prefix, int status) {
+        if (HttpStatus.isAuthFailure(status)) {
+            return new StoreError(base, kind, StoreErrorDetail.AUTH,
+                    prefix + "access denied (HTTP " + status + "): check the store credentials");
         }
-        if (status >= REDIRECT_MIN && status <= REDIRECT_MAX) {
-            return "the store answered with a redirect (HTTP " + status + "), which is not followed: check the store URL";
+        if (HttpStatus.isRedirect(status)) {
+            return new StoreError(base, kind, StoreErrorDetail.REDIRECT, prefix + "the store answered with a redirect (HTTP "
+                    + status + "), which is not followed: check the store URL");
         }
-        String storeMessage = status == SC_SERVICE_UNAVAILABLE ? storeErrorMessage(result.getBody()) : null;
-        return "HTTP " + status + (storeMessage == null ? "" : ": " + storeMessage);
+        return new StoreError(base, kind, StoreErrorDetail.HTTP_STATUS, prefix + "HTTP " + status);
     }
 
-    /** The {@code error} text of a JSON error body, cleaned; null when the body is not such a document. */
-    private static String storeErrorMessage(String body) {
-        try {
-            Object value = new JSONTokener(body).nextValue();
-            if (value instanceof JSONObject) {
-                Object error = ((JSONObject) value).opt("error");
-                return error instanceof String ? UntrustedText.clean((String) error, MAX_STORE_MESSAGE) : null;
-            }
-        } catch (RuntimeException e) {
-            // not JSON: the status alone is reported
-        }
-        return null;
-    }
-
-    private static String transportMessage(Exception e) {
+    /** The exception message can carry a URL or a proxy answer: only its category and type are reported. */
+    private static StoreError transportError(String base, StoreErrorKind kind, String prefix, Exception e) {
         if (e instanceof ResponseTooLargeException) {
-            return "response too large";
+            return new StoreError(base, kind, StoreErrorDetail.TOO_LARGE, prefix + "response too large");
         }
-        // the exception message can carry a URL or a proxy answer; only its type is reported
-        return "connection failed (" + e.getClass().getSimpleName() + ")";
+        if (isSsrfBlocked(e)) {
+            return new StoreError(base, kind, StoreErrorDetail.SSRF_BLOCKED, prefix + "Jahia refused to connect to this "
+                    + "address (outbound request screening; see jahia.httpClient.allowedInternalHosts)");
+        }
+        String type = " (" + e.getClass().getSimpleName() + ")";
+        if (e instanceof InterruptedIOException) {
+            return new StoreError(base, kind, StoreErrorDetail.TIMEOUT, prefix + "timed out" + type);
+        }
+        return new StoreError(base, kind, StoreErrorDetail.CONNECTION, prefix + "connection failed" + type);
+    }
+
+    private static boolean isSsrfBlocked(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause() == t ? null : t.getCause()) {
+            if (t instanceof SsrfProtectionDnsResolver.SsrfBlockedException) {
+                return true;
+            }
+        }
+        return false;
     }
 }

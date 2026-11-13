@@ -1,7 +1,9 @@
 package org.jahia.community.securityupdates.feed;
 
 import org.jahia.community.securityupdates.model.StoreError;
+import org.jahia.community.securityupdates.model.StoreErrorDetail;
 import org.jahia.community.securityupdates.model.StoreErrorKind;
+import org.jahia.services.notification.SsrfProtectionDnsResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,6 +23,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -79,35 +82,37 @@ class StoreClientTest {
 
         verify(fetcher).get(eq(FEED_URL), anyMap(), eq(StoreClient.MAX_FEED_BYTES));
         verify(fetcher).get(eq(LIST_URL), anyMap(), eq(StoreClient.MAX_CATALOG_BYTES));
+        assertThat(StoreClient.MAX_CATALOG_BYTES).isEqualTo(4 * 1024 * 1024);
     }
 
     @Test
     @DisplayName("404 means the store does not publish security data, not that nothing needs updating")
     void notPublished() throws IOException {
         feedAnswers(new HttpResult(404, "<html>Not found</html>"));
-        listAnswers(new HttpResult(200, "[]"));
 
         StoreFetchResult result = client.fetch(StoreTarget.store(BASE, null, null));
 
         assertThat(result.getFeed()).isNull();
-        assertThat(result.getCatalog()).isNotNull();
+        assertThat(result.getCatalog()).isNull();
         assertThat(result.getErrors()).singleElement().satisfies(e -> {
             assertThat(e.getKind()).isEqualTo(StoreErrorKind.NOT_PUBLISHED);
             assertThat(e.getStoreUrl()).isEqualTo(BASE);
         });
+        // no security data from this store: its catalogue is not needed
+        verify(fetcher, never()).get(eq(LIST_URL), anyMap(), anyInt());
     }
 
     @Test
-    @DisplayName("503 reports the store's own error, cleaned and bounded")
-    void unavailableWithStoreMessage() throws IOException {
-        feedAnswers(new HttpResult(503, "{\"error\": \"feed cannot be built\\u0007 " + "x".repeat(1000) + "\"}"));
+    @DisplayName("503 reports the status only, never the store's own text")
+    void unavailableDoesNotEchoTheStoreText() throws IOException {
+        feedAnswers(new HttpResult(503, "{\"error\": \"feed cannot be built " + "x".repeat(1000) + "\"}"));
         listAnswers(new HttpResult(200, "[]"));
 
         StoreError error = client.fetch(StoreTarget.store(BASE, null, null)).getErrors().get(0);
 
         assertThat(error.getKind()).isEqualTo(StoreErrorKind.UNAVAILABLE);
-        assertThat(error.getMessage()).contains("503").contains("feed cannot be built").doesNotContain("\u0007");
-        assertThat(error.getMessage().length()).isLessThan(400);
+        assertThat(error.getDetail()).isEqualTo(StoreErrorDetail.HTTP_STATUS);
+        assertThat(error.getMessage()).contains("503").doesNotContain("feed cannot be built");
     }
 
     @Test
@@ -132,6 +137,7 @@ class StoreClientTest {
 
         assertThat(result.getFeed()).isNull();
         assertThat(result.getErrors()).extracting(StoreError::getKind).containsExactly(StoreErrorKind.NOT_UNDERSTOOD);
+        assertThat(result.getErrors()).extracting(StoreError::getDetail).containsExactly(StoreErrorDetail.SCHEMA_UNSUPPORTED);
     }
 
     @Test
@@ -141,7 +147,8 @@ class StoreClientTest {
         listAnswers(new HttpResult(200, "[]"));
 
         assertThat(client.fetch(StoreTarget.store(BASE, null, null)).getErrors())
-                .extracting(StoreError::getKind).containsExactly(StoreErrorKind.NOT_UNDERSTOOD);
+                .extracting(StoreError::getKind, StoreError::getDetail)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(StoreErrorKind.NOT_UNDERSTOOD, StoreErrorDetail.INVALID_JSON));
     }
 
     @Test
@@ -155,6 +162,7 @@ class StoreClientTest {
         assertThat(result.getErrors()).extracting(StoreError::getKind)
                 .containsExactly(StoreErrorKind.UNAVAILABLE, StoreErrorKind.CATALOGUE_UNAVAILABLE);
         assertThat(result.getErrors()).allSatisfy(e -> assertThat(e.getMessage()).contains("credentials").doesNotContain(SECRET));
+        assertThat(result.getErrors()).extracting(StoreError::getDetail).containsOnly(StoreErrorDetail.AUTH);
     }
 
     @Test
@@ -163,7 +171,10 @@ class StoreClientTest {
         feedAnswers(new HttpResult(302, ""));
         listAnswers(new HttpResult(200, "[]"));
 
-        assertThat(client.fetch(StoreTarget.store(BASE, null, null)).getErrors().get(0).getMessage()).contains("redirect");
+        StoreError error = client.fetch(StoreTarget.store(BASE, null, null)).getErrors().get(0);
+
+        assertThat(error.getMessage()).contains("redirect");
+        assertThat(error.getDetail()).isEqualTo(StoreErrorDetail.REDIRECT);
     }
 
     @Test
@@ -172,7 +183,10 @@ class StoreClientTest {
         feedAnswers(new HttpResult(500, "boom"));
         listAnswers(new HttpResult(200, "[]"));
 
-        assertThat(client.fetch(StoreTarget.store(BASE, null, null)).getErrors().get(0).getMessage()).contains("500");
+        StoreError error = client.fetch(StoreTarget.store(BASE, null, null)).getErrors().get(0);
+
+        assertThat(error.getMessage()).contains("500").doesNotContain("boom");
+        assertThat(error.getDetail()).isEqualTo(StoreErrorDetail.HTTP_STATUS);
     }
 
     @Test
@@ -187,7 +201,37 @@ class StoreClientTest {
         assertThat(result.getCatalog()).isNull();
         assertThat(result.getErrors()).extracting(StoreError::getKind)
                 .containsExactly(StoreErrorKind.UNAVAILABLE, StoreErrorKind.CATALOGUE_UNAVAILABLE);
-        assertThat(result.getErrors().get(0).getMessage()).contains("SocketTimeoutException").doesNotContain(SECRET);
+        assertThat(result.getErrors().get(0).getMessage()).contains("timed out").doesNotContain(SECRET);
+        assertThat(result.getErrors()).extracting(StoreError::getDetail)
+                .containsExactly(StoreErrorDetail.TIMEOUT, StoreErrorDetail.CONNECTION);
+    }
+
+    @Test
+    @DisplayName("a request refused by Jahia's outbound screening is reported as such")
+    void ssrfBlocked() throws IOException {
+        SsrfProtectionDnsResolver.SsrfBlockedException blocked = mock(SsrfProtectionDnsResolver.SsrfBlockedException.class);
+        when(fetcher.get(eq(FEED_URL), anyMap(), anyInt())).thenThrow(blocked);
+        listAnswers(new HttpResult(200, "[]"));
+
+        StoreFetchResult result = client.fetch(StoreTarget.store(BASE, null, null));
+
+        assertThat(result.getErrors()).singleElement().satisfies(e -> {
+            assertThat(e.getKind()).isEqualTo(StoreErrorKind.UNAVAILABLE);
+            assertThat(e.getDetail()).isEqualTo(StoreErrorDetail.SSRF_BLOCKED);
+            assertThat(e.getMessage()).contains("allowedInternalHosts");
+        });
+    }
+
+    @Test
+    @DisplayName("a screening refusal wrapped in another exception is still recognised")
+    void ssrfBlockedAsCause() throws IOException {
+        SsrfProtectionDnsResolver.SsrfBlockedException blocked = mock(SsrfProtectionDnsResolver.SsrfBlockedException.class);
+        when(fetcher.get(eq(FEED_URL), anyMap(), anyInt())).thenThrow(new IOException("wrapped", blocked));
+        listAnswers(new HttpResult(200, "[]"));
+
+        StoreFetchResult result = client.fetch(StoreTarget.store(BASE, null, null));
+
+        assertThat(result.getErrors()).extracting(StoreError::getDetail).containsExactly(StoreErrorDetail.SSRF_BLOCKED);
     }
 
     @Test
@@ -196,7 +240,10 @@ class StoreClientTest {
         when(fetcher.get(eq(FEED_URL), anyMap(), anyInt())).thenThrow(new ResponseTooLargeException(10));
         listAnswers(new HttpResult(200, "[]"));
 
-        assertThat(client.fetch(StoreTarget.store(BASE, null, null)).getErrors().get(0).getMessage()).contains("too large");
+        StoreError error = client.fetch(StoreTarget.store(BASE, null, null)).getErrors().get(0);
+
+        assertThat(error.getMessage()).contains("too large");
+        assertThat(error.getDetail()).isEqualTo(StoreErrorDetail.TOO_LARGE);
     }
 
     @Test
@@ -210,6 +257,25 @@ class StoreClientTest {
         assertThat(result.getFeed()).isNotNull();
         assertThat(result.getCatalog()).isNull();
         assertThat(result.getErrors()).extracting(StoreError::getKind).containsExactly(StoreErrorKind.CATALOGUE_UNAVAILABLE);
+        assertThat(result.getErrors()).extracting(StoreError::getDetail).containsExactly(StoreErrorDetail.INVALID_JSON);
+    }
+
+    @Test
+    @DisplayName("a truncated catalogue is used and reported as not entirely read")
+    void truncatedCatalogue() throws IOException {
+        StringBuilder json = new StringBuilder("[{\"modules\":[");
+        for (int i = 0; i <= ModuleCatalogParser.MAX_ENTRIES; i++) {
+            json.append(i == 0 ? "" : ",").append("{\"groupId\":\"g\",\"name\":\"m").append(i).append("\",\"versions\":[]}");
+        }
+        feedAnswers(new HttpResult(200, Fixtures.read("empty-v1.json")));
+        listAnswers(new HttpResult(200, json.append("]}]").toString()));
+
+        StoreFetchResult result = client.fetch(StoreTarget.store(BASE, null, null));
+
+        assertThat(result.getCatalog()).isNotNull();
+        assertThat(result.getErrors()).extracting(StoreError::getKind, StoreError::getDetail)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(StoreErrorKind.CATALOGUE_UNAVAILABLE,
+                        StoreErrorDetail.ENTRIES_SKIPPED));
     }
 
     @Test
@@ -261,6 +327,7 @@ class StoreClientTest {
         StoreFetchResult result = client.fetch(StoreTarget.store("file:///etc/passwd", "u", SECRET));
 
         assertThat(result.getErrors()).extracting(StoreError::getKind).containsExactly(StoreErrorKind.INVALID_URL);
+        assertThat(result.getErrors().get(0).getDetail()).isNull();
         assertThat(result.getFeed()).isNull();
         verify(fetcher, never()).get(anyString(), anyMap(), anyInt());
     }
@@ -280,24 +347,27 @@ class StoreClientTest {
     }
 
     @Test
-    @DisplayName("credentials are never sent over plain http, and that is reported")
-    @SuppressWarnings("unchecked")
-    void noCredentialsOverHttp() throws IOException {
-        String base = "http://store.example.org";
-        when(fetcher.get(eq(base + StoreClient.SECURITY_FEED_PATH), anyMap(), anyInt()))
-                .thenReturn(new HttpResult(200, Fixtures.read("empty-v1.json")));
-        when(fetcher.get(eq(base + StoreClient.MODULE_LIST_PATH), anyMap(), anyInt())).thenReturn(new HttpResult(200, "[]"));
+    @DisplayName("a plain http store is refused (NOT_HTTPS) and never fetched, with or without credentials")
+    void httpStoreIsRefused() throws IOException {
+        StoreFetchResult result = client.fetch(StoreTarget.store("http://store.example.org", "jdoe", SECRET));
 
-        StoreFetchResult result = client.fetch(StoreTarget.store(base, "jdoe", SECRET));
-
-        ArgumentCaptor<Map<String, String>> headers = ArgumentCaptor.forClass(Map.class);
-        verify(fetcher).get(eq(base + StoreClient.SECURITY_FEED_PATH), headers.capture(), anyInt());
-        assertThat(headers.getValue()).doesNotContainKey("Authorization");
-        assertThat(result.getFeed()).isNotNull();
+        assertThat(result.getFeed()).isNull();
         assertThat(result.getErrors()).singleElement().satisfies(e -> {
             assertThat(e.getKind()).isEqualTo(StoreErrorKind.INVALID_URL);
+            assertThat(e.getDetail()).isEqualTo(StoreErrorDetail.NOT_HTTPS);
+            assertThat(e.getStoreUrl()).isEqualTo("http://store.example.org");
             assertThat(e.getMessage()).contains("https").doesNotContain(SECRET);
         });
+        verify(fetcher, never()).get(anyString(), anyMap(), anyInt());
+    }
+
+    @Test
+    @DisplayName("a plain http extra feed is refused (NOT_HTTPS) and never fetched")
+    void httpFeedIsRefused() throws IOException {
+        StoreFetchResult result = client.fetch(StoreTarget.feed("http://mirror.example.org/security.json"));
+
+        assertThat(result.getErrors()).extracting(StoreError::getDetail).containsExactly(StoreErrorDetail.NOT_HTTPS);
+        verify(fetcher, never()).get(anyString(), anyMap(), anyInt());
     }
 
     @Test
@@ -311,6 +381,22 @@ class StoreClientTest {
         assertThat(result.getErrors()).extracting(StoreError::getKind)
                 .containsExactly(StoreErrorKind.UNAVAILABLE, StoreErrorKind.CATALOGUE_UNAVAILABLE);
         assertThat(result.getErrors()).allSatisfy(e -> assertThat(e.getMessage()).doesNotContain(SECRET));
+        assertThat(result.getErrors()).extracting(StoreError::getDetail).containsOnly(StoreErrorDetail.CONNECTION);
+    }
+
+    @Test
+    @DisplayName("a null password is sent as an empty one")
+    @SuppressWarnings("unchecked")
+    void nullPassword() throws IOException {
+        feedAnswers(new HttpResult(200, Fixtures.read("empty-v1.json")));
+        listAnswers(new HttpResult(200, "[]"));
+
+        client.fetch(StoreTarget.store(BASE, "jdoe", null));
+
+        ArgumentCaptor<Map<String, String>> headers = ArgumentCaptor.forClass(Map.class);
+        verify(fetcher).get(eq(FEED_URL), headers.capture(), anyInt());
+        String expected = "Basic " + Base64.getEncoder().encodeToString("jdoe:".getBytes(StandardCharsets.UTF_8));
+        assertThat(headers.getValue()).containsEntry("Authorization", expected);
     }
 
     @Test
@@ -324,6 +410,7 @@ class StoreClientTest {
         assertThat(result.getFeed()).isNotNull();
         assertThat(result.getErrors()).singleElement().satisfies(e -> {
             assertThat(e.getKind()).isEqualTo(StoreErrorKind.NOT_UNDERSTOOD);
+            assertThat(e.getDetail()).isEqualTo(StoreErrorDetail.ENTRIES_SKIPPED);
             assertThat(e.getMessage()).contains("5");
         });
     }
