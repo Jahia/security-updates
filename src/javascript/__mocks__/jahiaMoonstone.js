@@ -1,5 +1,6 @@
 // Test doubles for the @jahia/moonstone components used by the module. They mirror the markup the real components
-// render (checked against Moonstone 2.21.1): Input, Switch and Textarea put id and aria-* on the control; Button is
+// render (checked against Moonstone 2.21.1): Input, Switch and Textarea put id and aria-* on the control (isReadOnly
+// becomes readOnly on Input and Textarea); Button is
 // type="button" unless told otherwise and calls onClick unconditionally; Header renders an h1; Table cells take
 // `component`; Modal renders nothing when closed, an aria-modal dialog when open (closed by Escape through
 // onOpenChange) that focuses its first tabbable element when it opens (Floating UI's FloatingFocusManager with its
@@ -84,12 +85,12 @@ export const ModalBody = ({children, ...rest}) => <div {...mark('ModalBody')} {.
 
 export const ModalFooter = ({children, ...rest}) => <footer {...mark('ModalFooter')} {...rest}>{children}</footer>;
 
-export const Input = ({isDisabled, onChange, value, ...rest}) => (
-    <div><input disabled={isDisabled} value={value} onChange={onChange} {...mark('Input')} {...rest}/></div>
+export const Input = ({isDisabled, isReadOnly, onChange, value, ...rest}) => (
+    <div><input disabled={isDisabled} readOnly={isReadOnly} value={value} onChange={onChange} {...mark('Input')} {...rest}/></div>
 );
 
-export const Textarea = ({isDisabled, onChange, value, ...rest}) => (
-    <textarea disabled={isDisabled} value={value} onChange={onChange} {...mark('Textarea')} {...rest}/>
+export const Textarea = ({isDisabled, isReadOnly, onChange, value, ...rest}) => (
+    <textarea disabled={isDisabled} readOnly={isReadOnly} value={value} onChange={onChange} {...mark('Textarea')} {...rest}/>
 );
 
 export const Switch = ({isDisabled, onChange, checked, value = '', ...rest}) => (

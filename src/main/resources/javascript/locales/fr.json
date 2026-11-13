@@ -196,6 +196,11 @@
     "loading": "Chargement des paramètres…",
     "loadError": "Les paramètres n’ont pas pu être chargés. Rechargez la page pour réessayer.",
     "readOnly": "Seuls les administrateurs du serveur peuvent modifier ces paramètres. Ils sont affichés ici pour information.",
+    "value": {
+      "on": "Activé",
+      "off": "Désactivé",
+      "none": "Non renseigné"
+    },
     "groups": {
       "checks": "Vérifications",
       "banner": "Bandeau dans l’interface de Jahia"
@@ -277,6 +282,7 @@
     "resetDone": "Paramètres par défaut rétablis. La prochaine vérification a lieu dans environ une minute.",
     "resetDoneNow": "Paramètres par défaut rétablis. Ils s’appliquent immédiatement.",
     "invalid": "Certains paramètres ne sont pas valides : rien n’a été enregistré. Voir les champs signalés en erreur.",
+    "invalidList": "Paramètres à corriger :",
     "resetConfirm": {
       "title": "Rétablir la valeur par défaut de chaque paramètre ?",
       "body": "Vos paramètres actuels, y compris les adresses des stores et les couleurs du bandeau, seront remplacés par les valeurs par défaut. Cette action est irréversible.",

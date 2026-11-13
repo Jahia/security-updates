@@ -196,6 +196,11 @@
     "loading": "Loading the settings…",
     "loadError": "The settings could not be loaded. Reload the page to try again.",
     "readOnly": "Only server administrators can change these settings. They are shown here for information.",
+    "value": {
+      "on": "On",
+      "off": "Off",
+      "none": "Not set"
+    },
     "groups": {
       "checks": "Checks",
       "banner": "Banner in the Jahia interface"
@@ -277,6 +282,7 @@
     "resetDone": "Default settings restored. The next check runs in about one minute.",
     "resetDoneNow": "Default settings restored. They apply at once.",
     "invalid": "Some settings are not valid: nothing was saved. See the fields marked with an error.",
+    "invalidList": "Settings to correct:",
     "resetConfirm": {
       "title": "Reset every setting to its default value?",
       "body": "Your current settings, including the store addresses and the banner colours, will be replaced by the default values. This cannot be undone.",

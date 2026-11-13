@@ -10,6 +10,7 @@ import {contrastRatio, formatRatio} from './colorUtils';
 import {requestErrorCode, splitErrors} from './settingsResult';
 import {ColorField, idOf, SelectField, SwitchField, TextField} from './fields';
 import {BannerPreview} from './BannerPreview';
+import {SettingsSummary} from './SettingsSummary';
 import {ResetDialog} from './ResetDialog';
 import {StatusMessage} from '../SecurityUpdates/StatusMessage';
 import {
@@ -24,6 +25,7 @@ import {
 import {values} from '../common/i18n';
 
 const TITLE_ID = 'security-updates-settings-title';
+const INVALID_LIST_ID = 'security-updates-settings-invalid-list';
 const COLOR_FIELDS = ['bannerBackgroundColor', 'bannerTextColor'];
 
 /**
@@ -50,9 +52,45 @@ const Section = ({children}) => {
 Section.propTypes = {children: PropTypes.node.isRequired};
 
 /**
- * The settings of the module. Users who cannot change them (settings.canEdit false) see them read-only. The form is
- * filled once from the query, then from the values returned by each save or reset (no refetch that could overwrite
- * edits in progress).
+ * The alert of a refused save: what happened, then (for field errors) a link to each setting to correct, which moves
+ * the focus to its control.
+ */
+const FormAlert = ({formError, errors}) => {
+    const {t} = useTranslation(NS);
+    const invalid = FIELDS.filter(field => errors[field]);
+    const goTo = (event, field) => {
+        event.preventDefault();
+        document.getElementById(idOf(field))?.focus();
+    };
+
+    return (
+        <div role="alert" className={styles.alert} data-testid="security-updates-settings-alert">
+            <StatusMessage tone="warning">{formError === 'invalid' ? t('settings.invalid') : t(`settings.errors.${formError}`)}</StatusMessage>
+            {invalid.length > 0 && (
+                <>
+                    <Typography id={INVALID_LIST_ID} weight="bold">{t('settings.invalidList')}</Typography>
+                    <ul className={styles.invalidList} aria-labelledby={INVALID_LIST_ID}>
+                        {invalid.map(field => (
+                            <li key={field}>
+                                <a className={styles.invalidLink} href={`#${idOf(field)}`} onClick={event => goTo(event, field)}>
+                                    {t(`settings.fields.${field}.label`)}
+                                </a>
+                            </li>
+                        ))}
+                    </ul>
+                </>
+            )}
+        </div>
+    );
+};
+
+FormAlert.propTypes = {formError: PropTypes.string.isRequired, errors: PropTypes.object.isRequired};
+
+/**
+ * The settings of the module. Users who cannot change them (settings.canEdit false) see them as text. The form is
+ * filled once from the query (a later answer of the query does not overwrite the edits), then from the values
+ * returned by each save or reset. While a save or reset runs, the controls do not take edits (text fields are read
+ * only, the others ignore changes, the group is aria-busy), since the answer replaces every value; they keep the focus.
  *
  * @param {{onSettingsChanged: function}} props onSettingsChanged is called after each successful save or reset (the
  *        page reads its report again)
@@ -67,6 +105,9 @@ export const SettingsForm = ({onSettingsChanged}) => {
     const [formError, setFormError] = useState(null);
     const [status, setStatus] = useState('');
     const [isConfirming, setConfirming] = useState(false);
+    const [isSaving, setSaving] = useState(false);
+    // The confirmation of an applied colour suggestion, shown next to the preview.
+    const [applied, setApplied] = useState('');
     // The settings as the server last returned them: a save says when the check schedule restarts.
     const [saved, setSaved] = useState(null);
     const busy = useRef(false);
@@ -115,24 +156,35 @@ export const SettingsForm = ({onSettingsChanged}) => {
         );
     }
 
-    // An edited field loses its error (and its aria-invalid) at once.
+    // An edited field loses its error (and its aria-invalid) at once, and the message of the last save or suggestion
+    // goes: it no longer describes the form. Edits wait for the running save or reset.
     const onChange = (field, value) => {
+        if (busy.current) {
+            return;
+        }
+
         setForm(previous => ({...previous, [field]: value}));
         setErrors(previous => withoutErrorsOf(previous, field));
+        setStatus('');
+        setApplied('');
     };
 
     const ratio = formatRatio(contrastRatio(form.bannerBackgroundColor, form.bannerTextColor));
 
-    // Applies a suggested colour (or, with a null field, the default pair), says so in the status region, and moves the
+    // Applies a suggested colour (or, with a null field, the default pair), says so next to the preview, and moves the
     // focus to the colour field that changed (the background one for the default pair).
     const onApply = (field, value) => {
+        if (busy.current) {
+            return;
+        }
+
         if (field) {
             onChange(field, value);
-            setStatus(t(field === 'bannerTextColor' ? 'settings.suggest.appliedText' : 'settings.suggest.appliedBackground', values({value})));
+            setApplied(t(field === 'bannerTextColor' ? 'settings.suggest.appliedText' : 'settings.suggest.appliedBackground', values({value})));
         } else {
             onChange('bannerBackgroundColor', DEFAULT_BANNER_BACKGROUND);
             onChange('bannerTextColor', DEFAULT_BANNER_TEXT);
-            setStatus(t('settings.suggest.appliedDefaults'));
+            setApplied(t('settings.suggest.appliedDefaults'));
         }
 
         focusNext.current = idOf(field || 'bannerBackgroundColor');
@@ -169,6 +221,8 @@ export const SettingsForm = ({onSettingsChanged}) => {
         }
 
         busy.current = true;
+        setSaving(true);
+        setApplied('');
         setStatus(t('settings.saving'));
         Promise.resolve()
             .then(mutate)
@@ -176,12 +230,13 @@ export const SettingsForm = ({onSettingsChanged}) => {
             .catch(failure => showErrors({}, requestErrorCode(failure)))
             .finally(() => {
                 busy.current = false;
+                setSaving(false);
             });
     };
 
     const onSubmit = event => {
         event.preventDefault();
-        if (isReadOnly || busy.current) {
+        if (busy.current) {
             return;
         }
 
@@ -199,14 +254,22 @@ export const SettingsForm = ({onSettingsChanged}) => {
         run(() => resetSettings(), r => r?.resetSettings, 'resetDone');
     };
 
-    const fieldProps = {form, errors, onChange};
+    if (isReadOnly) {
+        return (
+            <Section>
+                <Typography className={styles.text}>{t('settings.intro')}</Typography>
+                <StatusMessage tone="info">{t('settings.readOnly')}</StatusMessage>
+                <SettingsSummary form={form}/>
+            </Section>
+        );
+    }
+
+    const fieldProps = {form, errors, onChange, isBusy: isSaving};
     return (
         <Section>
             <Typography className={styles.text}>{t('settings.intro')}</Typography>
-            {isReadOnly && <StatusMessage tone="info">{t('settings.readOnly')}</StatusMessage>}
             <form noValidate className={styles.form} onSubmit={onSubmit}>
-                {/* A disabled fieldset disables every control in it: the read-only view. */}
-                <fieldset className={styles.group} disabled={isReadOnly}>
+                <fieldset className={styles.group} aria-busy={isSaving ? 'true' : undefined}>
                     <fieldset className={styles.group}>
                         <Typography component="legend" variant="subheading" weight="bold">{t('settings.groups.checks')}</Typography>
                         <SwitchField field="enabled" {...fieldProps}/>
@@ -224,7 +287,7 @@ export const SettingsForm = ({onSettingsChanged}) => {
                         <SwitchField field="bannerIncludeOwnerReports" {...fieldProps}/>
                         <ColorField field="bannerBackgroundColor" ratio={ratio} {...fieldProps}/>
                         <ColorField field="bannerTextColor" ratio={ratio} {...fieldProps}/>
-                        <BannerPreview form={form} isReadOnly={isReadOnly} onApply={onApply}/>
+                        <BannerPreview form={form} applied={applied} onApply={onApply}/>
                         <SelectField field="bannerDismissPolicy" {...fieldProps}>
                             {DISMISS_POLICIES.map(policy => <option key={policy} value={policy}>{t(`settings.dismiss.${policy}`)}</option>)}
                         </SelectField>
@@ -237,20 +300,14 @@ export const SettingsForm = ({onSettingsChanged}) => {
                         />
                     </fieldset>
                 </fieldset>
-                {formError && (
-                    <StatusMessage tone="warning" role="alert">
-                        {formError === 'invalid' ? t('settings.invalid') : t(`settings.errors.${formError}`)}
-                    </StatusMessage>
-                )}
+                {formError && <FormAlert formError={formError} errors={errors}/>}
                 <p role="status" aria-live="polite" data-testid="security-updates-settings-status" className={styles.status}>{status}</p>
-                {!isReadOnly && (
-                    <div className={styles.actions}>
-                        {/* The form's only submit path: Enter in a field or this button. Moonstone's Button calls onClick
-                            unconditionally (a missing one throws on click), hence the no-op: the submit does the work. */}
-                        <Button size="big" color="accent" type="submit" className={styles.target} label={t('settings.save')} onClick={() => undefined}/>
-                        <Button size="big" variant="ghost" className={styles.target} label={t('settings.reset')} onClick={() => setConfirming(true)}/>
-                    </div>
-                )}
+                <div className={styles.actions}>
+                    {/* The form's only submit path: Enter in a field or this button. Moonstone's Button calls onClick
+                        unconditionally (a missing one throws on click), hence the no-op: the submit does the work. */}
+                    <Button size="big" color="accent" type="submit" className={styles.target} label={t('settings.save')} onClick={() => undefined}/>
+                    <Button size="big" variant="ghost" className={styles.target} label={t('settings.reset')} onClick={() => setConfirming(true)}/>
+                </div>
             </form>
             <ResetDialog isOpen={isConfirming} onCancel={() => setConfirming(false)} onConfirm={onConfirmReset}/>
         </Section>

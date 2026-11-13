@@ -95,7 +95,7 @@ Suggestions.propTypes = {background: PropTypes.string.isRequired, text: PropType
  * saved); the default pair is only used while a code is not a colour. The sample is decorative for screen readers:
  * the verdict says what matters.
  */
-export const BannerPreview = ({form, onApply, isReadOnly}) => {
+export const BannerPreview = ({form, onApply, isReadOnly, applied}) => {
     const {t, i18n} = useTranslation(NS);
     const background = normalizeHex(form.bannerBackgroundColor);
     const text = normalizeHex(form.bannerTextColor);
@@ -128,8 +128,15 @@ export const BannerPreview = ({form, onApply, isReadOnly}) => {
             </StatusMessage>
             <p role="status" className={styles.srOnly} data-testid="security-updates-contrast-status">{announcement}</p>
             {verdict === 'fail' && !isReadOnly && <Suggestions background={background} text={text} onApply={onApply}/>}
+            {/* The confirmation of an applied suggestion, here where the suggestion was (a live region from the start). */}
+            {!isReadOnly && <p role="status" className={styles.applied} data-testid="security-updates-suggestion-status">{applied}</p>}
         </div>
     );
 };
 
-BannerPreview.propTypes = {form: PropTypes.object.isRequired, onApply: PropTypes.func.isRequired, isReadOnly: PropTypes.bool};
+BannerPreview.propTypes = {
+    form: PropTypes.object.isRequired,
+    onApply: PropTypes.func.isRequired,
+    isReadOnly: PropTypes.bool,
+    applied: PropTypes.string
+};

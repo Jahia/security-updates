@@ -25,7 +25,9 @@ const fieldPropTypes = {
     field: PropTypes.string.isRequired,
     form: PropTypes.object.isRequired,
     errors: PropTypes.object.isRequired,
-    onChange: PropTypes.func.isRequired
+    onChange: PropTypes.func.isRequired,
+    // A save or reset is running: text controls are read only (they keep the focus; the form ignores other changes).
+    isBusy: PropTypes.bool
 };
 
 /**
@@ -74,8 +76,14 @@ export const SwitchField = ({field, form, errors, onChange}) => (
 
 SwitchField.propTypes = fieldPropTypes;
 
-export const TextField = ({field, form, errors, onChange, type, isDisabled, note}) => {
-    const props = {...controlProps(field, errors, note), value: form[field], isDisabled, onChange: event => onChange(field, event.target.value)};
+export const TextField = ({field, form, errors, onChange, type, isDisabled, note, isBusy}) => {
+    const props = {
+        ...controlProps(field, errors, note),
+        value: form[field],
+        isDisabled,
+        isReadOnly: Boolean(isBusy),
+        onChange: event => onChange(field, event.target.value)
+    };
     let control;
     if (type === 'textarea') {
         control = <Textarea {...props} rows={3}/>;
@@ -116,7 +124,7 @@ const DEFAULTS = {bannerBackgroundColor: DEFAULT_BANNER_BACKGROUND, bannerTextCo
  * A native colour picker (Moonstone has none) next to a Moonstone Input for the colour code. While the code is not a
  * colour, the picker shows the default colour of the field (the preview says the code is not valid).
  */
-export const ColorField = ({field, form, errors, onChange, ratio}) => {
+export const ColorField = ({field, form, errors, onChange, ratio, isBusy}) => {
     const {t} = useTranslation(NS);
     const hex = normalizeHex(form[field]) || DEFAULTS[field];
     return (
@@ -137,6 +145,7 @@ export const ColorField = ({field, form, errors, onChange, ratio}) => {
                     spellCheck={false}
                     autoComplete="off"
                     maxLength={7}
+                    isReadOnly={Boolean(isBusy)}
                     onChange={event => onChange(field, event.target.value)}
                 />
             </div>

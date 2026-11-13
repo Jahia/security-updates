@@ -209,6 +209,65 @@ $focus-color: var(--color-accent_dark_contrast, #004781);
   flex-shrink: 0;
 }
 
+// The read-only settings: each value under its label, at full contrast.
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-medium, 16px);
+  max-width: 45rem;
+}
+
+.summaryList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-small, 8px);
+  margin: 0;
+
+  dd {
+    margin: 0;
+  }
+}
+
+.summaryRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-nano, 4px);
+}
+
+.summaryValue {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-small, 8px);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.alert {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-small, 8px);
+}
+
+.invalidList {
+  margin: 0;
+  padding-left: var(--spacing-medium, 16px);
+}
+
+// Each link to a setting to correct is a 44 pixel high target.
+.invalidLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  text-decoration: underline;
+}
+
+.applied {
+  margin: 0;
+  min-height: 1.5em;
+  max-width: 80ch;
+  font-weight: 700;
+}
+
 .status {
   min-height: 1.5em;
   margin: 0;

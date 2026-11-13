@@ -42,6 +42,7 @@ describe('SettingsForm', () => {
     const field = name => within(section()).getByLabelText(`settings.fields.${name}.label`);
     const status = () => screen.getByTestId('security-updates-settings-status');
     const save = () => screen.getByRole('button', {name: 'settings.save'});
+    const applied = () => screen.getByTestId('security-updates-suggestion-status');
 
     describe('loading', () => {
         test('says the settings are loading', () => {
@@ -103,16 +104,35 @@ describe('SettingsForm', () => {
     });
 
     describe('read only', () => {
-        test('a user who cannot change the settings sees them, disabled, with an explanation and no buttons', () => {
-            useQuery.mockReturnValue(loaded({...settings, canEdit: false}));
+        test('a user who cannot change the settings sees them as text, at full contrast, with an explanation and no buttons', () => {
+            useQuery.mockReturnValue(loaded({...settings, canEdit: false, extraFeedUrls: '', bannerDismissPolicy: 'HOURS'}));
             render(<SettingsForm/>);
 
             expect(within(section()).getByText('settings.readOnly')).toBeInTheDocument();
-            expect(field('refreshIntervalHours')).toBeDisabled();
-            expect(field('enabled')).toBeDisabled();
-            expect(field('bannerMinimumSeverity')).toBeDisabled();
+            // No disabled control: a disabled form greys the values out and takes them out of the keyboard order.
+            expect(section().querySelectorAll('input, select, textarea')).toHaveLength(0);
             expect(screen.queryByRole('button', {name: 'settings.save'})).toBeNull();
             expect(screen.queryByRole('button', {name: 'settings.reset'})).toBeNull();
+            const value = name => screen.getByTestId(`security-updates-setting-value-${name}`);
+            expect(value('enabled')).toHaveTextContent('settings.fields.enabled.labelsettings.value.on');
+            expect(value('refreshIntervalHours').querySelector('dd')).toHaveTextContent('24');
+            expect(value('extraFeedUrls').querySelector('dd')).toHaveTextContent('settings.value.none');
+            expect(value('bannerMinimumSeverity').querySelector('dd')).toHaveTextContent('page.severity.HIGH');
+            expect(value('bannerDismissPolicy').querySelector('dd')).toHaveTextContent('settings.dismiss.HOURS');
+            expect(value('bannerBackgroundColor').querySelector('dd')).toHaveTextContent('#1B1B1B');
+            expect(value('bannerBackgroundColor').querySelector('[aria-hidden="true"]').style.backgroundColor).toBe('rgb(27, 27, 27)');
+            expect(screen.getAllByRole('heading', {level: 3}).map(heading => heading.textContent))
+                .toEqual(['settings.groups.checks', 'settings.groups.banner', 'settings.preview.title']);
+            expect(screen.getByTestId('security-updates-banner-preview')).toBeInTheDocument();
+            expect(screen.queryByTestId('security-updates-suggestion-status')).toBeNull();
+        });
+
+        test('a switch turned off reads "off", and jest-axe finds no violation in the read-only view', async () => {
+            useQuery.mockReturnValue(loaded({...settings, canEdit: false, enabled: false}));
+            const {container} = render(<SettingsForm/>);
+
+            expect(screen.getByTestId('security-updates-setting-value-enabled').querySelector('dd')).toHaveTextContent('settings.value.off');
+            expect(await axe(container)).toHaveNoViolations();
         });
     });
 
@@ -206,6 +226,78 @@ describe('SettingsForm', () => {
             expect(query.refetch).not.toHaveBeenCalled();
             expect(changed).toHaveBeenCalledTimes(1);
             window.removeEventListener(CHANGED_EVENT, changed);
+        });
+
+        test('while a save runs, the controls keep the focus but take no edit, and the group is busy', async () => {
+            let answer;
+            update.mockImplementationOnce(() => new Promise(resolve => {
+                answer = () => resolve({data: {securityUpdates: {updateSettings: {ok: true, errors: [], settings: {...settings, refreshIntervalHours: 6}}}}});
+            }));
+            render(<SettingsForm/>);
+            field('refreshIntervalHours').focus();
+            fireEvent.submit(field('refreshIntervalHours').closest('form'));
+
+            await waitFor(() => expect(field('refreshIntervalHours')).toHaveAttribute('readonly'));
+            expect(field('refreshIntervalHours')).not.toBeDisabled();
+            expect(document.activeElement).toBe(field('refreshIntervalHours'));
+            expect(field('bannerBackgroundColor')).toHaveAttribute('readonly');
+            expect(field('extraFeedUrls')).toHaveAttribute('readonly');
+            expect(field('enabled').closest('fieldset').parentElement.closest('fieldset')).toHaveAttribute('aria-busy', 'true');
+            fireEvent.change(field('defaultStoreUrl'), {target: {value: 'https://lost.example'}});
+            fireEvent.click(field('enabled'));
+            expect(field('defaultStoreUrl')).toHaveValue('https://store.jahia.com');
+            expect(field('enabled')).toBeChecked();
+
+            await act(async () => answer());
+
+            expect(field('refreshIntervalHours')).toHaveValue(6);
+            expect(field('refreshIntervalHours')).not.toHaveAttribute('readonly');
+            expect(field('enabled').closest('fieldset').parentElement.closest('fieldset')).not.toHaveAttribute('aria-busy');
+            fireEvent.change(field('defaultStoreUrl'), {target: {value: 'https://kept.example'}});
+            expect(field('defaultStoreUrl')).toHaveValue('https://kept.example');
+        });
+
+        test('editing a field again clears the message of the last save', async () => {
+            render(<SettingsForm/>);
+            fireEvent.click(save());
+            await waitFor(() => expect(status()).toHaveTextContent('settings.saved'));
+
+            fireEvent.change(field('refreshIntervalHours'), {target: {value: '12'}});
+
+            expect(status()).toBeEmptyDOMElement();
+        });
+
+        test('a refused save lists the settings to correct in its alert, each a link that focuses its control', async () => {
+            update.mockImplementationOnce(() => Promise.resolve({data: {securityUpdates: {updateSettings: {ok: false, settings: null, errors: [
+                {field: 'defaultStoreUrl', code: 'NOT_HTTPS'},
+                {field: 'refreshIntervalHours', code: 'OUT_OF_RANGE'}
+            ]}}}}));
+            render(<SettingsForm/>);
+            fireEvent.click(save());
+
+            const alert = await screen.findByRole('alert');
+            const list = within(alert).getByRole('list', {name: 'settings.invalidList'});
+            const links = within(list).getAllByRole('link');
+            expect(links.map(link => link.textContent))
+                .toEqual(['settings.fields.refreshIntervalHours.label', 'settings.fields.defaultStoreUrl.label']);
+            expect(links[1]).toHaveAttribute('href', '#security-updates-setting-defaultStoreUrl');
+
+            fireEvent.click(links[1]);
+            expect(document.activeElement).toBe(field('defaultStoreUrl'));
+
+            // A corrected field leaves the list.
+            fireEvent.change(field('defaultStoreUrl'), {target: {value: 'https://ok.example'}});
+            expect(within(screen.getByRole('alert')).getAllByRole('link')).toHaveLength(1);
+        });
+
+        test('a refused save without field errors has no list of settings', async () => {
+            update.mockImplementationOnce(() => Promise.reject(new Error('Network error')));
+            render(<SettingsForm/>);
+            fireEvent.click(save());
+
+            const alert = await screen.findByRole('alert');
+            expect(alert).toHaveTextContent('settings.errors.REQUEST_FAILED');
+            expect(within(alert).queryByRole('list')).toBeNull();
         });
 
         test('a successful save calls onSettingsChanged, so that the page reads its report again; a refused one does not', async () => {
@@ -539,7 +631,11 @@ describe('SettingsForm', () => {
 
             expect(field('bannerTextColor')).toHaveValue('#A6A6A6');
             expect(screen.getByTestId('security-updates-contrast')).toHaveTextContent('settings.preview.pass');
-            expect(status()).toHaveTextContent('settings.suggest.appliedText');
+            // Said next to the preview, where the suggestion was, not in the status line below the form.
+            expect(applied()).toHaveTextContent('settings.suggest.appliedText {value=#A6A6A6}');
+            expect(applied()).toHaveAttribute('role', 'status');
+            expect(screen.getByTestId('security-updates-banner-preview').parentElement).toContainElement(applied());
+            expect(status()).toBeEmptyDOMElement();
             expect(screen.queryByTestId('security-updates-suggestions')).toBeNull();
             // The button is gone: the focus is on the field it changed.
             expect(document.activeElement).toBe(field('bannerTextColor'));
@@ -551,7 +647,7 @@ describe('SettingsForm', () => {
             fireEvent.click(within(screen.getByTestId('security-updates-suggestion-background')).getByRole('button'));
 
             expect(field('bannerBackgroundColor')).toHaveValue('#C1C1C1');
-            expect(status()).toHaveTextContent('settings.suggest.appliedBackground');
+            expect(applied()).toHaveTextContent('settings.suggest.appliedBackground');
             expect(document.activeElement).toBe(field('bannerBackgroundColor'));
         });
 
@@ -563,8 +659,18 @@ describe('SettingsForm', () => {
 
             expect(field('bannerBackgroundColor')).toHaveValue('#1B1B1B');
             expect(field('bannerTextColor')).toHaveValue('#FFFFFF');
-            expect(status()).toHaveTextContent('settings.suggest.appliedDefaults');
+            expect(applied()).toHaveTextContent('settings.suggest.appliedDefaults');
             expect(document.activeElement).toBe(field('bannerBackgroundColor'));
+        });
+
+        test('the confirmation goes once a field is edited again', () => {
+            fail('#1B1B1B', '#333333');
+            fireEvent.click(within(screen.getByTestId('security-updates-suggestion-text')).getByRole('button'));
+            expect(applied()).not.toBeEmptyDOMElement();
+
+            fireEvent.change(field('bannerTextColor'), {target: {value: '#EEEEEE'}});
+
+            expect(applied()).toBeEmptyDOMElement();
         });
     });
 });
