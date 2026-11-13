@@ -32,6 +32,31 @@ export const KEY_CORE = 'jahia-core|JSA-2099-0001';
 export const KEY_MODULE = 'security-updates|JSA-2099-0002';
 export const KEY_OWNER = 'security-updates|GHSA-2c2c-3f3f-4g4g';
 
+/**
+ * The hashes under which the banner stores those keys (never the keys themselves): SHA-256 in hexadecimal of the
+ * UTF-8 key where SubtleCrypto exists, else its 32-bit FNV-1a, as for the user name. Precomputed: the specs run at
+ * http://jahia:8080, which is not a secure context, so they have no SubtleCrypto either.
+ */
+const STORED_KEY_HASHES: Record<string, { sha256: string; fnv1a: string }> = {
+    [KEY_CORE]: {sha256: 'feddab4d011d7e07eb60cec5253fdc803fb2383a1991f5fed32704fa177d35a1', fnv1a: '5d7fe35d'},
+    [KEY_MODULE]: {sha256: '9c778a9cf1deb093774a8528db6c17235ea74d145fa46e9ccfe0230ccab63e5e', fnv1a: '1cffbca6'},
+    [KEY_OWNER]: {sha256: '9b1b9d8169a1cbfe409586d1bc25f2d197cb258854bcc375993358def4acc6a6', fnv1a: '41e38b68'}
+};
+
+/**
+ * Asserts that a stored list of dismissed keys is the list of the hashes of the keys, in the same order, all made
+ * with the same hash function, and that no key is stored in clear.
+ */
+export const expectStoredDismissalKeys = (stored: unknown, keys: string[], label: string): void => {
+    keys.forEach(key => expect(STORED_KEY_HASHES, `${label}: precomputed hashes of ${key}`).to.have.property(key));
+    const hashed = [
+        JSON.stringify(keys.map(key => STORED_KEY_HASHES[key].sha256)),
+        JSON.stringify(keys.map(key => STORED_KEY_HASHES[key].fnv1a))
+    ];
+    expect(hashed, `${label}: the hashes of ${keys.join(', ')}`).to.include(JSON.stringify(stored));
+    keys.forEach(key => expect(JSON.stringify(stored), `${label}: ${key} not stored in clear`).to.not.contain(key));
+};
+
 const GQL = {
     report: 'graphql/query/getSecurityUpdatesReport.graphql',
     banner: 'graphql/query/getSecurityUpdatesBanner.graphql',

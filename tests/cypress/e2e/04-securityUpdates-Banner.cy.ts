@@ -11,6 +11,7 @@ import {
     SESSION_DISMISS_KEY,
     ensureFixtureReport,
     errorText,
+    expectStoredDismissalKeys,
     openAppPage,
     provision,
     raw,
@@ -41,22 +42,26 @@ describe('Security updates: banner', () => {
     };
 
     /**
-     * Puts the focus origin right before the banner, focuses it, then goes into the banner with the Tab key (native
-     * key events) up to "Hide this banner".
+     * Puts the TEST-ONLY focus origin right before the banner and focuses it: a known element outside the banner,
+     * from which the Tab key goes into the banner.
      */
-    const tabToDismissFrom = (origin: string): void => {
+    const focusOriginBeforeBanner = (): void => {
         cy.get(BANNER_DISMISS, {timeout: 30000}).should('be.visible');
         cy.get(BANNER).then($banner => {
             const button = $banner[0].ownerDocument.createElement('button');
             button.type = 'button';
-            button.id = origin;
+            button.id = FOCUS_ORIGIN_ID;
             button.textContent = 'Focus origin (test)';
             // Fixed at the top left, away from the banner (bottom right), so that it is visible and covers nothing.
             button.style.cssText = 'position: fixed; top: 0; left: 0; z-index: 10000;';
             $banner[0].before(button);
         });
-        cy.get(`#${origin}`).focus();
-        cy.focused().should('have.id', origin);
+        cy.get(`#${FOCUS_ORIGIN_ID}`).focus();
+        cy.focused().should('have.id', FOCUS_ORIGIN_ID);
+    };
+
+    /** From the focus origin, goes into the banner with the Tab key (native key events) up to "Hide this banner". */
+    const tabToDismiss = (): void => {
         cy.press(Cypress.Keyboard.Keys.TAB);
         cy.focused().should('match', BANNER_LINK);
         cy.press(Cypress.Keyboard.Keys.TAB);
@@ -172,7 +177,8 @@ describe('Security updates: banner', () => {
             cy.get(BANNER_DISMISS, {timeout: 30000}).click();
             cy.get(BANNER).should('not.exist');
             cy.window().then(win => {
-                expect(JSON.parse(win.sessionStorage.getItem(SESSION_DISMISS_KEY) as string)).to.deep.equal(banner.dismissalKeys);
+                const stored = JSON.parse(win.sessionStorage.getItem(SESSION_DISMISS_KEY) as string);
+                expectStoredDismissalKeys(stored, banner.dismissalKeys, 'session dismissal');
             });
 
             reloadAppPage().then(answer => expect(answer.data?.securityUpdates?.banner?.visible).to.equal(true));
@@ -191,15 +197,23 @@ describe('Security updates: banner', () => {
         cy.login();
         openAppPage();
 
-        tabToDismissFrom(FOCUS_ORIGIN_ID);
+        // The focus went into the banner from a known element: Hide (Enter) gives it back to that element.
+        focusOriginBeforeBanner();
+        tabToDismiss();
         cy.press(Cypress.Keyboard.Keys.ENTER);
         cy.get(BANNER).should('not.exist');
         cy.focused().should('have.id', FOCUS_ORIGIN_ID);
 
-        // That element left the page meanwhile: nothing to go back to, so the focus stays on the document.
-        cy.clearAllSessionStorage();
-        reloadAppPage();
-        tabToDismissFrom(FOCUS_ORIGIN_ID);
+        // Neither the element focused before the banner nor the one focused when it appeared is still in the page:
+        // the focus stays on the document. The banner comes back (new session, then a "changed" event) while the
+        // focus origin has the focus, the keyboard goes into it from there, then the focus origin leaves the page.
+        cy.window().then(win => {
+            win.sessionStorage.removeItem(SESSION_DISMISS_KEY);
+            win.dispatchEvent(new win.Event('security-updates:changed'));
+        });
+        cy.get(BANNER_DISMISS, {timeout: 30000}).should('be.visible');
+        cy.focused().should('have.id', FOCUS_ORIGIN_ID);
+        tabToDismiss();
         cy.get(`#${FOCUS_ORIGIN_ID}`).then($origin => $origin.remove());
         cy.press(Cypress.Keyboard.Keys.SPACE);
         cy.get(BANNER).should('not.exist');

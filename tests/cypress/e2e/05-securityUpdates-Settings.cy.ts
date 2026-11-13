@@ -13,6 +13,7 @@ import {
     Settings,
     checkPageAccessibility,
     ensureFixtureReport,
+    expectStoredDismissalKeys,
     openAppPage,
     provision,
     readBanner,
@@ -256,7 +257,7 @@ describe('Security updates: settings', () => {
             cy.get(BANNER).should('not.exist');
             cy.window().then(win => {
                 const {record} = localRecord(win);
-                expect(record.keys).to.deep.equal(banner.dismissalKeys);
+                expectStoredDismissalKeys(record.keys, banner.dismissalKeys, 'HOURS dismissal');
                 expect(record.at).to.be.a('number');
             });
         });
