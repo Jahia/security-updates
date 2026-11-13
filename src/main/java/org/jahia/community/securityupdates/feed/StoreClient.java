@@ -45,9 +45,22 @@ public final class StoreClient {
             + "references per flagged version): the rest was ignored";
 
     private final HttpFetcher fetcher;
+    private final FeedParser feedParser;
 
     public StoreClient(HttpFetcher fetcher) {
+        this(fetcher, SecurityFeedParser::parse);
+    }
+
+    /** Test constructor: the parser of the security feed. */
+    StoreClient(HttpFetcher fetcher, FeedParser feedParser) {
         this.fetcher = fetcher;
+        this.feedParser = feedParser;
+    }
+
+    /** Parses a security feed body. */
+    @FunctionalInterface
+    interface FeedParser {
+        SecurityFeed parse(String body) throws FeedFormatException;
     }
 
     /**
@@ -65,8 +78,9 @@ public final class StoreClient {
 
         String feedUrl = target.isFeedOnly() ? base : base + SECURITY_FEED_PATH;
         FeedOutcome feed = readFeed(base, feedUrl, headers, errors);
-        // a store that publishes no security feed gives no finding: its catalogue is not needed
-        ModuleCatalog catalog = target.isFeedOnly() || feed == FeedOutcome.NOT_PUBLISHED
+        // a store that publishes no security feed gives no finding: its catalogue is not needed; a store that could
+        // not be reached (timeout, connection failure, screening refusal) is not asked again for its catalogue
+        ModuleCatalog catalog = target.isFeedOnly() || feed == FeedOutcome.NOT_PUBLISHED || feed == FeedOutcome.UNREACHABLE
                 ? null : readCatalog(base, headers, errors);
         return new StoreFetchResult(base, feed.feed, catalog, errors);
     }
@@ -91,6 +105,8 @@ public final class StoreClient {
     private static final class FeedOutcome {
         static final FeedOutcome NOT_PUBLISHED = new FeedOutcome(null);
         static final FeedOutcome FAILED = new FeedOutcome(null);
+        /** The store could not be reached: a second request (the catalogue) would wait as long and fail the same way. */
+        static final FeedOutcome UNREACHABLE = new FeedOutcome(null);
 
         private final SecurityFeed feed;
 
@@ -104,9 +120,10 @@ public final class StoreClient {
         try {
             result = fetcher.get(feedUrl, headers, MAX_FEED_BYTES);
         } catch (IOException | RuntimeException e) {
-            errors.add(transportError(base, StoreErrorKind.UNAVAILABLE, FEED, e));
+            StoreError error = transportError(base, StoreErrorKind.UNAVAILABLE, FEED, e);
+            errors.add(error);
             logger.debug("Security feed of {} could not be read", base, e);
-            return FeedOutcome.FAILED;
+            return error.getDetail() == StoreErrorDetail.TOO_LARGE ? FeedOutcome.FAILED : FeedOutcome.UNREACHABLE;
         }
         int status = result.getStatus();
         if (status == HttpStatus.NOT_FOUND) {
@@ -118,7 +135,7 @@ public final class StoreClient {
             return FeedOutcome.FAILED;
         }
         try {
-            SecurityFeed feed = SecurityFeedParser.parse(result.getBody());
+            SecurityFeed feed = feedParser.parse(result.getBody());
             if (feed.getSkippedEntries() > 0) {
                 errors.add(new StoreError(base, StoreErrorKind.NOT_UNDERSTOOD, StoreErrorDetail.ENTRIES_SKIPPED,
                         feed.getSkippedEntries() + " entries of the security feed could not be understood and were ignored"));
@@ -131,6 +148,12 @@ public final class StoreClient {
             logger.debug("Security feed of {} not understood: {}", base, e.getMessage());
             errors.add(new StoreError(base, StoreErrorKind.NOT_UNDERSTOOD, e.getDetail(), "Security feed not understood: "
                     + e.getMessage()));
+            return FeedOutcome.FAILED;
+        } catch (RuntimeException e) {
+            // a parser defect, not the store's: the type only, the message may quote the document
+            logger.warn("Security feed of {} could not be parsed", base, e);
+            errors.add(new StoreError(base, StoreErrorKind.NOT_UNDERSTOOD, StoreErrorDetail.INVALID_JSON,
+                    "Security feed not understood: unexpected parser failure (" + e.getClass().getSimpleName() + ")"));
             return FeedOutcome.FAILED;
         }
     }

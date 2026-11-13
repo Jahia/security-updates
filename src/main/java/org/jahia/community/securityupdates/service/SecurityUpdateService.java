@@ -113,7 +113,7 @@ public class SecurityUpdateService {
         this.clock = clock;
         this.jahiaVersion = jahiaVersion;
         this.executorFactory = executorFactory;
-        this.assembler = new ReportAssembler(warnSink);
+        this.assembler = new ReportAssembler(warnSink, clock);
     }
 
     /** Test hook: where the configuration warnings go. */

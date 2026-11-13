@@ -15,10 +15,16 @@ import org.jahia.community.securityupdates.model.ReportStatus;
 import org.jahia.community.securityupdates.model.SecurityFeed;
 import org.jahia.community.securityupdates.model.SecurityReport;
 import org.jahia.community.securityupdates.model.StoreError;
+import org.jahia.community.securityupdates.model.StoreErrorDetail;
 import org.jahia.community.securityupdates.model.StoreErrorKind;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -37,10 +43,19 @@ import java.util.function.Function;
  * <p>When a store fails, the last data read from it is kept (and the error says so), so a transient outage does
  * not empty the report; the status is then {@link ReportStatus#PARTIAL}. The status is {@link ReportStatus#OK} only
  * when every store returned a feed this module understands and every component could be compared.
+ *
+ * <p>A store whose reading fails unexpectedly gets an {@link StoreErrorDetail#CHECK_FAILED} error, the other stores
+ * are still read. A check stops starting new stores {@link #CHECK_DEADLINE} after it began: each store not read then
+ * gets a {@link StoreErrorDetail#TIMEOUT} error (the store being read finishes, within its own request limits).
  */
 final class ReportAssembler {
 
     static final String KEPT_DATA_SUFFIX = " (showing the data of the last successful check of this store)";
+    /** Longest time a check starts reading new stores for. */
+    static final Duration CHECK_DEADLINE = Duration.ofMinutes(5);
+    static final String OUT_OF_TIME = "Not checked: the check ran out of time";
+    static final String STORE_CHECK_FAILED = "The check of this store failed unexpectedly; see the Jahia log";
+    private static final Logger logger = LoggerFactory.getLogger(ReportAssembler.class);
     /** Error kinds that do not make the report incomplete. */
     private static final Set<StoreErrorKind> NON_BLOCKING = EnumSet.of(StoreErrorKind.CATALOGUE_UNAVAILABLE);
 
@@ -49,9 +64,14 @@ final class ReportAssembler {
     /** Keys of the findings already logged; a finding that disappears is logged again when it comes back. */
     private final Set<String> loggedFindings = new HashSet<>();
     private final Consumer<Finding> warnSink;
+    private final Clock clock;
 
-    ReportAssembler(Consumer<Finding> warnSink) {
+    /**
+     * @param clock read before each store, for the {@link #CHECK_DEADLINE}
+     */
+    ReportAssembler(Consumer<Finding> warnSink, Clock clock) {
         this.warnSink = warnSink;
+        this.clock = clock;
     }
 
     /** What the check reads from and the context it runs in. */
@@ -71,6 +91,7 @@ final class ReportAssembler {
     }
 
     /**
+     * @param now      the start of the check, which the {@link #CHECK_DEADLINE} counts from
      * @param closed   checked between two stores: when it turns true, the check stops
      * @param previous the report before this check, for its last success time
      * @return the report, or null when the check was stopped
@@ -95,13 +116,15 @@ final class ReportAssembler {
         List<SecurityFeed> feeds = new ArrayList<>();
         List<ModuleCatalog> catalogs = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
+        Instant deadline = now.plus(CHECK_DEADLINE);
         for (StoreTarget target : targets) {
             if (closed.getAsBoolean()) {
                 return null;
             }
             String key = StoreUrls.normalize(target.getUrl()).orElse(StoreUrls.display(target.getUrl()));
             if (seen.add(key)) {
-                StoreOutcome outcome = collect(fetch.apply(target));
+                StoreFetchResult result = clock.instant().isBefore(deadline) ? fetchSafely(fetch, target, key) : outOfTime(key);
+                StoreOutcome outcome = collect(result);
                 outcome.addTo(feeds, catalogs, errors);
                 complete = complete && outcome.complete;
             }
@@ -119,6 +142,29 @@ final class ReportAssembler {
         ReportStatus status = status(!feeds.isEmpty(), complete);
         Instant lastSuccess = status == ReportStatus.OK ? now : previous.getLastSuccess();
         return new SecurityReport(status, now, lastSuccess, sources.jahiaVersion, errors, match.getFindings());
+    }
+
+    /**
+     * Reads one store; a failure that escapes the store client (a defect) becomes an error of that store only. Errors
+     * that leave the virtual machine unusable ({@link OutOfMemoryError}, {@link ThreadDeath}) are not caught.
+     */
+    private static StoreFetchResult fetchSafely(Function<StoreTarget, StoreFetchResult> fetch, StoreTarget target, String key) {
+        try {
+            return fetch.apply(target);
+        } catch (RuntimeException | StackOverflowError | LinkageError e) {
+            logger.error("The check of the security source {} failed unexpectedly", key, e);
+            return failed(key, StoreErrorDetail.CHECK_FAILED, STORE_CHECK_FAILED);
+        }
+    }
+
+    private static StoreFetchResult outOfTime(String key) {
+        logger.warn("Security source {} not checked: the check ran out of time ({} minutes)", key, CHECK_DEADLINE.toMinutes());
+        return failed(key, StoreErrorDetail.TIMEOUT, OUT_OF_TIME);
+    }
+
+    private static StoreFetchResult failed(String key, StoreErrorDetail detail, String message) {
+        return new StoreFetchResult(key, null, null,
+                Collections.singletonList(new StoreError(key, StoreErrorKind.UNAVAILABLE, detail, message)));
     }
 
     static ReportStatus status(boolean anyFeed, boolean complete) {

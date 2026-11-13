@@ -9,6 +9,7 @@ import org.jahia.community.securityupdates.model.ReportStatus;
 import org.jahia.community.securityupdates.model.SecurityFeed;
 import org.jahia.community.securityupdates.model.SecurityReport;
 import org.jahia.community.securityupdates.model.StoreError;
+import org.jahia.community.securityupdates.model.StoreErrorDetail;
 import org.jahia.community.securityupdates.model.StoreErrorKind;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,7 +17,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
@@ -51,7 +54,7 @@ class ReportAssemblerTest {
     @BeforeEach
     void setUp() {
         fixture = new ServiceFixture();
-        assembler = new ReportAssembler(finding -> { });
+        assembler = new ReportAssembler(finding -> { }, fixture.clock);
         sources = new ReportAssembler.Sources(fixture.fetcher, fixture.forges, fixture.installed, JAHIA);
     }
 
@@ -150,5 +153,98 @@ class ReportAssemblerTest {
 
         assertThat(report.getStatus()).isEqualTo(ReportStatus.OK);
         assertThat(report.getFindings()).hasSize(2);
+    }
+
+    private static final String THIRD_STORE = "https://third.example.org";
+
+    private void threeStores() {
+        fixture.forges.stores = List.of(StoreTarget.store(DEFAULT_STORE, null, null), StoreTarget.store(PRIVATE_STORE, null, null),
+                StoreTarget.store(THIRD_STORE, null, null));
+    }
+
+    @ParameterizedTest(name = "a {0} thrown while reading one store fails that store only")
+    @ValueSource(strings = {"runtime", "stack", "linkage"})
+    void oneStoreFailingUnexpectedlyKeepsTheOthers(String failure) {
+        threeStores();
+        answers.put(DEFAULT_STORE, new StoreFetchResult(DEFAULT_STORE, feed(FEED_WITH_FINDING), null, Collections.emptyList()));
+        answers.put(THIRD_STORE, new StoreFetchResult(THIRD_STORE, feed(SECOND_FEED), null, Collections.emptyList()));
+        Function<StoreTarget, StoreFetchResult> fetch = target -> {
+            if (PRIVATE_STORE.equals(target.getUrl())) {
+                throwUnexpected(failure);
+            }
+            return answers.get(target.getUrl());
+        };
+
+        SecurityReport report = assembler.assemble(Settings.defaults(), sources, fetch, NOW, SecurityReport.notChecked(JAHIA), () -> false);
+
+        assertThat(report.getStatus()).isEqualTo(ReportStatus.PARTIAL);
+        assertThat(report.getFindings()).extracting(Finding::getComponent).containsExactlyInAnyOrder("graphql-dxm-provider", "jcontent");
+        assertThat(report.getErrors()).singleElement().satisfies(e -> {
+            assertThat(e.getStoreUrl()).isEqualTo(PRIVATE_STORE);
+            assertThat(e.getKind()).isEqualTo(StoreErrorKind.UNAVAILABLE);
+            assertThat(e.getDetail()).isEqualTo(StoreErrorDetail.CHECK_FAILED);
+            assertThat(e.getMessage()).isEqualTo(ReportAssembler.STORE_CHECK_FAILED);
+        });
+    }
+
+    private static void throwUnexpected(String failure) {
+        if ("runtime".equals(failure)) {
+            throw new IllegalStateException("bug");
+        }
+        if ("stack".equals(failure)) {
+            throw new StackOverflowError();
+        }
+        throw new NoClassDefFoundError("x");
+    }
+
+    @Test
+    @DisplayName("an OutOfMemoryError is not swallowed")
+    void outOfMemoryIsNotCaught() {
+        Function<StoreTarget, StoreFetchResult> fetch = target -> {
+            throw new OutOfMemoryError("test");
+        };
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> assembler.assemble(Settings.defaults(), sources, fetch, NOW,
+                SecurityReport.notChecked(JAHIA), () -> false)).isInstanceOf(OutOfMemoryError.class);
+    }
+
+    @Test
+    @DisplayName("stores not reached before the check deadline are not read: TIMEOUT error, kept data shown, PARTIAL")
+    void checkDeadline() {
+        threeStores();
+        answers.put(DEFAULT_STORE, new StoreFetchResult(DEFAULT_STORE, feed(EMPTY_FEED), null, Collections.emptyList()));
+        answers.put(PRIVATE_STORE, new StoreFetchResult(PRIVATE_STORE, feed(SECOND_FEED), null, Collections.emptyList()));
+        answers.put(THIRD_STORE, new StoreFetchResult(THIRD_STORE, feed(EMPTY_FEED), null, Collections.emptyList()));
+        assertThat(assembleWithAnswers(Settings.defaults()).getStatus()).isEqualTo(ReportStatus.OK);
+        List<String> read = new java.util.ArrayList<>();
+        Function<StoreTarget, StoreFetchResult> slowFirst = target -> {
+            read.add(target.getUrl());
+            // the first store takes the whole budget
+            fixture.clock.advance(ReportAssembler.CHECK_DEADLINE);
+            return answers.get(target.getUrl());
+        };
+
+        SecurityReport report = assembler.assemble(Settings.defaults(), sources, slowFirst, NOW, SecurityReport.notChecked(JAHIA),
+                () -> false);
+
+        assertThat(read).containsExactly(DEFAULT_STORE);
+        assertThat(report.getStatus()).isEqualTo(ReportStatus.PARTIAL);
+        // the private store's last data is still used
+        assertThat(report.getFindings()).extracting(Finding::getComponent).containsExactly("jcontent");
+        assertThat(report.getErrors()).extracting(StoreError::getStoreUrl).containsExactly(PRIVATE_STORE, THIRD_STORE);
+        assertThat(report.getErrors()).allSatisfy(e -> {
+            assertThat(e.getKind()).isEqualTo(StoreErrorKind.UNAVAILABLE);
+            assertThat(e.getDetail()).isEqualTo(StoreErrorDetail.TIMEOUT);
+            assertThat(e.getMessage()).isEqualTo(ReportAssembler.OUT_OF_TIME + ReportAssembler.KEPT_DATA_SUFFIX);
+        });
+    }
+
+    @Test
+    @DisplayName("a store started just before the deadline is read")
+    void justBeforeTheDeadline() {
+        answers.put(DEFAULT_STORE, new StoreFetchResult(DEFAULT_STORE, feed(EMPTY_FEED), null, Collections.emptyList()));
+        fixture.clock.advance(ReportAssembler.CHECK_DEADLINE.minus(Duration.ofSeconds(1)));
+
+        assertThat(assembleWithAnswers(Settings.defaults()).getStatus()).isEqualTo(ReportStatus.OK);
     }
 }

@@ -15,7 +15,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -189,20 +191,67 @@ class StoreClientTest {
     }
 
     @Test
-    @DisplayName("a transport failure is reported without the exception details or credentials")
+    @DisplayName("a feed timeout is reported without the exception details or credentials; the catalogue is not requested")
     void transportFailure() throws IOException {
         when(fetcher.get(eq(FEED_URL), anyMap(), anyInt())).thenThrow(new SocketTimeoutException("Read timed out " + SECRET));
-        when(fetcher.get(eq(LIST_URL), anyMap(), anyInt())).thenThrow(new IOException("refused"));
 
         StoreFetchResult result = client.fetch(StoreTarget.store(BASE, "user", SECRET));
 
         assertThat(result.getFeed()).isNull();
         assertThat(result.getCatalog()).isNull();
-        assertThat(result.getErrors()).extracting(StoreError::getKind)
-                .containsExactly(StoreErrorKind.UNAVAILABLE, StoreErrorKind.CATALOGUE_UNAVAILABLE);
-        assertThat(result.getErrors().get(0).getMessage()).contains("timed out").doesNotContain(SECRET);
-        assertThat(result.getErrors()).extracting(StoreError::getDetail)
-                .containsExactly(StoreErrorDetail.TIMEOUT, StoreErrorDetail.CONNECTION);
+        assertThat(result.getErrors()).singleElement().satisfies(e -> {
+            assertThat(e.getKind()).isEqualTo(StoreErrorKind.UNAVAILABLE);
+            assertThat(e.getDetail()).isEqualTo(StoreErrorDetail.TIMEOUT);
+            assertThat(e.getMessage()).contains("timed out").doesNotContain(SECRET);
+        });
+        verify(fetcher, never()).get(eq(LIST_URL), anyMap(), anyInt());
+    }
+
+    @Test
+    @DisplayName("a feed connection failure (or a fetcher defect) skips the catalogue too")
+    void connectionFailureSkipsCatalogue() throws IOException {
+        when(fetcher.get(eq(FEED_URL), anyMap(), anyInt())).thenThrow(new IOException("refused"), new IllegalStateException("bug"));
+
+        StoreFetchResult first = client.fetch(StoreTarget.store(BASE, null, null));
+        StoreFetchResult second = client.fetch(StoreTarget.store(BASE, null, null));
+
+        assertThat(first.getErrors()).extracting(StoreError::getDetail).containsExactly(StoreErrorDetail.CONNECTION);
+        assertThat(second.getErrors()).extracting(StoreError::getDetail).containsExactly(StoreErrorDetail.CONNECTION);
+        verify(fetcher, never()).get(eq(LIST_URL), anyMap(), anyInt());
+    }
+
+    @Test
+    @DisplayName("a catalogue transport failure keeps the feed")
+    void catalogueTransportFailure() throws IOException {
+        feedAnswers(new HttpResult(200, FULL_FEED));
+        when(fetcher.get(eq(LIST_URL), anyMap(), anyInt())).thenThrow(new IOException("refused"));
+
+        StoreFetchResult result = client.fetch(StoreTarget.store(BASE, null, null));
+
+        assertThat(result.getFeed()).isNotNull();
+        assertThat(result.getErrors()).extracting(StoreError::getKind).containsExactly(StoreErrorKind.CATALOGUE_UNAVAILABLE);
+        assertThat(result.getErrors()).extracting(StoreError::getDetail).containsExactly(StoreErrorDetail.CONNECTION);
+    }
+
+    @Test
+    @DisplayName("an unexpected parser failure is NOT_UNDERSTOOD / INVALID_JSON, without its message; the catalogue is read")
+    void parserDefect() throws IOException {
+        StoreClient defective = new StoreClient(fetcher, body -> {
+            throw new IllegalArgumentException("remote text " + body);
+        });
+        feedAnswers(new HttpResult(200, FULL_FEED));
+        listAnswers(new HttpResult(200, "[]"));
+
+        StoreFetchResult result = defective.fetch(StoreTarget.store(BASE, null, null));
+
+        assertThat(result.getFeed()).isNull();
+        assertThat(result.getCatalog()).isNotNull();
+        assertThat(result.getErrors()).singleElement().satisfies(e -> {
+            assertThat(e.getKind()).isEqualTo(StoreErrorKind.NOT_UNDERSTOOD);
+            assertThat(e.getDetail()).isEqualTo(StoreErrorDetail.INVALID_JSON);
+            assertThat(e.getMessage()).isEqualTo("Security feed not understood: unexpected parser failure "
+                    + "(IllegalArgumentException)");
+        });
     }
 
     @Test
@@ -210,7 +259,6 @@ class StoreClientTest {
     void ssrfBlocked() throws IOException {
         SsrfProtectionDnsResolver.SsrfBlockedException blocked = mock(SsrfProtectionDnsResolver.SsrfBlockedException.class);
         when(fetcher.get(eq(FEED_URL), anyMap(), anyInt())).thenThrow(blocked);
-        listAnswers(new HttpResult(200, "[]"));
 
         StoreFetchResult result = client.fetch(StoreTarget.store(BASE, null, null));
 
@@ -226,7 +274,6 @@ class StoreClientTest {
     void ssrfBlockedAsCause() throws IOException {
         SsrfProtectionDnsResolver.SsrfBlockedException blocked = mock(SsrfProtectionDnsResolver.SsrfBlockedException.class);
         when(fetcher.get(eq(FEED_URL), anyMap(), anyInt())).thenThrow(new IOException("wrapped", blocked));
-        listAnswers(new HttpResult(200, "[]"));
 
         StoreFetchResult result = client.fetch(StoreTarget.store(BASE, null, null));
 
@@ -239,10 +286,13 @@ class StoreClientTest {
         when(fetcher.get(eq(FEED_URL), anyMap(), anyInt())).thenThrow(new ResponseTooLargeException(10));
         listAnswers(new HttpResult(200, "[]"));
 
-        StoreError error = client.fetch(StoreTarget.store(BASE, null, null)).getErrors().get(0);
+        StoreFetchResult result = client.fetch(StoreTarget.store(BASE, null, null));
+        StoreError error = result.getErrors().get(0);
 
         assertThat(error.getMessage()).contains("too large");
         assertThat(error.getDetail()).isEqualTo(StoreErrorDetail.TOO_LARGE);
+        // the store answered: its catalogue is still read
+        assertThat(result.getCatalog()).isNotNull();
     }
 
     @Test
@@ -372,15 +422,18 @@ class StoreClientTest {
     @Test
     @DisplayName("an unexpected runtime failure of one request becomes a store error")
     void runtimeFailure() throws IOException {
+        feedAnswers(new HttpResult(200, FULL_FEED));
+        when(fetcher.get(eq(LIST_URL), anyMap(), anyInt())).thenThrow(new IllegalStateException("bad " + SECRET));
+        StoreFetchResult catalogueFailed = client.fetch(StoreTarget.store(BASE, null, null));
         when(fetcher.get(eq(FEED_URL), anyMap(), anyInt())).thenThrow(new IllegalArgumentException("bad " + SECRET));
-        when(fetcher.get(eq(LIST_URL), anyMap(), anyInt())).thenThrow(new IllegalStateException("x"));
+        StoreFetchResult feedFailed = client.fetch(StoreTarget.store(BASE, null, null));
 
-        StoreFetchResult result = client.fetch(StoreTarget.store(BASE, null, null));
-
-        assertThat(result.getErrors()).extracting(StoreError::getKind)
-                .containsExactly(StoreErrorKind.UNAVAILABLE, StoreErrorKind.CATALOGUE_UNAVAILABLE);
-        assertThat(result.getErrors()).allSatisfy(e -> assertThat(e.getMessage()).doesNotContain(SECRET));
-        assertThat(result.getErrors()).extracting(StoreError::getDetail).containsOnly(StoreErrorDetail.CONNECTION);
+        List<StoreError> errors = new ArrayList<>(catalogueFailed.getErrors());
+        errors.addAll(feedFailed.getErrors());
+        assertThat(errors).extracting(StoreError::getKind)
+                .containsExactly(StoreErrorKind.CATALOGUE_UNAVAILABLE, StoreErrorKind.UNAVAILABLE);
+        assertThat(errors).allSatisfy(e -> assertThat(e.getMessage()).doesNotContain(SECRET));
+        assertThat(errors).extracting(StoreError::getDetail).containsOnly(StoreErrorDetail.CONNECTION);
     }
 
     @Test
