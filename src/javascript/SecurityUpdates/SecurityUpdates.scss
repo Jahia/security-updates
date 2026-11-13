@@ -162,3 +162,12 @@ $focus-color: var(--color-accent_dark_contrast, #004781);
     overflow-wrap: anywhere;
   }
 }
+
+// Moonstone's Loader spins whatever the system setting: it stays still for users who ask for reduced motion.
+@media (prefers-reduced-motion: reduce) {
+  .page [class*='moonstone-loader'],
+  .page [class*='moonstone-loader'] * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

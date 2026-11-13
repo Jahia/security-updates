@@ -221,3 +221,12 @@ $focus-color: var(--color-accent_dark_contrast, #004781);
 .dialogFooter {
   gap: var(--spacing-small, 8px);
 }
+
+// Moonstone's Loader spins whatever the system setting: it stays still for users who ask for reduced motion.
+@media (prefers-reduced-motion: reduce) {
+  .settings [class*='moonstone-loader'],
+  .settings [class*='moonstone-loader'] * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
