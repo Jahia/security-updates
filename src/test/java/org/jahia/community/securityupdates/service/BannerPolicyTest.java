@@ -24,7 +24,7 @@ class BannerPolicyTest {
 
     /** The rows of the e2e fixture store, plus a low owner row and an unknown-severity advisory row. */
     private static SecurityReport report() {
-        return new SecurityReport(ReportStatus.OK, Instant.now(), Instant.now(), "8.2.2.1", Collections.emptyList(), List.of(
+        return new SecurityReport(ReportStatus.OK, Instant.EPOCH, Instant.EPOCH, "8.2.2.1", Collections.emptyList(), List.of(
                 finding("jahia-core", Severity.CRITICAL, FindingSource.ADVISORY),
                 finding("security-updates", Severity.HIGH, FindingSource.ADVISORY),
                 finding("security-updates", Severity.HIGH, FindingSource.OWNER_REPORTED),

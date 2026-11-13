@@ -16,10 +16,11 @@ import java.util.List;
 @Component(service = InstalledComponentsProvider.class)
 public class JahiaInstalledComponentsProvider implements InstalledComponentsProvider {
 
-    private volatile JahiaTemplateManagerService templateManagerService;
+    private JahiaTemplateManagerService templateManagerService;
 
+    /** Static mandatory reference, set by Declarative Services before the component is used. */
     @Reference
-    public void setTemplateManagerService(JahiaTemplateManagerService templateManagerService) {
+    void setTemplateManagerService(JahiaTemplateManagerService templateManagerService) {
         this.templateManagerService = templateManagerService;
     }
 

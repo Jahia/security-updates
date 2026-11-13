@@ -26,6 +26,8 @@ class JahiaInstalledComponentsProviderTest {
         registered.put("graphql-dxm-provider", pkg("graphql-dxm-provider", "org.jahia.modules", "3.4.0"));
         registered.put("no-version", pkg("no-version", "org.jahia.modules", null));
         registered.put("jcontent", pkg("jcontent", "org.jahia.modules", "3.5.0-SNAPSHOT"));
+        registered.put("not-loaded", null);
+        registered.put("no-id", pkg(null, "org.jahia.modules", "1.0.0"));
         TemplatePackageRegistry registry = mock(TemplatePackageRegistry.class);
         when(registry.getRegisteredModules()).thenReturn(registered);
         JahiaTemplateManagerService templates = mock(JahiaTemplateManagerService.class);

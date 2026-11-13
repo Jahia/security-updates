@@ -46,6 +46,16 @@ class JcrForgeSettingsReaderTest {
         assertThat(targets.get(1).hasCredentials()).isFalse();
     }
 
+    @Test
+    @DisplayName("a repository failure is passed to the caller")
+    void repositoryFailure() throws RepositoryException {
+        Session session = org.mockito.Mockito.mock(Session.class);
+        org.mockito.Mockito.when(session.itemExists(JcrForgeSettingsReader.FORGES_PATH)).thenThrow(new RepositoryException("down"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> JcrForgeSettingsReader.read(session))
+                .isInstanceOf(RepositoryException.class);
+    }
+
     private static Session sessionWith(Node... forges) throws RepositoryException {
         Session session = mock(Session.class);
         Node root = mock(Node.class);
