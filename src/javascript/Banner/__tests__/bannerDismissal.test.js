@@ -1,4 +1,4 @@
-import {hashUser, isDismissed, localKey, recordDismissal, SESSION_KEY} from '../bannerDismissal';
+import {hashKeys, hashText, hashUser, isDismissed, localKey, recordDismissal, SESSION_KEY} from '../bannerDismissal';
 
 const HOUR = 3600 * 1000;
 const KEYS = ['jahia-core|JSA-2026-0001', 'security-updates|JSA-2026-0002'];
@@ -180,6 +180,29 @@ describe('banner dismissal', () => {
             expect(hashed).not.toContain('jdoe');
             expect(await hashUser('jdoe', undefined)).toBe(hashed);
             expect(await hashUser('jdoe2', undefined)).not.toBe(hashed);
+        });
+
+        test('hashKeys hashes each dismissal key, in order, so that the storage does not name the components', async () => {
+            const stored = await hashKeys(KEYS);
+            expect(stored).toEqual([await hashText(KEYS[0]), await hashText(KEYS[1])]);
+            stored.forEach(value => expect(value).toMatch(/^[0-9a-f]+$/));
+            expect(stored.join('')).not.toContain('jahia-core');
+            expect(await hashKeys(undefined)).toEqual([]);
+            expect(await hashKeys(['a'], text => Promise.resolve(`h:${text}`))).toEqual(['h:a']);
+            expect(hashUser).toBe(hashText);
+        });
+
+        test('hashed keys keep the rules: a new key shows the banner, a removed one keeps it hidden', async () => {
+            const ctx = context({policy: 'UNTIL_CHANGE', keys: await hashKeys(KEYS)});
+            recordDismissal(ctx);
+            expect(isDismissed({...ctx, keys: await hashKeys([KEYS[0]])})).toBe(true);
+            expect(isDismissed({...ctx, keys: await hashKeys([...KEYS, 'jcontent|JSA-1'])})).toBe(false);
+        });
+
+        test('a record of keys stored in clear (older version) shows the banner', async () => {
+            const ctx = context({policy: 'UNTIL_CHANGE'});
+            recordDismissal(ctx);
+            expect(isDismissed({...ctx, keys: await hashKeys(KEYS)})).toBe(false);
         });
 
         test('a failing SubtleCrypto falls back too', async () => {
