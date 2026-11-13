@@ -1,6 +1,7 @@
 import {
     ADMIN_PATH,
     BANNER,
+    Report,
     answerOf,
     checkPageAccessibility,
     checkUntil,
@@ -10,7 +11,8 @@ import {
     openAppPage,
     provision,
     readReport,
-    refresh
+    refresh,
+    waitForBannerDecision
 } from '../utils/securityUpdates';
 
 /**
@@ -20,6 +22,22 @@ import {
 describe('Security updates: report, Check now and the admin page', () => {
     const STATUSES = ['NOT_CHECKED', 'DISABLED', 'OK', 'PARTIAL', 'UNAVAILABLE'];
     const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+
+    /**
+     * Waits for the running check to end, and checks that it ended after the answer of the refresh mutation: its
+     * time is newer than that answer's, with the same results.
+     */
+    const expectCheckEndedAfter = (started: Report): void => {
+        const ended = () => readReport().then(report => (report.inProgress ? false : report));
+        cy.waitUntil(ended, {
+            timeout: 120000,
+            interval: 1000,
+            errorMsg: 'the check never ended'
+        }).then((report: Report) => {
+            expect(Date.parse(report.checkedAt as string), 'a newer check').to.be.greaterThan(Date.parse(started.checkedAt as string));
+            expect(isFixtureReport(report), 'same results').to.equal(true);
+        });
+    };
 
     before(() => {
         cy.apolloClient();
@@ -55,16 +73,11 @@ describe('Security updates: report, Check now and the admin page', () => {
             refresh().then(started => {
                 expect(STATUSES).to.include(started.status);
                 expect(started.inProgress, 'a check runs').to.equal(true);
-                expect(started.checkedAt, 'the report of the previous check, returned at once').to.equal(before.checkedAt);
-            });
-            const ended = () => readReport().then(report => (report.inProgress ? false : report));
-            cy.waitUntil(ended, {
-                timeout: 120000,
-                interval: 1000,
-                errorMsg: 'the check never ended'
-            }).then((report: typeof before) => {
-                expect(Date.parse(report.checkedAt as string), 'a newer check').to.be.greaterThan(Date.parse(before.checkedAt as string));
-                expect(isFixtureReport(report), 'same results').to.equal(true);
+                // The report of a check already ended, returned at once: the previous one, or a newer one when a
+                // scheduled check ended between the two reads (never an older one).
+                expect(Date.parse(started.checkedAt as string), 'the report of an ended check, returned at once')
+                    .to.be.at.least(Date.parse(before.checkedAt as string));
+                expectCheckEndedAfter(started);
             });
         });
     });
@@ -99,6 +112,7 @@ describe('Security updates: report, Check now and the admin page', () => {
         // problem, and the banner, shown on the previous page, is not on this one.
         cy.get('#security-updates-errors-title').should('not.exist');
         cy.contains('h2', 'Problems found during the last check').should('not.exist');
+        waitForBannerDecision();
         cy.get(BANNER).should('not.exist');
     });
 

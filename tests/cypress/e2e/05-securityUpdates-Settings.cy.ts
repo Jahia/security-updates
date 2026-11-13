@@ -19,7 +19,8 @@ import {
     readSettings,
     reloadAppPage,
     saveSettings,
-    until
+    until,
+    waitForBannerDecision
 } from '../utils/securityUpdates';
 
 /**
@@ -261,6 +262,7 @@ describe('Security updates: settings', () => {
         });
 
         reloadAppPage().then(answer => expect(answer.data?.securityUpdates?.banner?.visible).to.equal(true));
+        waitForBannerDecision();
         cy.get(BANNER).should('not.exist');
 
         cy.window().then(win => {
@@ -280,15 +282,18 @@ describe('Security updates: settings', () => {
         cy.get(BANNER_DISMISS, {timeout: 30000}).click();
         cy.get(BANNER).should('not.exist');
         reloadAppPage();
+        waitForBannerDecision();
         cy.get(BANNER).should('not.exist');
         cy.clearAllSessionStorage();
         reloadAppPage().then(answer => expect(answer.data?.securityUpdates?.banner?.visible, 'still visible server-side').to.equal(true));
+        waitForBannerDecision();
         cy.get(BANNER).should('not.exist');
 
         // A key disappears (critical only): still hidden.
         save({bannerDismissPolicy: 'UNTIL_CHANGE', bannerIncludeOwnerReports: false, bannerMinimumSeverity: 'CRITICAL'});
         until(readBanner, {dismissalKeys: [KEY_CORE]}, 'one advisory');
         reloadAppPage().then(answer => expect(answer.data?.securityUpdates?.banner?.dismissalKeys).to.deep.equal([KEY_CORE]));
+        waitForBannerDecision();
         cy.get(BANNER).should('not.exist');
 
         // A new advisory for a component already listed (the owner report of security-updates): back.

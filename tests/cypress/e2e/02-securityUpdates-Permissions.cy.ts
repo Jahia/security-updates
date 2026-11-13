@@ -21,7 +21,8 @@ import {
     runCheck,
     saveSettings,
     settingsOf,
-    until
+    until,
+    waitForBannerDecision
 } from '../utils/securityUpdates';
 
 /**
@@ -214,6 +215,7 @@ describe('Security updates: permissions', () => {
             expect(answer.data?.jcr?.nodeByPath?.hasPermission ?? false, 'no adminTemplates').to.equal(false);
         });
         cy.get('.moonstone-primaryNav', {timeout: 60000}).should('be.visible');
+        waitForBannerDecision();
         cy.get(BANNER).should('not.exist');
 
         cy.visit(ADMIN_PATH, {failOnStatusCode: false});

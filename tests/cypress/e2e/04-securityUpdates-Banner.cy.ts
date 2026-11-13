@@ -16,7 +16,8 @@ import {
     raw,
     readBanner,
     reloadAppPage,
-    until
+    until,
+    waitForBannerDecision
 } from '../utils/securityUpdates';
 
 /**
@@ -30,11 +31,36 @@ import {
 describe('Security updates: banner', () => {
     const DENIED_USER = 'securityUpdatesBannerUser';
     const PASSWORD = 'SecUpdBanner9-Test';
+    /** A TEST-ONLY button put right before the banner: the element focused before the keyboard goes into it. */
+    const FOCUS_ORIGIN_ID = 'security-updates-e2e-focus-origin';
 
     /** Provisions a banner fixture and waits until the service decides with it. */
     const withBanner = (fileName: string, expected: Partial<Banner>): Cypress.Chainable<Banner> => {
         provision(fileName);
         return until(readBanner, expected, fileName);
+    };
+
+    /**
+     * Puts the focus origin right before the banner, focuses it, then goes into the banner with the Tab key (native
+     * key events) up to "Hide this banner".
+     */
+    const tabToDismissFrom = (origin: string): void => {
+        cy.get(BANNER_DISMISS, {timeout: 30000}).should('be.visible');
+        cy.get(BANNER).then($banner => {
+            const button = $banner[0].ownerDocument.createElement('button');
+            button.type = 'button';
+            button.id = origin;
+            button.textContent = 'Focus origin (test)';
+            // Fixed at the top left, away from the banner (bottom right), so that it is visible and covers nothing.
+            button.style.cssText = 'position: fixed; top: 0; left: 0; z-index: 10000;';
+            $banner[0].before(button);
+        });
+        cy.get(`#${origin}`).focus();
+        cy.focused().should('have.id', origin);
+        cy.press(Cypress.Keyboard.Keys.TAB);
+        cy.focused().should('match', BANNER_LINK);
+        cy.press(Cypress.Keyboard.Keys.TAB);
+        cy.focused().should('match', BANNER_DISMISS);
     };
 
     before(() => {
@@ -61,7 +87,7 @@ describe('Security updates: banner', () => {
         provision('restore-defaults.yml');
     });
 
-    it('defaults: counts the two components, first in the page, links to the page', () => {
+    it('defaults: counts the two components, outside the Jahia UI tree, links to the page', () => {
         withBanner('banner-defaults.yml', {visible: true, count: 2, dismissalKeys: [KEY_CORE, KEY_OWNER, KEY_MODULE]}).then(banner => {
             expect(banner.minimumSeverity).to.equal('HIGH');
             expect(banner.components, 'distinct components').to.deep.equal(['jahia-core', 'security-updates']);
@@ -72,7 +98,8 @@ describe('Security updates: banner', () => {
         cy.get(BANNER, {timeout: 30000}).should('be.visible').and('have.attr', 'data-count', '2');
         cy.get(BANNER).should('contain', '2 components need a security update (high severity or above).');
         cy.get(BANNER).should('have.attr', 'role', 'region').and('have.attr', 'lang');
-        cy.get('body').children().first().should('have.id', 'security-updates-banner');
+        // A child of <body>, outside the React tree of the Jahia UI (which would remove it when it renders again).
+        cy.get(BANNER).parent().should('match', 'body');
         cy.get(BANNER_LINK)
             .should('contain', 'View security updates')
             .and('have.attr', 'href')
@@ -89,12 +116,14 @@ describe('Security updates: banner', () => {
         cy.get(BANNER_LINK).click();
         cy.location('pathname', {timeout: 30000}).should('match', /\/administration\/securityUpdates$/);
         cy.contains('h1', 'Security updates', {timeout: 60000}).should('be.visible');
+        waitForBannerDecision();
         cy.get(BANNER).should('not.exist');
 
         openAppPage();
         cy.get(BANNER, {timeout: 30000}).should('be.visible');
         cy.visit(ADMIN_PATH);
         cy.contains('h1', 'Security updates', {timeout: 60000}).should('be.visible');
+        waitForBannerDecision();
         cy.get(BANNER).should('not.exist');
     });
 
@@ -132,6 +161,7 @@ describe('Security updates: banner', () => {
             expect(answer.data?.jcr?.nodeByPath?.hasPermission).to.equal(true);
             expect(answer.data?.securityUpdates?.banner?.visible).to.equal(false);
         });
+        waitForBannerDecision();
         cy.get(BANNER).should('not.exist');
     });
 
@@ -141,19 +171,41 @@ describe('Security updates: banner', () => {
             openAppPage();
             cy.get(BANNER_DISMISS, {timeout: 30000}).click();
             cy.get(BANNER).should('not.exist');
-            cy.document().then(doc => {
-                expect(doc.activeElement?.closest(BANNER) ?? null, 'the focus is not lost in the removed banner').to.equal(null);
-            });
             cy.window().then(win => {
                 expect(JSON.parse(win.sessionStorage.getItem(SESSION_DISMISS_KEY) as string)).to.deep.equal(banner.dismissalKeys);
             });
 
             reloadAppPage().then(answer => expect(answer.data?.securityUpdates?.banner?.visible).to.equal(true));
+            waitForBannerDecision();
             cy.get(BANNER).should('not.exist');
 
             cy.clearAllSessionStorage();
             reloadAppPage();
             cy.get(BANNER, {timeout: 30000}).should('be.visible');
+        });
+    });
+
+    it('"Hide this banner" with the keyboard gives the focus back to the element focused before the banner', () => {
+        withBanner('banner-defaults.yml', {visible: true, dismissPolicy: 'SESSION', count: 2});
+        cy.clearAllSessionStorage();
+        cy.login();
+        openAppPage();
+
+        tabToDismissFrom(FOCUS_ORIGIN_ID);
+        cy.press(Cypress.Keyboard.Keys.ENTER);
+        cy.get(BANNER).should('not.exist');
+        cy.focused().should('have.id', FOCUS_ORIGIN_ID);
+
+        // That element left the page meanwhile: nothing to go back to, so the focus stays on the document.
+        cy.clearAllSessionStorage();
+        reloadAppPage();
+        tabToDismissFrom(FOCUS_ORIGIN_ID);
+        cy.get(`#${FOCUS_ORIGIN_ID}`).then($origin => $origin.remove());
+        cy.press(Cypress.Keyboard.Keys.SPACE);
+        cy.get(BANNER).should('not.exist');
+        cy.document().should(doc => {
+            expect(doc.getElementById(FOCUS_ORIGIN_ID), 'the focus origin is gone').to.equal(null);
+            expect(doc.activeElement, 'the focus is on the document').to.equal(doc.body);
         });
     });
 
@@ -169,6 +221,7 @@ describe('Security updates: banner', () => {
             expect(answer.data?.jcr?.nodeByPath?.hasPermission ?? false, 'no adminTemplates').to.equal(false);
         });
         cy.get('.moonstone-primaryNav', {timeout: 60000}).should('be.visible');
+        waitForBannerDecision();
         cy.get(BANNER).should('not.exist');
     });
 });

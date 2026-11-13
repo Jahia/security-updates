@@ -350,6 +350,22 @@ export const reloadAppPage = (): Cypress.Chainable<BannerAnswer> => {
     return waitForBannerQuery();
 };
 
+/**
+ * The test hook of the banner script on <html>: "pending" while a banner request runs, "ready" once the banner is
+ * decided (shown, hidden by the settings or a dismissal, not allowed, Security updates page open, or an error).
+ */
+export const BANNER_DECISION_ATTRIBUTE = 'data-security-updates-banner';
+
+/**
+ * Waits until the banner script of the current page has decided. Call it after the navigation it is about (after
+ * waitForBannerQuery, or once the Security updates page is shown) and before any assertion that the banner is
+ * absent: the banner is rendered asynchronously after its answer (response body, hash of the user name), so an
+ * absence assertion made before the decision could pass on a banner that is still to come.
+ */
+export const waitForBannerDecision = (): void => {
+    cy.get('html', {timeout: 30000, log: false}).should('have.attr', BANNER_DECISION_ATTRIBUTE, 'ready');
+};
+
 /** Aliases the GraphQL operations of the admin page by operation name (@SecurityUpdatesRefresh, ...). */
 export const interceptPageOperations = (): void => {
     cy.intercept('POST', '**/modules/graphql', req => {
