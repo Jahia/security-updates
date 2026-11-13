@@ -231,6 +231,24 @@ class SecurityUpdateServiceSchedulingTest {
         }
 
         @Test
+        @DisplayName("after a slow check, the next on-demand check waits the minimum interval from its END")
+        void rateLimitCountsFromTheEndOfASlowCheck() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, EMPTY_FEED);
+            // the check takes two minutes, more than the 30 s window
+            fixture.fetcher.onGet(() -> fixture.clock.advance(Duration.ofMinutes(2)));
+            service.refresh();
+            fixture.runSubmitted();
+
+            fixture.clock.advance(Duration.ofSeconds(10));
+            assertThat(service.refresh().isInProgress()).isFalse();
+            assertThat(fixture.submitted).isEmpty();
+
+            fixture.clock.advance(Duration.ofSeconds(20));
+            assertThat(service.refresh().isInProgress()).isTrue();
+        }
+
+        @Test
         @DisplayName("onDemandMinIntervalSeconds=0 removes the rate limit")
         void noRateLimit() {
             service.apply(onDemandInterval(0));

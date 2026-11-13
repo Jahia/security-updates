@@ -86,6 +86,7 @@ public class SecurityUpdateService {
     private Instant nextCheckAt;
     private boolean running;
     private Instant lastStart;
+    private Instant lastEnd;
 
     // ------------------------------------------------ static mandatory references, set before activation
     private HttpFetcher httpFetcher;
@@ -212,7 +213,7 @@ public class SecurityUpdateService {
 
     /**
      * Starts a check in the background, unless the check is disabled, a check is running, or the previous check
-     * started less than {@code onDemandMinIntervalSeconds} ago. Never blocks on the network.
+     * started or ended less than {@code onDemandMinIntervalSeconds} ago. Never blocks on the network.
      *
      * @return the current report; {@code inProgress} is true when a check runs
      */
@@ -313,12 +314,20 @@ public class SecurityUpdateService {
             return false;
         }
         Instant now = clock.instant();
-        if (onDemand && lastStart != null && lastStart.plus(settings.getOnDemandMinInterval()).isAfter(now)) {
+        Instant previous = later(lastStart, lastEnd);
+        if (onDemand && previous != null && previous.plus(settings.getOnDemandMinInterval()).isAfter(now)) {
             return false;
         }
         running = true;
         lastStart = now;
         return true;
+    }
+
+    private static Instant later(Instant a, Instant b) {
+        if (a == null || b == null) {
+            return a == null ? b : a;
+        }
+        return a.isAfter(b) ? a : b;
     }
 
     private void scheduledCheck() {
@@ -376,6 +385,7 @@ public class SecurityUpdateService {
     private void publish(SecurityReport next, boolean scheduledRun) {
         synchronized (lock) {
             running = false;
+            lastEnd = clock.instant();
             // a check that was stopped, or that ends after the check was disabled, publishes nothing
             if (next != null && !closed.get() && settings.isEnabled()) {
                 report = next;
