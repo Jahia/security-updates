@@ -107,7 +107,8 @@ module.exports = (env, argv) => {
         config.plugins.push(new CycloneDxWebpackPlugin(cycloneDxWebpackPluginOptions));
     }
 
-    // Production source maps are written for debugging but not referenced by the bundle (not served to browsers).
+    // Production source maps are written for debugging: the bundles do not reference them (no sourceMappingURL), and
+    // the module jar leaves the *.map files out.
     config.devtool = production ? 'hidden-source-map' : 'eval-source-map';
 
     if (argv.analyze) {
