@@ -39,6 +39,10 @@ public final class StoreClient {
     private static final Logger logger = LoggerFactory.getLogger(StoreClient.class);
     private static final String FEED = "Security feed: ";
     private static final String MODULE_LIST = "Module list: ";
+    static final String TRUNCATED_FEED = "Security feed: some lists are longer than this module reads (at most "
+            + SecurityFeedParser.MAX_ENTRIES + " advisories and " + SecurityFeedParser.MAX_ENTRIES + " flagged versions, "
+            + SecurityFeedParser.MAX_ITEMS + " fixes per advisory, fixed versions per fix, CVEs per advisory and "
+            + "references per flagged version): the rest was ignored";
 
     private final HttpFetcher fetcher;
 
@@ -120,9 +124,7 @@ public final class StoreClient {
                         feed.getSkippedEntries() + " entries of the security feed could not be understood and were ignored"));
             }
             if (feed.isTruncated()) {
-                errors.add(new StoreError(base, StoreErrorKind.NOT_UNDERSTOOD, StoreErrorDetail.ENTRIES_SKIPPED,
-                        "Security feed: only the first " + SecurityFeedParser.MAX_ENTRIES + " advisories and the first "
-                                + SecurityFeedParser.MAX_ENTRIES + " flagged versions were read"));
+                errors.add(new StoreError(base, StoreErrorKind.NOT_UNDERSTOOD, StoreErrorDetail.ENTRIES_SKIPPED, TRUNCATED_FEED));
             }
             return new FeedOutcome(feed);
         } catch (FeedFormatException e) {

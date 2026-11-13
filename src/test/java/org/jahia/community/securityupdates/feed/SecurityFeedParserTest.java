@@ -9,6 +9,7 @@ import org.jahia.community.securityupdates.model.StoreErrorDetail;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -63,8 +64,9 @@ class SecurityFeedParserTest {
             assertThat(fix.getComponent()).isEqualTo("ok-module");
             assertThat(fix.getFixedVersions()).containsExactly("2.0");
         });
-        // no id, no fixes, not an object, fix without component, flagged without version
-        assertThat(feed.getSkippedEntries()).isEqualTo(5);
+        // no id, no fixes, not an object, fix without component, flagged without version, and the two fixed
+        // versions of ok-module that are not version strings (3 and null)
+        assertThat(feed.getSkippedEntries()).isEqualTo(7);
     }
 
     @Test
@@ -171,7 +173,7 @@ class SecurityFeedParserTest {
     }
 
     @Test
-    @DisplayName("a fix whose fixed versions are all malformed is dropped and counted, not read as 'not affected'")
+    @DisplayName("a fix whose fixed versions are all malformed is dropped and counted; a malformed version of a kept fix is counted too")
     void malformedFixedVersionsAreSkipped() throws Exception {
         String json = "{\"schemaVersion\":1,\"advisories\":[{\"id\":\"JSA-1\",\"severity\":\"high\",\"fixes\":["
                 + "{\"component\":\"a\",\"fixedVersions\":[\"latest\",\"v2\"]},"
@@ -181,8 +183,78 @@ class SecurityFeedParserTest {
 
         assertThat(feed.getAdvisories()).singleElement().satisfies(a -> assertThat(a.getFixes())
                 .singleElement().satisfies(f -> assertThat(f.getFixedVersions()).containsExactly("2.0.0")));
-        // the fix of "a" is dropped; the malformed version of "b" is ignored but its fix entry is kept
+        // the fix of "a" is dropped (counted once); the malformed version of "b" is dropped and counted, its fix is kept
+        assertThat(feed.getSkippedEntries()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("one malformed fixed version next to a well-formed one is counted: it may be the installed version's line")
+    void malformedFixedVersionNextToAGoodOneIsCounted() throws Exception {
+        SecurityFeed feed = SecurityFeedParser.parse(advisoryWithFix(
+                "{\"component\":\"m\",\"fixedVersions\":[\"2.24.0\",\"3..5\"]}"));
+
+        assertThat(feed.getAdvisories().get(0).getFixes().get(0).getFixedVersions()).containsExactly("2.24.0");
         assertThat(feed.getSkippedEntries()).isEqualTo(1);
+    }
+
+    /** A JSON array of {@code count} times {@code item}. */
+    private static String array(String item, int count) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < count; i++) {
+            sb.append(i == 0 ? "" : ",").append(item);
+        }
+        return sb.append(']').toString();
+    }
+
+    @ParameterizedTest(name = "{0} fixes in one advisory: truncated {1}")
+    @CsvSource({"100, false", "101, true"})
+    void fixesPerAdvisoryCap(int count, boolean truncated) throws Exception {
+        SecurityFeed feed = SecurityFeedParser.parse("{\"schemaVersion\":1,\"advisories\":[{\"id\":\"JSA-1\",\"fixes\":"
+                + array("{\"component\":\"m\",\"fixedVersions\":[\"1.0\"]}", count) + "}]}");
+
+        assertThat(feed.getAdvisories().get(0).getFixes()).hasSize(SecurityFeedParser.MAX_ITEMS);
+        assertThat(feed.isTruncated()).isEqualTo(truncated);
+        assertThat(feed.getSkippedEntries()).isZero();
+    }
+
+    @ParameterizedTest(name = "{0} fixed versions in one fix: truncated {1}")
+    @CsvSource({"100, false", "101, true"})
+    void fixedVersionsPerFixCap(int count, boolean truncated) throws Exception {
+        SecurityFeed feed = SecurityFeedParser.parse(advisoryWithFix(
+                "{\"component\":\"m\",\"fixedVersions\":" + array("\"1.0\"", count) + "}"));
+
+        assertThat(feed.getAdvisories().get(0).getFixes().get(0).getFixedVersions()).hasSize(SecurityFeedParser.MAX_ITEMS);
+        assertThat(feed.isTruncated()).isEqualTo(truncated);
+    }
+
+    @ParameterizedTest(name = "{0} CVEs in one advisory: truncated {1}")
+    @CsvSource({"100, false", "101, true"})
+    void cvesCap(int count, boolean truncated) throws Exception {
+        SecurityFeed feed = SecurityFeedParser.parse("{\"schemaVersion\":1,\"advisories\":[{\"id\":\"JSA-1\",\"cves\":"
+                + array("\"CVE-2026-1234\"", count) + ",\"fixes\":[{\"component\":\"m\",\"fixedVersions\":[\"1.0\"]}]}]}");
+
+        assertThat(feed.getAdvisories().get(0).getCves()).hasSize(SecurityFeedParser.MAX_ITEMS);
+        assertThat(feed.isTruncated()).isEqualTo(truncated);
+    }
+
+    @ParameterizedTest(name = "{0} references in one flagged version: truncated {1}")
+    @CsvSource({"100, false", "101, true"})
+    void referencesCap(int count, boolean truncated) throws Exception {
+        SecurityFeed feed = SecurityFeedParser.parse("{\"schemaVersion\":1,\"flaggedVersions\":[{\"name\":\"m\","
+                + "\"version\":\"1.0\",\"references\":" + array("\"CVE-2026-1234\"", count) + "}]}");
+
+        assertThat(feed.getFlaggedVersions().get(0).getReferences()).hasSize(SecurityFeedParser.MAX_ITEMS);
+        assertThat(feed.isTruncated()).isEqualTo(truncated);
+    }
+
+    @Test
+    @DisplayName("items of another type or empty do not count towards the cap and do not truncate")
+    void ignoredItemsDoNotTruncate() throws Exception {
+        SecurityFeed feed = SecurityFeedParser.parse("{\"schemaVersion\":1,\"flaggedVersions\":[{\"name\":\"m\","
+                + "\"version\":\"1.0\",\"references\":[1,\"\",\"CVE-2026-1234\"]}]}");
+
+        assertThat(feed.getFlaggedVersions().get(0).getReferences()).containsExactly("CVE-2026-1234");
+        assertThat(feed.isTruncated()).isFalse();
     }
 
     @Test

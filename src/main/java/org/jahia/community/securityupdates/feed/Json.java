@@ -21,21 +21,28 @@ final class Json {
         return value instanceof String ? UntrustedText.clean((String) value, maxLength) : null;
     }
 
-    static List<String> strings(JSONObject object, String key, int maxItems, int maxLength) {
+    /**
+     * @param truncated run when the array holds more items than {@code maxItems} strings were read from
+     * @return the first {@code maxItems} non-empty strings of the array; items of another type are ignored
+     */
+    static List<String> strings(JSONObject object, String key, int maxItems, int maxLength, Runnable truncated) {
         Object value = object.opt(key);
         if (!(value instanceof JSONArray)) {
             return Collections.emptyList();
         }
         JSONArray array = (JSONArray) value;
         List<String> result = new ArrayList<>();
-        for (int i = 0; i < array.length() && result.size() < maxItems; i++) {
+        int i = 0;
+        while (i < array.length() && result.size() < maxItems) {
             Object item = array.opt(i);
-            if (item instanceof String) {
-                String cleaned = UntrustedText.clean((String) item, maxLength);
-                if (cleaned != null) {
-                    result.add(cleaned);
-                }
+            String cleaned = item instanceof String ? UntrustedText.clean((String) item, maxLength) : null;
+            if (cleaned != null) {
+                result.add(cleaned);
             }
+            i++;
+        }
+        if (i < array.length()) {
+            truncated.run();
         }
         return result;
     }

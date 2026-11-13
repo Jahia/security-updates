@@ -9,4 +9,8 @@ public final class SecurityFeedParserAccess {
     public static int maxEntries() {
         return SecurityFeedParser.MAX_ENTRIES;
     }
+
+    public static int maxItems() {
+        return SecurityFeedParser.MAX_ITEMS;
+    }
 }

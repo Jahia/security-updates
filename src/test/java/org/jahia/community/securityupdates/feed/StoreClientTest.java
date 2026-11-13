@@ -410,7 +410,7 @@ class StoreClientTest {
         assertThat(result.getErrors()).singleElement().satisfies(e -> {
             assertThat(e.getKind()).isEqualTo(StoreErrorKind.NOT_UNDERSTOOD);
             assertThat(e.getDetail()).isEqualTo(StoreErrorDetail.ENTRIES_SKIPPED);
-            assertThat(e.getMessage()).contains("5");
+            assertThat(e.getMessage()).startsWith("7 entries");
         });
     }
 
@@ -427,8 +427,9 @@ class StoreClientTest {
         assertThat(result.getErrors()).singleElement().satisfies(e -> {
             assertThat(e.getKind()).isEqualTo(StoreErrorKind.NOT_UNDERSTOOD);
             assertThat(e.getDetail()).isEqualTo(StoreErrorDetail.ENTRIES_SKIPPED);
-            assertThat(e.getMessage()).isEqualTo("Security feed: only the first 10000 advisories and the first 10000 "
-                    + "flagged versions were read");
+            assertThat(e.getMessage()).isEqualTo("Security feed: some lists are longer than this module reads (at most "
+                    + "10000 advisories and 10000 flagged versions, 100 fixes per advisory, fixed versions per fix, CVEs per "
+                    + "advisory and references per flagged version): the rest was ignored");
         });
     }
 }

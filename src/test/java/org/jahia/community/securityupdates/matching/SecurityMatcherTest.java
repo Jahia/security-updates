@@ -143,7 +143,7 @@ class SecurityMatcherTest {
         }
 
         @Test
-        @DisplayName("malformed fixed versions are ignored, well-formed ones still apply")
+        @DisplayName("malformed fixed versions are ignored, well-formed ones still apply (the parser drops and counts them first)")
         void malformedFixedVersionsAreIgnored() {
             assertThat(SecurityMatcher.recommendForAdvisory("1.0.0", List.of("garbage", "1.1.0"), false)).contains("1.1.0");
             assertThat(SecurityMatcher.recommendForAdvisory("1.0.0", List.of("garbage"), false)).isEmpty();

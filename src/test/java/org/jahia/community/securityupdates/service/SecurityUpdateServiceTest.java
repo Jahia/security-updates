@@ -385,6 +385,42 @@ class SecurityUpdateServiceTest {
         }
 
         @Test
+        @DisplayName("a malformed fixed version next to a good one (installed above it) is counted: PARTIAL, never OK")
+        void malformedFixedVersionIsNeverOk() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, "{\"schemaVersion\":1,\"advisories\":[{\"id\":\"JSA-1\",\"fixes\":["
+                    + "{\"component\":\"graphql-dxm-provider\",\"fixedVersions\":[\"2.24.0\",\"3..5\"]}]}]}");
+
+            SecurityReport report = fixture.check(service);
+
+            assertThat(report.getStatus()).isEqualTo(ReportStatus.PARTIAL);
+            assertThat(report.getFindings()).isEmpty();
+            assertThat(report.getLastSuccess()).isNull();
+            assertThat(report.getErrors()).singleElement().satisfies(e -> {
+                assertThat(e.getKind()).isEqualTo(StoreErrorKind.NOT_UNDERSTOOD);
+                assertThat(e.getDetail()).isEqualTo(StoreErrorDetail.ENTRIES_SKIPPED);
+            });
+        }
+
+        @Test
+        @DisplayName("an advisory with more fixes than the cap is PARTIAL, never OK")
+        void cappedFixesAreNeverOk() {
+            service.apply(Settings.defaults());
+            StringBuilder fixes = new StringBuilder();
+            for (int i = 0; i <= org.jahia.community.securityupdates.feed.SecurityFeedParserAccess.maxItems(); i++) {
+                fixes.append(i == 0 ? "" : ",").append("{\"component\":\"not-installed\",\"fixedVersions\":[\"1.0\"]}");
+            }
+            fixture.storeServes(DEFAULT_STORE, "{\"schemaVersion\":1,\"advisories\":[{\"id\":\"JSA-1\",\"fixes\":["
+                    + fixes + "]}]}");
+
+            SecurityReport report = fixture.check(service);
+
+            assertThat(report.getStatus()).isEqualTo(ReportStatus.PARTIAL);
+            assertThat(report.getErrors()).extracting(StoreError::getDetail)
+                    .containsExactly(StoreErrorDetail.ENTRIES_SKIPPED);
+        }
+
+        @Test
         @DisplayName("a feed cut at the entry limit is used, and the report is PARTIAL, never OK")
         void truncatedFeed() {
             service.apply(Settings.defaults());
@@ -400,7 +436,7 @@ class SecurityUpdateServiceTest {
             assertThat(report.getFindings()).hasSize(1);
             assertThat(report.getErrors()).singleElement().satisfies(e -> {
                 assertThat(e.getKind()).isEqualTo(StoreErrorKind.NOT_UNDERSTOOD);
-                assertThat(e.getDetail()).isEqualTo(org.jahia.community.securityupdates.model.StoreErrorDetail.ENTRIES_SKIPPED);
+                assertThat(e.getDetail()).isEqualTo(StoreErrorDetail.ENTRIES_SKIPPED);
             });
         }
     }

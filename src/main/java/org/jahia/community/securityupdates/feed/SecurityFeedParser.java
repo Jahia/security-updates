@@ -23,7 +23,10 @@ import java.util.function.Function;
  * a {@link FeedFormatException}. Inside a supported document, incomplete entries are skipped and counted, and
  * unknown keys are ignored. All text is cleaned and bounded. Versions are checked as the feed gives them (trimmed),
  * before any cut: a version longer than {@link #MAX_VERSION} is malformed. At most {@link #MAX_ENTRIES}
- * advisories and as many flagged versions are read; a longer list marks the feed truncated.
+ * advisories and as many flagged versions are read, and at most {@link #MAX_ITEMS} fixes per advisory, fixed versions
+ * per fix, CVEs per advisory and references per flagged version; a longer list marks the feed truncated, so the
+ * report is never complete. A malformed fixed version is dropped and counted as skipped, even when other fixed
+ * versions of its fix are kept.
  *
  * <p>A fix entry may give {@code introducedVersion}, the first version that has the issue: a malformed one is
  * ignored (the fix entry is kept, so versions below it are still reported) and counted as skipped.
@@ -61,7 +64,7 @@ public final class SecurityFeedParser {
         }
         Skipped skipped = new Skipped();
         List<Advisory> advisories = entries(optArray(root, "advisories"), value -> advisory(value, skipped), skipped);
-        List<FlaggedVersion> flags = entries(optArray(root, "flaggedVersions"), SecurityFeedParser::flag, skipped);
+        List<FlaggedVersion> flags = entries(optArray(root, "flaggedVersions"), value -> flag(value, skipped), skipped);
         return new SecurityFeed(advisories, flags, skipped.count, skipped.truncated);
     }
 
@@ -82,7 +85,7 @@ public final class SecurityFeedParser {
             i++;
         }
         if (i < array.length()) {
-            skipped.truncated = true;
+            skipped.truncate();
         }
         return entries;
     }
@@ -94,6 +97,14 @@ public final class SecurityFeedParser {
 
         void add() {
             count++;
+        }
+
+        void add(int entries) {
+            count += entries;
+        }
+
+        void truncate() {
+            truncated = true;
         }
     }
 
@@ -134,22 +145,33 @@ public final class SecurityFeedParser {
         if (id == null || fixArray == null) {
             return null;
         }
+        List<AdvisoryFix> fixes = fixes(fixArray, skipped);
+        if (fixes.isEmpty()) {
+            return null;
+        }
+        String title = Json.string(object, "title", MAX_TEXT);
+        return new Advisory(id, title == null ? id : title, Severity.parse(Json.string(object, SEVERITY, MAX_ID)),
+                Json.number(object, "cvss"), Json.strings(object, "cves", MAX_ITEMS, MAX_ID, skipped::truncate),
+                webUrl(Json.string(object, "url", MAX_URL)), Json.string(object, "published", MAX_ID), fixes);
+    }
+
+    /** Reads at most {@link #MAX_ITEMS} fix entries; a longer list marks the feed truncated. */
+    private static List<AdvisoryFix> fixes(JSONArray fixArray, Skipped skipped) {
         List<AdvisoryFix> fixes = new ArrayList<>();
-        for (int i = 0; i < fixArray.length() && fixes.size() < MAX_ITEMS; i++) {
+        int i = 0;
+        while (i < fixArray.length() && fixes.size() < MAX_ITEMS) {
             AdvisoryFix fix = fix(fixArray.opt(i), skipped);
             if (fix == null) {
                 skipped.add();
             } else {
                 fixes.add(fix);
             }
+            i++;
         }
-        if (fixes.isEmpty()) {
-            return null;
+        if (i < fixArray.length()) {
+            skipped.truncate();
         }
-        String title = Json.string(object, "title", MAX_TEXT);
-        return new Advisory(id, title == null ? id : title, Severity.parse(Json.string(object, SEVERITY, MAX_ID)),
-                Json.number(object, "cvss"), Json.strings(object, "cves", MAX_ITEMS, MAX_ID),
-                webUrl(Json.string(object, "url", MAX_URL)), Json.string(object, "published", MAX_ID), fixes);
+        return fixes;
     }
 
     private static AdvisoryFix fix(Object value, Skipped skipped) {
@@ -158,20 +180,42 @@ public final class SecurityFeedParser {
         }
         JSONObject object = (JSONObject) value;
         String component = Json.string(object, "component", MAX_NAME);
-        List<String> fixedVersions = new ArrayList<>();
         JSONArray versions = object.optJSONArray("fixedVersions");
-        for (int i = 0; versions != null && i < versions.length() && fixedVersions.size() < MAX_ITEMS; i++) {
-            String version = version(versions.opt(i));
-            if (version != null) {
-                fixedVersions.add(version);
-            }
-        }
-        // a fix with no comparable version would read as "not affected": it is dropped and counted instead
+        List<String> fixedVersions = new ArrayList<>();
+        int malformed = versions == null ? 0 : fixedVersions(versions, fixedVersions, skipped);
+        // a fix with no comparable version would read as "not affected": it is dropped and counted (once) instead
         if (component == null || fixedVersions.isEmpty()) {
             return null;
         }
+        // a malformed fixed version dropped from a kept fix could hide the line the installed version is on (and
+        // "installed >= every fixed version" would then read as "not affected"): each one is counted
+        skipped.add(malformed);
         return new AdvisoryFix(component, Json.string(object, GROUP_ID, MAX_NAME), fixedVersions,
                 introducedVersion(object, skipped));
+    }
+
+    /**
+     * Adds the well-formed versions among the first {@link #MAX_ITEMS} of {@code versions} to {@code fixedVersions};
+     * a longer list marks the feed truncated.
+     *
+     * @return the number of malformed versions dropped
+     */
+    private static int fixedVersions(JSONArray versions, List<String> fixedVersions, Skipped skipped) {
+        int malformed = 0;
+        int i = 0;
+        while (i < versions.length() && fixedVersions.size() < MAX_ITEMS) {
+            String version = version(versions.opt(i));
+            if (version == null) {
+                malformed++;
+            } else {
+                fixedVersions.add(version);
+            }
+            i++;
+        }
+        if (i < versions.length()) {
+            skipped.truncate();
+        }
+        return malformed;
     }
 
     /**
@@ -202,7 +246,7 @@ public final class SecurityFeedParser {
         return version.length() <= MAX_VERSION && Versions.isWellFormed(version) ? version : null;
     }
 
-    private static FlaggedVersion flag(Object value) {
+    private static FlaggedVersion flag(Object value, Skipped skipped) {
         if (!(value instanceof JSONObject)) {
             return null;
         }
@@ -214,7 +258,7 @@ public final class SecurityFeedParser {
         }
         return new FlaggedVersion(Json.string(object, GROUP_ID, MAX_NAME), name, version,
                 Severity.parse(Json.string(object, SEVERITY, MAX_ID)),
-                Json.strings(object, "references", MAX_ITEMS, MAX_URL), Json.string(object, "note", MAX_TEXT));
+                Json.strings(object, "references", MAX_ITEMS, MAX_URL, skipped::truncate), Json.string(object, "note", MAX_TEXT));
     }
 
     /** Keeps a URL only when it is an http(s) URL; the API and the UI further expose links only for https. */
