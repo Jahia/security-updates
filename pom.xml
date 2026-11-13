@@ -185,7 +185,7 @@
                 <extensions>true</extensions>
                 <configuration>
                     <instructions>
-                        <_dsannotations>org.jahia.community.securityupdates.*</_dsannotations>
+                        <_dsannotations>org.jahia.community.securityupdates.feed,org.jahia.community.securityupdates.service,org.jahia.community.securityupdates.graphql</_dsannotations>
                         <_metatypeannotations>*</_metatypeannotations>
                     </instructions>
                 </configuration>
