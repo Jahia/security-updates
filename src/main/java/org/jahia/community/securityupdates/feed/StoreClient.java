@@ -119,6 +119,11 @@ public final class StoreClient {
                 errors.add(new StoreError(base, StoreErrorKind.NOT_UNDERSTOOD, StoreErrorDetail.ENTRIES_SKIPPED,
                         feed.getSkippedEntries() + " entries of the security feed could not be understood and were ignored"));
             }
+            if (feed.isTruncated()) {
+                errors.add(new StoreError(base, StoreErrorKind.NOT_UNDERSTOOD, StoreErrorDetail.ENTRIES_SKIPPED,
+                        "Security feed: only the first " + SecurityFeedParser.MAX_ENTRIES + " advisories and the first "
+                                + SecurityFeedParser.MAX_ENTRIES + " flagged versions were read"));
+            }
             return new FeedOutcome(feed);
         } catch (FeedFormatException e) {
             logger.debug("Security feed of {} not understood: {}", base, e.getMessage());

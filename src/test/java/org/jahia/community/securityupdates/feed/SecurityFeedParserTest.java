@@ -241,4 +241,109 @@ class SecurityFeedParserTest {
         assertThat(SecurityFeedParser.parse(inSingleQuotes).getAdvisories()).isEmpty();
         assertThatThrownBy(() -> SecurityFeedParser.parse(apostrophe)).isInstanceOf(FeedFormatException.class);
     }
+
+    private static String advisoryWithFix(String fix) {
+        return "{\"schemaVersion\":1,\"advisories\":[{\"id\":\"JSA-1\",\"fixes\":[" + fix + "]}]}";
+    }
+
+    @Test
+    @DisplayName("a version longer than the limit is malformed, never cut to a valid prefix")
+    void overlongVersionsAreMalformed() throws Exception {
+        String overlong = "1." + "1".repeat(SecurityFeedParser.MAX_VERSION + 4);
+        String overlongQualifier = "1.0-" + "a".repeat(SecurityFeedParser.MAX_VERSION);
+
+        SecurityFeed onlyOverlong = SecurityFeedParser.parse(advisoryWithFix(
+                "{\"component\":\"m\",\"fixedVersions\":[\"" + overlongQualifier + "\"]}"));
+        SecurityFeed mixed = SecurityFeedParser.parse(advisoryWithFix(
+                "{\"component\":\"m\",\"fixedVersions\":[\"" + overlongQualifier + "\",\" 2.0.0 \"]}"));
+        SecurityFeed flag = SecurityFeedParser.parse("{\"schemaVersion\":1,\"flaggedVersions\":["
+                + "{\"name\":\"m\",\"version\":\"" + overlong + "\"},{\"name\":\"n\",\"version\":\"1.4.2\"}]}");
+
+        assertThat(onlyOverlong.getAdvisories()).isEmpty();
+        assertThat(onlyOverlong.getSkippedEntries()).isEqualTo(2);
+        assertThat(mixed.getAdvisories().get(0).getFixes().get(0).getFixedVersions()).containsExactly("2.0.0");
+        assertThat(flag.getFlaggedVersions()).extracting(FlaggedVersion::getName).containsExactly("n");
+        assertThat(flag.getSkippedEntries()).isEqualTo(1);
+    }
+
+    @ParameterizedTest(name = "flagged version [{0}] is malformed: the flag is skipped and counted")
+    @ValueSource(strings = {"latest", "v1.2", "1..2", ""})
+    void malformedFlaggedVersionsAreSkipped(String version) throws Exception {
+        SecurityFeed feed = SecurityFeedParser.parse("{\"schemaVersion\":1,\"flaggedVersions\":["
+                + "{\"name\":\"m\",\"version\":\"" + version + "\"}]}");
+
+        assertThat(feed.getFlaggedVersions()).isEmpty();
+        assertThat(feed.getSkippedEntries()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("more than MAX_ENTRIES advisories: the first MAX_ENTRIES are read and the feed is marked truncated")
+    void advisoriesCap() throws Exception {
+        SecurityFeed feed = SecurityFeedParser.parse(manyEntries("advisories",
+                "{\"id\":\"JSA-1\",\"fixes\":[{\"component\":\"m\",\"fixedVersions\":[\"1.0\"]}]}",
+                SecurityFeedParser.MAX_ENTRIES + 1));
+
+        assertThat(feed.getAdvisories()).hasSize(SecurityFeedParser.MAX_ENTRIES);
+        assertThat(feed.isTruncated()).isTrue();
+        assertThat(feed.getSkippedEntries()).isZero();
+    }
+
+    @Test
+    @DisplayName("more than MAX_ENTRIES flagged versions: the first MAX_ENTRIES are read and the feed is marked truncated")
+    void flagsCap() throws Exception {
+        SecurityFeed feed = SecurityFeedParser.parse(manyEntries("flaggedVersions", "{\"name\":\"m\",\"version\":\"1.0\"}",
+                SecurityFeedParser.MAX_ENTRIES + 1));
+
+        assertThat(feed.getFlaggedVersions()).hasSize(SecurityFeedParser.MAX_ENTRIES);
+        assertThat(feed.isTruncated()).isTrue();
+    }
+
+    @Test
+    @DisplayName("exactly MAX_ENTRIES entries, or skipped entries beyond them, is not truncated")
+    void capNotReached() throws Exception {
+        SecurityFeed atCap = SecurityFeedParser.parse(manyEntries("flaggedVersions", "{\"name\":\"m\",\"version\":\"1.0\"}",
+                SecurityFeedParser.MAX_ENTRIES));
+
+        assertThat(atCap.getFlaggedVersions()).hasSize(SecurityFeedParser.MAX_ENTRIES);
+        assertThat(atCap.isTruncated()).isFalse();
+        assertThat(SecurityFeedParser.parse(Fixtures.read("security-v1.json")).isTruncated()).isFalse();
+    }
+
+    /** A feed whose {@code key} array holds {@code count} times {@code entry}. */
+    static String manyEntries(String key, String entry, int count) {
+        StringBuilder sb = new StringBuilder("{\"schemaVersion\":1,\"").append(key).append("\":[");
+        for (int i = 0; i < count; i++) {
+            sb.append(i == 0 ? "" : ",").append(entry);
+        }
+        return sb.append("]}").toString();
+    }
+
+    @Test
+    @DisplayName("introducedVersion: read when present, null when absent")
+    void introducedVersion() throws Exception {
+        SecurityFeed present = SecurityFeedParser.parse(advisoryWithFix(
+                "{\"component\":\"m\",\"fixedVersions\":[\"2.24.0\"],\"introducedVersion\":\"2.0.0\"}"));
+        SecurityFeed absent = SecurityFeedParser.parse(advisoryWithFix(
+                "{\"component\":\"m\",\"fixedVersions\":[\"2.24.0\"]}"));
+        SecurityFeed jsonNull = SecurityFeedParser.parse(advisoryWithFix(
+                "{\"component\":\"m\",\"fixedVersions\":[\"2.24.0\"],\"introducedVersion\":null}"));
+
+        assertThat(present.getAdvisories().get(0).getFixes().get(0).getIntroducedVersion()).isEqualTo("2.0.0");
+        assertThat(present.getSkippedEntries()).isZero();
+        assertThat(absent.getAdvisories().get(0).getFixes().get(0).getIntroducedVersion()).isNull();
+        assertThat(jsonNull.getAdvisories().get(0).getFixes().get(0).getIntroducedVersion()).isNull();
+        assertThat(jsonNull.getSkippedEntries()).isZero();
+    }
+
+    @ParameterizedTest(name = "introducedVersion {0} is malformed: ignored (the fix is kept) and counted")
+    @ValueSource(strings = {"\"latest\"", "2", "[\"2.0.0\"]", "\"2.0.0-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""})
+    void malformedIntroducedVersion(String value) throws Exception {
+        SecurityFeed feed = SecurityFeedParser.parse(advisoryWithFix(
+                "{\"component\":\"m\",\"fixedVersions\":[\"2.24.0\"],\"introducedVersion\":" + value + "}"));
+
+        AdvisoryFix fix = feed.getAdvisories().get(0).getFixes().get(0);
+        assertThat(fix.getFixedVersions()).containsExactly("2.24.0");
+        assertThat(fix.getIntroducedVersion()).isNull();
+        assertThat(feed.getSkippedEntries()).isEqualTo(1);
+    }
 }

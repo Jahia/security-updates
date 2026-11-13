@@ -90,6 +90,58 @@ class SecurityMatcherTest {
             assertExpected(result, expected);
         }
 
+        @ParameterizedTest(name = "module {0}, introduced in {1}, fixes [{2}] -> {3}")
+        @CsvSource(delimiter = ';', value = {
+                // installed below the version that introduced the flaw: not affected
+                "1.4.0; 2.0.0; 2.24.0,3.10.0; -",
+                "1.99.99; 2.0.0; 2.24.0,3.10.0; -",
+                // from the introduced version on, the advisory rule
+                "2.0.0; 2.0.0; 2.24.0,3.10.0; 2.24.0",
+                "2.30.0; 2.0.0; 2.24.0,3.10.0; -",
+                "3.0.0; 2.0.0; 2.24.0,3.10.0; 3.10.0",
+                "3.10.0; 2.0.0; 2.24.0,3.10.0; -",
+                // a malformed introduced version is ignored: the advisory rule alone (over-report rather than hide)
+                "1.4.0; garbage; 2.24.0,3.10.0; 2.24.0"
+        })
+        void moduleWithIntroducedVersion(String installed, String introduced, String fixes, String expected) {
+            assertExpected(SecurityMatcher.recommendForAdvisory(installed, Arrays.asList(fixes.split(",")), introduced, false),
+                    expected);
+        }
+
+        @ParameterizedTest(name = "core {0}, introduced in {1}, fixes [{2}] -> {3}")
+        @CsvSource(delimiter = ';', value = {
+                "8.2.0.5; 8.2.1.0; 8.2.3.7; -",
+                "8.1.9.0; 8.2.1.0; 8.2.3.7; -",
+                "8.2.1.0; 8.2.1.0; 8.2.3.7; 8.2.3.7",
+                "8.2.2.0; 8.2.1.0; 8.2.3.7; 8.2.3.7",
+                "8.2.3.7; 8.2.1.0; 8.2.3.7; -"
+        })
+        void coreWithIntroducedVersion(String installed, String introduced, String fixes, String expected) {
+            assertExpected(SecurityMatcher.recommendForAdvisory(installed, Arrays.asList(fixes.split(",")), introduced, true),
+                    expected);
+        }
+
+        @Test
+        @DisplayName("match applies the introduced version of a fix entry")
+        void matchUsesTheIntroducedVersion() {
+            AdvisoryFix introduced = new AdvisoryFix("m", GROUP, List.of("2.24.0", "3.10.0"), "2.0.0");
+            SecurityFeed feed = feed(advisory("JSA-1", Severity.HIGH, introduced));
+
+            MatchResult before = new SecurityMatcher(JAHIA).match(List.of(module("m", "1.4.0")), List.of(feed), catalog("m",
+                    GROUP, "2.24.0", "version-8.2.0.0"));
+            MatchResult after = new SecurityMatcher(JAHIA).match(List.of(module("m", "2.1.0")), List.of(feed), catalog("m",
+                    GROUP, "2.24.0", "version-8.2.0.0"));
+
+            assertThat(before.getFindings()).isEmpty();
+            assertThat(after.getFindings()).singleElement().satisfies(f -> assertThat(f.getRecommendedVersion()).isEqualTo("2.24.0"));
+        }
+
+        @Test
+        @DisplayName("without an introduced version, the row 1.4.0 / [2.24.0, 3.10.0] still recommends 2.24.0")
+        void noIntroducedVersion() {
+            assertThat(SecurityMatcher.recommendForAdvisory("1.4.0", List.of("2.24.0", "3.10.0"), null, false)).contains("2.24.0");
+        }
+
         @Test
         @DisplayName("malformed fixed versions are ignored, well-formed ones still apply")
         void malformedFixedVersionsAreIgnored() {

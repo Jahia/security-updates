@@ -33,6 +33,8 @@ import java.util.regex.Pattern;
  * <p>Advisory rule, for an installed version X and the fixed versions of one fix entry (the "line" of a
  * version is its major for a module, {@code major.minor.servicePack} for {@code jahia-core}):
  * <ul>
+ *     <li>X is not affected when the fix entry gives an introduced version (the first version with the issue) and
+ *     X is below it;</li>
  *     <li>X is not affected when a fixed version on X's line is &lt;= X, or when X &gt;= every fixed version;</li>
  *     <li>otherwise the recommendation is the smallest fixed version on X's line above X, else the smallest
  *     fixed version above X.</li>
@@ -139,8 +141,19 @@ public final class SecurityMatcher {
      * @return the recommended version, or empty when {@code installed} is not affected
      */
     static Optional<String> recommendForAdvisory(String installed, List<String> fixedVersions, boolean core) {
+        return recommendForAdvisory(installed, fixedVersions, null, core);
+    }
+
+    /**
+     * Applies the advisory rule to one fix entry that may give the first version having the issue.
+     *
+     * @param introduced the first version that has the issue, or null; a malformed one is ignored
+     * @return the recommended version, or empty when {@code installed} is not affected
+     */
+    static Optional<String> recommendForAdvisory(String installed, List<String> fixedVersions, String introduced,
+                                                 boolean core) {
         List<String> fixes = wellFormed(fixedVersions);
-        if (fixes.isEmpty()) {
+        if (fixes.isEmpty() || introducedLater(installed, introduced)) {
             return Optional.empty();
         }
         String line = Versions.line(installed, core);
@@ -164,6 +177,10 @@ public final class SecurityMatcher {
             return Optional.empty();
         }
         return Optional.ofNullable(lowestAboveOnLine != null ? lowestAboveOnLine : lowestAbove);
+    }
+
+    private static boolean introducedLater(String installed, String introduced) {
+        return introduced != null && Versions.isWellFormed(introduced) && Versions.compare(installed, introduced) < 0;
     }
 
     /**
@@ -244,6 +261,7 @@ public final class SecurityMatcher {
             for (AdvisoryFix fix : advisory.getFixes()) {
                 if (concerns(fix, component)) {
                     List<String> fixed = fix.getFixedVersions();
+                    String introduced = fix.getIntroducedVersion();
                     versions += fixed.size();
                     if (versions > MAX_FIXED_VERSIONS_PER_COMPONENT) {
                         problems.add(new StoreError(null, StoreErrorKind.NOT_UNDERSTOOD, StoreErrorDetail.ENTRIES_SKIPPED,
@@ -254,7 +272,7 @@ public final class SecurityMatcher {
                     boolean core = component.isCore();
                     AdvisoryRef ref = new AdvisoryRef(advisory.getId(), advisory.getTitle(), advisory.getUrl(),
                             advisory.getCves(), advisory.getSeverity());
-                    rules.add(new Rule(ref, version -> recommendForAdvisory(version, fixed, core)));
+                    rules.add(new Rule(ref, version -> recommendForAdvisory(version, fixed, introduced, core)));
                 }
             }
         }
