@@ -7,6 +7,7 @@
     "refresh": "Vérifier maintenant",
     "refreshing": "Interrogation des stores...",
     "refreshed": "Vérification terminée.",
+    "notRefreshed": "Une vérification a eu lieu il y a moins de 30 secondes : le rapport est inchangé.",
     "refreshError": "La vérification n'a pas pu être lancée.",
     "jahiaVersion": "Version de Jahia",
     "checkedAt": "Dernière vérification",

@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import PropTypes from 'prop-types';
 import {useMutation, useQuery} from '@apollo/client';
 import {useTranslation} from 'react-i18next';
@@ -147,11 +147,17 @@ export const SecurityUpdates = () => {
     const [filter, setFilter] = useState('advisories');
     const [refreshed, setRefreshed] = useState(null);
     const [announcement, setAnnouncement] = useState('');
+    const [refreshError, setRefreshError] = useState(false);
+    const inFlight = useRef(false);
     const {data, loading, error} = useQuery(GET_SECURITY_REPORT, {fetchPolicy: 'network-only'});
-    const [refreshReport, {loading: refreshing}] = useMutation(REFRESH_SECURITY_REPORT);
+    const [refreshReport] = useMutation(REFRESH_SECURITY_REPORT);
 
     useEffect(() => {
+        const previousTitle = document.title;
         document.title = `${t('label')} — Jahia Administration`;
+        return () => {
+            document.title = previousTitle;
+        };
     }, [t]);
 
     const report = refreshed || data?.securityUpdates?.report;
@@ -160,7 +166,15 @@ export const SecurityUpdates = () => {
     const language = i18n?.language;
 
     const onRefresh = () => {
+        // The button stays enabled (disabling it would drop the keyboard focus); a click during a check is ignored.
+        if (inFlight.current) {
+            return;
+        }
+
+        inFlight.current = true;
+        setRefreshError(false);
         setAnnouncement(t('page.refreshing'));
+        const previousCheck = report?.checkedAt;
         refreshReport()
             .then(result => {
                 const next = result?.data?.securityUpdates?.refresh;
@@ -168,9 +182,15 @@ export const SecurityUpdates = () => {
                     setRefreshed(next);
                 }
 
-                setAnnouncement(t('page.refreshed'));
+                setAnnouncement(next && next.checkedAt !== previousCheck ? t('page.refreshed') : t('page.notRefreshed'));
             })
-            .catch(() => setAnnouncement(t('page.refreshError')));
+            .catch(() => {
+                setRefreshError(true);
+                setAnnouncement(t('page.refreshError'));
+            })
+            .finally(() => {
+                inFlight.current = false;
+            });
     };
 
     let statusText = announcement;
@@ -204,12 +224,12 @@ export const SecurityUpdates = () => {
                         <Button
                             label={t('page.refresh')}
                             variant="primary"
-                            isDisabled={refreshing}
                             onClick={onRefresh}
                         />
                         <a className={styles.link} href={adminUrl('manageModules')}>{t('page.manageModules')}</a>
                     </div>
 
+                    {refreshError && <p role="alert" className={`${styles.notice} ${styles.notice_error}`}>{t('page.refreshError')}</p>}
                     <StatusNotice report={report} hasFindings={allFindings.length > 0}/>
                     <StoreErrors errors={report.errors}/>
 

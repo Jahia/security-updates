@@ -9,10 +9,10 @@ const permission = allowed => ({data: {jcr: {nodeByPath: {hasPermission: allowed
 const report = findings => ({data: {securityUpdates: {report: {findings}}}});
 
 const urgent = [
-    {severity: 'CRITICAL', source: 'ADVISORY'},
-    {severity: 'HIGH', source: 'ADVISORY'},
-    {severity: 'CRITICAL', source: 'OWNER_REPORTED'},
-    {severity: 'LOW', source: 'ADVISORY'}
+    {component: 'a', severity: 'CRITICAL', source: 'ADVISORY'},
+    {component: 'b', severity: 'HIGH', source: 'ADVISORY'},
+    {component: 'c', severity: 'CRITICAL', source: 'OWNER_REPORTED'},
+    {component: 'd', severity: 'LOW', source: 'ADVISORY'}
 ];
 
 describe('showSecurityBanner', () => {
@@ -49,7 +49,7 @@ describe('showSecurityBanner', () => {
         document.getElementById(BANNER_ID).querySelector('button').click();
 
         expect(document.getElementById(BANNER_ID)).toBeNull();
-        expect(window.sessionStorage.getItem(DISMISS_KEY)).toBe('2');
+        expect(window.sessionStorage.getItem(DISMISS_KEY)).toBe('a|b');
 
         const again = jest.fn()
             .mockReturnValueOnce(response(permission(true)))
@@ -107,5 +107,17 @@ describe('showSecurityBanner', () => {
         await showSecurityBanner({t, fetchImpl: twice});
 
         expect(document.querySelectorAll(`#${BANNER_ID}`)).toHaveLength(1);
+    });
+
+    test('a dismissed notice comes back when other advisories apply, even with the same count', async () => {
+        window.sessionStorage.setItem(DISMISS_KEY, 'a|b');
+        const fetchImpl = jest.fn()
+            .mockReturnValueOnce(response(permission(true)))
+            .mockReturnValueOnce(response(report([
+                {component: 'a', severity: 'CRITICAL', source: 'ADVISORY'},
+                {component: 'x', severity: 'HIGH', source: 'ADVISORY'}
+            ])));
+
+        expect(await showSecurityBanner({t, fetchImpl})).toBe(true);
     });
 });

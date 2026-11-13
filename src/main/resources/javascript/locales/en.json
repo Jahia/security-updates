@@ -7,6 +7,7 @@
     "refresh": "Check now",
     "refreshing": "Checking the stores...",
     "refreshed": "Check completed.",
+    "notRefreshed": "A check ran less than 30 seconds ago: the report is unchanged.",
     "refreshError": "The check could not be run.",
     "jahiaVersion": "Jahia version",
     "checkedAt": "Last check",

@@ -1,5 +1,5 @@
 import React from 'react';
-import {fireEvent, render, screen, within} from '@testing-library/react';
+import {fireEvent, render, screen, waitFor, within} from '@testing-library/react';
 import {useMutation, useQuery} from '@apollo/client';
 import {SecurityUpdates} from '../SecurityUpdates';
 
@@ -145,6 +145,40 @@ describe('SecurityUpdates page', () => {
 
         fireEvent.click(screen.getByRole('button', {name: 'page.refresh'}));
 
-        expect(await screen.findByText('page.refreshError')).toBeInTheDocument();
+        await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('page.refreshError'));
+    });
+
+    test('a refresh that returns the same check is announced as unchanged', async () => {
+        refresh.mockImplementation(() => Promise.resolve({data: {securityUpdates: {refresh: report()}}}));
+        mockReport(report());
+        render(<SecurityUpdates/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'page.refresh'}));
+
+        expect(await screen.findByText('page.notRefreshed')).toBeInTheDocument();
+    });
+
+    test('the button stays focusable during a check and a second click does not start another', () => {
+        refresh.mockImplementation(() => new Promise(() => {}));
+        mockReport(report());
+        render(<SecurityUpdates/>);
+        const button = screen.getByRole('button', {name: 'page.refresh'});
+
+        fireEvent.click(button);
+        fireEvent.click(button);
+
+        expect(refresh).toHaveBeenCalledTimes(1);
+        expect(button).not.toBeDisabled();
+        expect(screen.getByRole('status')).toHaveTextContent('page.refreshing');
+    });
+
+    test('a failed refresh is also shown visibly', async () => {
+        refresh.mockImplementation(() => Promise.reject(new Error('boom')));
+        mockReport(report());
+        render(<SecurityUpdates/>);
+
+        fireEvent.click(screen.getByRole('button', {name: 'page.refresh'}));
+
+        expect(await screen.findByRole('alert')).toHaveTextContent('page.refreshError');
     });
 });

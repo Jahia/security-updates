@@ -66,6 +66,7 @@ Responses are handled as follows:
 | 3xx | `UNAVAILABLE`: redirects are not followed, so credentials never reach another host |
 | unknown `schemaVersion`, invalid JSON | `NOT_UNDERSTOOD`: fails closed |
 | catalogue failure | `CATALOGUE_UNAVAILABLE`: compatibility becomes `Unknown`, the feed is still used |
+| schema 1 feed with entries it cannot use | `NOT_UNDERSTOOD` (count of ignored entries); the rest of the feed is used |
 
 When a store fails, the data last read from it is kept and the error says so; the report status is
 then `PARTIAL`. The report status is `OK` only when every configured store returned a feed this module
@@ -99,8 +100,9 @@ the version is not in any catalogue. `jahia-core` findings read "Jahia upgrade r
 Versions are compared with Jahia's `org.jahia.utils.comparator.VersionComparator` (Maven
 `ComparableVersion` ordering). A version that does not start with a number, is longer than 64
 characters or has a segment longer than 9 digits is "malformed": a malformed fixed version is ignored,
-a malformed installed version is reported as `MALFORMED_VERSION` and that component is not checked;
-the rest of the report is still built.
+a fix entry with no well-formed version is ignored and reported; a malformed installed version (or
+running Jahia version) is reported as `MALFORMED_VERSION` and that component is not checked. The rest of
+the report is still built, and its status is `PARTIAL`, not `OK`.
 
 Each new finding is logged once at WARN level (`org.jahia.community.securityupdates`).
 
@@ -158,7 +160,8 @@ only when they start with `https://`.
 - HTTP goes through Jahia's `HttpClientService` (Jahia proxy settings apply) with a 10 s connect
   timeout, a 30 s read timeout, a 60 s deadline per body, no redirects, and size limits (2 MB for the
   feed, 16 MB for the catalogue, 4 KB kept of an error body).
-- Store credentials are sent only to the store they belong to, as Basic authentication, and are never
+- Store credentials are sent only to the store they belong to, as Basic authentication, and only over
+  https: for an `http://` store they are not sent and an `INVALID_URL` error says so. They are never
   logged nor returned; transport errors are reported by exception type only.
 - All feed text is untrusted: control characters are removed and lengths bounded on parsing; the UI
   renders it as React text (no `dangerouslySetInnerHTML`).
@@ -173,6 +176,8 @@ only when they start with `https://`.
 - `store.jahia.com` does not publish the security feed yet: until it does, the report is
   `UNAVAILABLE` with a `NOT_PUBLISHED` error.
 - Owner-flagged versions are declared by module developers and not reviewed by Jahia.
+- **Check now** (the `refresh` mutation) runs the check in the GraphQL request: with several slow or
+  unreachable stores it can take minutes (each request is bounded by the timeouts above).
 - On Jahia versions whose `HttpClientService` screens outbound requests against internal addresses,
   a store on a private network is subject to that screening.
 

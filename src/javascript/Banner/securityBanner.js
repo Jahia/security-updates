@@ -5,7 +5,7 @@ export const DISMISS_KEY = 'security-updates-banner-dismissed';
 const STYLE_ID = 'security-updates-banner-style';
 
 const PERMISSION_QUERY = 'query SecurityUpdatesBannerPermission { jcr { nodeByPath(path: "/") { hasPermission(permissionName: "adminTemplates") } } }';
-const REPORT_QUERY = 'query SecurityUpdatesBannerReport { securityUpdates { report { findings { severity source } } } }';
+const REPORT_QUERY = 'query SecurityUpdatesBannerReport { securityUpdates { report { findings { component severity source } } } }';
 
 // Colours: white on #1b1b1b is 17:1; the focus ring is #ffd400 on #1b1b1b (12:1). The banner never relies on
 // colour alone: the message states what it is about.
@@ -65,7 +65,14 @@ const ensureStyle = () => {
     }
 };
 
-const render = (t, count) => {
+// Identifies the set of urgent findings, so that a dismissed notice comes back when another component is concerned.
+const urgentKey = findings => (findings || [])
+    .filter(f => f.source === 'ADVISORY' && (f.severity === 'CRITICAL' || f.severity === 'HIGH'))
+    .map(f => f.component)
+    .sort()
+    .join('|');
+
+const render = (t, count, key) => {
     ensureStyle();
     const banner = document.createElement('div');
     banner.id = BANNER_ID;
@@ -84,7 +91,7 @@ const render = (t, count) => {
     dismiss.textContent = t('banner.dismiss');
 
     const close = () => {
-        writeDismissed(String(count));
+        writeDismissed(key);
         banner.remove();
     };
 
@@ -118,12 +125,14 @@ export const showSecurityBanner = async ({t, fetchImpl = window.fetch && window.
         }
 
         const data = await postGraphql(fetchImpl, REPORT_QUERY);
-        const count = countUrgentAdvisories(data.securityUpdates?.report?.findings);
-        if (count === 0 || readDismissed() === String(count) || document.getElementById(BANNER_ID)) {
+        const findings = data.securityUpdates?.report?.findings;
+        const count = countUrgentAdvisories(findings);
+        const key = urgentKey(findings);
+        if (count === 0 || readDismissed() === key || document.getElementById(BANNER_ID)) {
             return false;
         }
 
-        render(t, count);
+        render(t, count, key);
         return true;
     } catch {
         return false;
