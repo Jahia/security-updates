@@ -42,7 +42,9 @@ services:
             - stack
     # A store that serves fixed moduleList.json and securityUpdates.json over https (tests/storefixture/contents),
     # so that the findings depend neither on what store.jahia.com publishes nor on internet access from the test
-    # network. Port 80 serves a different feed, as a trap: the module must never read a plain http store.
+    # network. Port 80 serves a different feed, as a trap: the module must never read a plain http store. Paths of
+    # it are failing stores (tests/storefixture/stores, 08-securityUpdates-StoreErrors.cy.ts); port 8081, not
+    # published, switches the "flaky" one.
     storefixture:
         image: 'nginx:1.27.5-alpine'
         container_name: storefixture
@@ -50,6 +52,9 @@ services:
             storefixture-tls:
                 condition: service_completed_successfully
         volumes:
+            # nginx-main.conf loads njs, for the switch of the "flaky" store (switches.js, see nginx.conf).
+            - ./storefixture/nginx-main.conf:/etc/nginx/nginx.conf:ro
+            - ./storefixture/switches.js:/etc/nginx/njs/switches.js:ro
             - ./storefixture/nginx.conf:/etc/nginx/conf.d/default.conf:ro
             - storefixture-generated:/srv/storefixture:ro
         networks:

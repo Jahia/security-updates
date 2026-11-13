@@ -1,0 +1,9 @@
+{"schemaVersion": 1,
+ "advisories": [
+   {"id": "JSA-2099-0101", "title": "Fixture advisory introduced after the installed version", "severity": "critical", "cves": [],
+    "fixes": [{"component": "security-updates", "groupId": "org.jahia.community", "introducedVersion": "50.0.0",
+      "fixedVersions": ["99.0.0"]}]},
+   {"id": "JSA-2099-0102", "title": "Fixture advisory, twin of JSA-2099-0101 without introducedVersion", "severity": "critical",
+    "cves": [], "fixes": [{"component": "security-updates", "groupId": "org.jahia.community", "fixedVersions": ["99.0.0"]}]}
+ ],
+ "flaggedVersions": []}

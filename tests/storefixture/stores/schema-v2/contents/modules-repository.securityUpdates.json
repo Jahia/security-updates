@@ -1,0 +1,6 @@
+{"schemaVersion": 2,
+ "advisories": [
+   {"id": "JSA-2099-0201", "title": "Fixture advisory of a feed format this module does not understand", "severity": "critical",
+    "cves": [], "fixes": [{"component": "security-updates", "groupId": "org.jahia.community", "fixedVersions": ["99.0.0"]}]}
+ ],
+ "flaggedVersions": []}

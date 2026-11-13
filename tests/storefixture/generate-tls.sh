@@ -7,8 +7,9 @@
 #                                               valid 30 days, created here and never committed
 #   trust/truststore.p12                        the JDK cacerts of the Jahia image plus that certificate, given to
 #                                               the Jahia JVM with -Djavax.net.ssl.trustStore (CATALINA_OPTS)
-#   https/, http-trap/                          the files nginx serves over https and, as a trap, over http,
-#                                               copied with permissions nginx can read whatever the host umask
+#   https/, http-trap/                          the files nginx serves over https (contents/, and stores/ for the
+#                                               failing stores) and, as a trap, over http, copied with
+#                                               permissions nginx can read whatever the host umask
 #
 # The module only fetches https stores: the fixture store must be a real https server that Jahia trusts, the way a
 # customer's private store is. Nothing here is a secret: the key only serves a throwaway test container.
@@ -49,6 +50,8 @@ fi
 
 mkdir -p "$OUT/https" "$OUT/http-trap"
 cp -R "$SRC/contents" "$OUT/https/"
+# the feeds of the failing stores of 08-securityUpdates-StoreErrors.cy.ts (stores/<name>/contents/, see nginx.conf)
+cp -R "$SRC/stores/." "$OUT/https/"
 cp -R "$SRC/http-trap/contents" "$OUT/http-trap/"
 chmod 755 "$OUT"
 find "$OUT/https" "$OUT/http-trap" -type d -exec chmod 755 {} +
