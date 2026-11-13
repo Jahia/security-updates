@@ -45,7 +45,8 @@ import java.util.regex.Pattern;
 public final class SecurityMatcher {
 
     private static final String REQUIRED_VERSION_PREFIX = "version-";
-    private static final Pattern CVE = Pattern.compile("CVE-\\d{4}-\\d{4,}");
+    /** A CVE, or a Jahia vulnerability identifier: JSA-YYYY-NNNN with an optional numeric suffix (JSA-2026-0036.1066). */
+    private static final Pattern CVE = Pattern.compile("CVE-\\d{4}-\\d{4,}|JSA-\\d{4}-\\d{4}(\\.\\d+)?");
     private static final String HTTPS = "https://";
 
     private static final Comparator<Finding> FINDING_ORDER = Comparator

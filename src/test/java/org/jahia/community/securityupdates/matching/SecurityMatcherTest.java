@@ -345,6 +345,22 @@ class SecurityMatcherTest {
         }
 
         @Test
+        @DisplayName("keep Jahia vulnerability identifiers (JSA-YYYY-NNNN.NNNN) with the CVEs of an owner report")
+        void ownerReportKeepsJahiaVulnerabilityIdentifiers() {
+            SecurityFeed feed = new SecurityFeed(List.of(),
+                    List.of(new FlaggedVersion("org.jahia.community", "my-module", "1.4.2", Severity.HIGH,
+                            List.of("JSA-2026-0036.1066", "CVE-2026-9999", "JSA-2026-0036.", "GHSA-xxxx-yyyy"), null)),
+                    0);
+
+            MatchResult result = new SecurityMatcher(JAHIA).match(
+                    List.of(new InstalledComponent("my-module", "org.jahia.community", "1.4.0")), List.of(feed),
+                    ModuleCatalog.empty());
+
+            AdvisoryRef ref = result.getFindings().get(0).getAdvisories().get(0);
+            assertThat(ref.getCves()).containsExactly("JSA-2026-0036.1066", "CVE-2026-9999");
+        }
+
+        @Test
         @DisplayName("several flags: the smallest flagged version above the installed one")
         void severalFlags() {
             SecurityFeed feed = new SecurityFeed(Collections.emptyList(), List.of(
