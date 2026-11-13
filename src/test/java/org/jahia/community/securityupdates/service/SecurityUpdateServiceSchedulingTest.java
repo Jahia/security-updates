@@ -448,10 +448,11 @@ class SecurityUpdateServiceSchedulingTest {
     class Staleness {
 
         @Test
-        @DisplayName("a report older than twice the interval is stale: PARTIAL with a STALE error; younger is not")
+        @DisplayName("a report older than twice the interval is stale: PARTIAL with a STALE error, its findings still in the "
+                + "banner; younger is not")
         void staleReport() {
             service.apply(Settings.defaults());
-            fixture.storeServes(DEFAULT_STORE, EMPTY_FEED);
+            fixture.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
             fixture.check(service);
 
             fixture.clock.advance(Duration.ofHours(48));
@@ -463,7 +464,10 @@ class SecurityUpdateServiceSchedulingTest {
             assertThat(view.isStale()).isTrue();
             assertThat(view.getReport().getStatus()).isEqualTo(ReportStatus.PARTIAL);
             assertThat(view.getReport().getErrors()).extracting(StoreError::getKind).containsExactly(StoreErrorKind.STALE);
-            assertThat(service.getBanner()).isNotNull();
+            assertThat(view.getReport().getFindings()).hasSize(1);
+            org.jahia.community.securityupdates.model.BannerDecision banner = service.getBanner();
+            assertThat(banner.isVisible()).isTrue();
+            assertThat(banner.getComponents()).containsExactly("graphql-dxm-provider");
         }
 
         @Test

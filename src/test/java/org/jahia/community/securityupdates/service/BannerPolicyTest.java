@@ -45,6 +45,21 @@ class BannerPolicyTest {
         return new AdvisoryRef(id, null, null, List.of(), severity);
     }
 
+    @ParameterizedTest(name = "a {0} report with findings: the banner counts them as for OK")
+    @org.junit.jupiter.params.provider.EnumSource(value = ReportStatus.class, names = {"PARTIAL", "UNAVAILABLE", "DISABLED"})
+    void statusDoesNotHideFindings(ReportStatus status) {
+        SecurityReport ok = report();
+        SecurityReport other = new SecurityReport(status, ok.getCheckedAt(), ok.getLastSuccess(), ok.getJahiaVersion(),
+                ok.getErrors(), ok.getFindings());
+
+        BannerDecision banner = BannerPolicy.decide(other, BannerSettings.defaults());
+
+        // the decision reads the findings only; the service never builds a DISABLED report with findings
+        assertThat(banner.isVisible()).isTrue();
+        assertThat(banner.getComponents()).containsExactly("jahia-core", "security-updates");
+        assertThat(banner.getDismissalKeys()).isEqualTo(BannerPolicy.decide(ok, BannerSettings.defaults()).getDismissalKeys());
+    }
+
     @Test
     @DisplayName("defaults: high or above, owner reports included")
     void defaults() {
