@@ -8,12 +8,14 @@ services:
         ports:
             # Local access only (Cypress reaches Jahia over the compose network, as http://jahia:8080).
             - '127.0.0.1:8080:8080'
-            # JDWP (JPDA=true): local debugging only, never on the other interfaces of the host.
+            # JDWP, only when JPDA=true (off by default): local debugging only, never on the other interfaces of the host.
             - '127.0.0.1:8000:8000'
         environment:
             - SUPER_USER_PASSWORD=${SUPER_USER_PASSWORD}
             - JAHIA_LICENSE=${JAHIA_LICENSE}
-            - JPDA=true
+            # The JVM debugger (JDWP) is off by default. To debug, start the stack with JPDA=true in the environment
+            # (for example "JPDA=true bash ci.startup.sh"), then attach to 127.0.0.1:8000.
+            - JPDA=${JPDA:-false}
             # Jahia's HTTP client refuses internal addresses (SSRF guard). Allow the fixture store, which a customer
             # does the same way for a private store: jahia.httpClient.allowedInternalHosts.
             - jahia_cfg_jahia_httpClient_allowedInternalHosts=storefixture
