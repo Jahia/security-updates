@@ -69,7 +69,8 @@ class SecurityUpdatesSchemaTest {
     @Test
     @DisplayName("the report query and the refresh mutation of the UI are valid")
     void reportDocuments() {
-        assertThat(validate("query SecurityUpdatesReport { securityUpdates { report { ...SecurityUpdatesReportFields } } } "
+        assertThat(validate("query SecurityUpdatesReport { securityUpdates { report { ...SecurityUpdatesReportFields }"
+                + " banner { visible count minimumSeverity } } } "
                 + REPORT_FIELDS)).isEmpty();
         assertThat(validate("mutation SecurityUpdatesRefresh { securityUpdates { refresh { ...SecurityUpdatesReportFields } } } "
                 + REPORT_FIELDS)).isEmpty();
