@@ -84,14 +84,21 @@ describe('Security updates', () => {
     })
 
     it('the Check now button runs a check and announces it, then announces the rate limit', () => {
+        // The fixture store answers at once: a check against store.jahia.com depends on the network and can
+        // take up to the HTTP timeouts, longer than an assertion should wait.
+        cy.runProvisioningScript({ script: { fileName: 'security-updates/use-fixture-store.yml', type: 'application/yaml' } })
         // before() ran a check: on-demand checks are limited to one per 30 seconds.
         // eslint-disable-next-line cypress/no-unnecessary-waiting
         cy.wait(31000)
         cy.login()
         cy.visit(ADMIN_PATH)
         cy.contains('button', 'Check now').click()
-        cy.get('[role="status"]').should('contain', 'Check completed')
+        cy.get('[role="status"]', { timeout: 20000 }).should('contain', 'Check completed')
         cy.contains('button', 'Check now').should('not.be.disabled').click()
-        cy.get('[role="status"]').should('contain', 'the report is unchanged')
+        cy.get('[role="status"]', { timeout: 20000 }).should('contain', 'the report is unchanged')
+    })
+
+    after(() => {
+        cy.runProvisioningScript({ script: { fileName: 'security-updates/use-default-store.yml', type: 'application/yaml' } })
     })
 })
