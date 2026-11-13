@@ -7,6 +7,7 @@ import {
     interceptPageOperations,
     isFixtureReport,
     named,
+    openAppPage,
     provision,
     readReport,
     refresh
@@ -70,6 +71,11 @@ describe('Security updates: report, Check now and the admin page', () => {
 
     it('renders the page: status chip, dates, findings in a named scrolling region, no store problem', () => {
         cy.login();
+        // Positive signal for the banner absence asserted below: on the other pages of the Jahia UI, this report
+        // shows the banner (the banner script sends no request at all on the Security updates page).
+        openAppPage().then(answer => expect(answer.data?.securityUpdates?.banner?.visible, 'the banner is due').to.equal(true));
+        cy.get(BANNER, {timeout: 30000}).should('be.visible');
+
         cy.visit(ADMIN_PATH);
         cy.contains('h1', 'Security updates').should('be.visible');
         cy.title().should('contain', 'Security updates');
@@ -89,7 +95,9 @@ describe('Security updates: report, Check now and the admin page', () => {
                 cy.get('tbody tr').should('have.length', 3);
             });
 
-        // Only now that the findings are shown: the store was read without a problem, and no banner on this page.
+        // Only now that the findings are shown (the same answer as the store problems): the store was read without a
+        // problem, and the banner, shown on the previous page, is not on this one.
+        cy.get('#security-updates-errors-title').should('not.exist');
         cy.contains('h2', 'Problems found during the last check').should('not.exist');
         cy.get(BANNER).should('not.exist');
     });

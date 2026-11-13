@@ -17,9 +17,9 @@ import {
     provision,
     readBanner,
     readSettings,
+    reloadAppPage,
     saveSettings,
-    until,
-    waitForBannerQuery
+    until
 } from '../utils/securityUpdates';
 
 /**
@@ -52,11 +52,6 @@ describe('Security updates: settings', () => {
         expect(ROOT_LOCAL_DISMISS_KEYS, 'key made of the hashed user name').to.include(keys[0]);
         expect(keys[0]).to.not.contain('root');
         return {key: keys[0], record: JSON.parse(win.localStorage.getItem(keys[0]) as string)};
-    };
-
-    const reloadApp = () => {
-        cy.reload();
-        return waitForBannerQuery();
     };
 
     before(() => {
@@ -265,14 +260,14 @@ describe('Security updates: settings', () => {
             });
         });
 
-        reloadApp().then(answer => expect(answer.data?.securityUpdates?.banner?.visible).to.equal(true));
+        reloadAppPage().then(answer => expect(answer.data?.securityUpdates?.banner?.visible).to.equal(true));
         cy.get(BANNER).should('not.exist');
 
         cy.window().then(win => {
             const {key, record} = localRecord(win);
             win.localStorage.setItem(key, JSON.stringify({...record, at: record.at - (2 * 3600 * 1000)}));
         });
-        reloadApp();
+        reloadAppPage();
         cy.get(BANNER, {timeout: 30000}).should('be.visible');
     });
 
@@ -284,22 +279,22 @@ describe('Security updates: settings', () => {
         openAppPage();
         cy.get(BANNER_DISMISS, {timeout: 30000}).click();
         cy.get(BANNER).should('not.exist');
-        reloadApp();
+        reloadAppPage();
         cy.get(BANNER).should('not.exist');
         cy.clearAllSessionStorage();
-        reloadApp().then(answer => expect(answer.data?.securityUpdates?.banner?.visible, 'still visible server-side').to.equal(true));
+        reloadAppPage().then(answer => expect(answer.data?.securityUpdates?.banner?.visible, 'still visible server-side').to.equal(true));
         cy.get(BANNER).should('not.exist');
 
         // A key disappears (critical only): still hidden.
         save({bannerDismissPolicy: 'UNTIL_CHANGE', bannerIncludeOwnerReports: false, bannerMinimumSeverity: 'CRITICAL'});
         until(readBanner, {dismissalKeys: [KEY_CORE]}, 'one advisory');
-        reloadApp().then(answer => expect(answer.data?.securityUpdates?.banner?.dismissalKeys).to.deep.equal([KEY_CORE]));
+        reloadAppPage().then(answer => expect(answer.data?.securityUpdates?.banner?.dismissalKeys).to.deep.equal([KEY_CORE]));
         cy.get(BANNER).should('not.exist');
 
         // A new advisory for a component already listed (the owner report of security-updates): back.
         save({bannerDismissPolicy: 'UNTIL_CHANGE', bannerIncludeOwnerReports: true});
         until(readBanner, {dismissalKeys: [KEY_CORE, KEY_OWNER, KEY_MODULE]}, 'three advisories');
-        reloadApp();
+        reloadAppPage();
         cy.get(BANNER, {timeout: 30000}).should('be.visible').and('have.attr', 'data-count', '2');
     });
 

@@ -15,8 +15,8 @@ import {
     provision,
     raw,
     readBanner,
-    until,
-    waitForBannerQuery
+    reloadAppPage,
+    until
 } from '../utils/securityUpdates';
 
 /**
@@ -148,13 +148,11 @@ describe('Security updates: banner', () => {
                 expect(JSON.parse(win.sessionStorage.getItem(SESSION_DISMISS_KEY) as string)).to.deep.equal(banner.dismissalKeys);
             });
 
-            cy.reload();
-            waitForBannerQuery().then(answer => expect(answer.data?.securityUpdates?.banner?.visible).to.equal(true));
+            reloadAppPage().then(answer => expect(answer.data?.securityUpdates?.banner?.visible).to.equal(true));
             cy.get(BANNER).should('not.exist');
 
             cy.clearAllSessionStorage();
-            cy.reload();
-            waitForBannerQuery();
+            reloadAppPage();
             cy.get(BANNER, {timeout: 30000}).should('be.visible');
         });
     });

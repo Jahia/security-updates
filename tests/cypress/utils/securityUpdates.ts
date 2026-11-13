@@ -284,12 +284,33 @@ export const named = (operationName: string) => (operation: GraphqlOperation): b
 
 const isBannerQuery = (operation: GraphqlOperation): boolean => typeof operation.query === 'string' && operation.query.includes('SecurityUpdatesBanner {');
 
-/** Aliases the banner request of the Jahia UI (one GraphQL request, sent with fetch) as @bannerQuery. */
+/*
+ * One alias per navigation. cy.wait('@alias') yields the oldest request of that alias not waited for yet, and the
+ * banner sends more requests than the one awaited (visibilitychange, the security-updates:changed event): with one
+ * alias for the whole test, a wait after a reload could yield an answer given before it. Each interceptBannerQuery
+ * call therefore gets its own alias, and only its handler names requests once it is the active one (older handlers
+ * of the same test stay registered but name nothing).
+ */
+let bannerGeneration = 0;
+let activeBannerGeneration = 0;
+let pendingBannerAlias: string | null = null;
+
+/**
+ * Aliases the banner requests of the next navigation (one GraphQL request, sent with fetch). Call it right before
+ * each cy.visit or cy.reload whose banner request waitForBannerQuery awaits.
+ */
 export const interceptBannerQuery = (): void => {
+    bannerGeneration += 1;
+    const generation = bannerGeneration;
+    const alias = `bannerQuery${generation}`;
+    pendingBannerAlias = alias;
+    cy.then(() => {
+        activeBannerGeneration = generation;
+    });
     cy.intercept('POST', '**/modules/graphql', req => {
         const operations: GraphqlOperation[] = Array.isArray(req.body) ? req.body : [req.body];
-        if (operations.some(operation => Boolean(operation) && isBannerQuery(operation))) {
-            req.alias = 'bannerQuery';
+        if (generation === activeBannerGeneration && operations.some(operation => Boolean(operation) && isBannerQuery(operation))) {
+            req.alias = alias;
         }
     });
 };
@@ -301,14 +322,31 @@ type BannerAnswer = {
     } | null;
 };
 
-/** Waits for the next banner request and yields its answer (a positive signal before any absence is asserted). */
-export const waitForBannerQuery = (): Cypress.Chainable<BannerAnswer> =>
-    cy.wait('@bannerQuery', {timeout: 60000}).then(interception => answerOf<BannerAnswer>(interception, isBannerQuery, 'banner request'));
+/**
+ * Waits for the first banner request of the navigation prepared by the last interceptBannerQuery call and yields its
+ * answer (a positive signal before any absence is asserted). Each call needs its own interceptBannerQuery call.
+ */
+export const waitForBannerQuery = (): Cypress.Chainable<BannerAnswer> => {
+    const alias = pendingBannerAlias;
+    pendingBannerAlias = null;
+    if (!alias) {
+        throw new Error('waitForBannerQuery: call interceptBannerQuery() right before the visit or reload it waits for');
+    }
+
+    return cy.wait(`@${alias}`, {timeout: 60000}).then(interception => answerOf<BannerAnswer>(interception, isBannerQuery, 'banner request'));
+};
 
 /** Opens a page of the Jahia UI and yields the answer to its banner request. */
 export const openAppPage = (path = APP_PATH): Cypress.Chainable<BannerAnswer> => {
     interceptBannerQuery();
     cy.visit(path);
+    return waitForBannerQuery();
+};
+
+/** Reloads the current page of the Jahia UI and yields the answer to its own banner request. */
+export const reloadAppPage = (): Cypress.Chainable<BannerAnswer> => {
+    interceptBannerQuery();
+    cy.reload();
     return waitForBannerQuery();
 };
 

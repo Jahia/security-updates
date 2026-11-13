@@ -70,6 +70,18 @@ describe('Security updates: permissions', () => {
         asRoot();
     });
 
+    // A test that changed the settings (or failed after changing them) must not leave the next tests on other ones.
+    afterEach(() => {
+        asRoot();
+        readSettings().then(settings => {
+            if (!Cypress._.isEqual(settings, FIXTURE_SETTINGS)) {
+                provision('settings-fixture-defaults.yml');
+                until(readSettings, FIXTURE_SETTINGS, 'fixture settings');
+                ensureFixtureReport();
+            }
+        });
+    });
+
     after(() => {
         asRoot();
         revokeRoles('/', ['web-designer'], DESIGNER, 'USER');
@@ -149,11 +161,7 @@ describe('Security updates: permissions', () => {
             expect(settingsOf(result.settings as NonNullable<typeof result.settings>)).to.deep.equal(DEFAULT_SETTINGS);
         });
         readSettings().then(settings => expect(settings, 'the module defaults').to.deep.equal(DEFAULT_SETTINGS));
-
-        // Back to the fixture store for the next tests.
-        provision('settings-fixture-defaults.yml');
-        until(readSettings, FIXTURE_SETTINGS, 'fixture settings');
-        ensureFixtureReport();
+        // The afterEach hook sets the fixture settings back, also when this test fails half-way.
     });
 
     it('a user without adminTemplates gets "Permission denied" on every field and mutation', () => {
