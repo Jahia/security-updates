@@ -103,6 +103,33 @@ class SettingsValidatorTest {
     }
 
     @Test
+    @DisplayName("a low contrast error carries the text and background suggestions, also in its message")
+    void lowContrastSuggestions() {
+        Map<String, String> input = valid();
+        input.put(SettingsKeys.BANNER_BACKGROUND_COLOR, "#1B1B1B");
+        input.put(SettingsKeys.BANNER_TEXT_COLOR, "#333333");
+
+        FieldError error = SettingsValidator.validate(input).getErrors().get(0);
+
+        assertThat(error.getSuggestions()).extracting(s -> s.getField() + "=" + s.getValue() + "@" + s.getRatio())
+                .containsExactly("bannerTextColor=#A6A6A6@7.07", "bannerBackgroundColor=#C1C1C1@7.01");
+        assertThat(error.getMessage()).endsWith("Suggested: text #A6A6A6 (7.07:1) or background #C1C1C1 (7.01:1).");
+    }
+
+    @Test
+    @DisplayName("when no single colour change reaches 7:1, the message says so and offers the default pair")
+    void lowContrastWithoutSuggestion() {
+        Map<String, String> input = valid();
+        input.put(SettingsKeys.BANNER_BACKGROUND_COLOR, "#777777");
+        input.put(SettingsKeys.BANNER_TEXT_COLOR, "#888888");
+
+        FieldError error = SettingsValidator.validate(input).getErrors().get(0);
+
+        assertThat(error.getSuggestions()).isEmpty();
+        assertThat(error.getMessage()).contains("No single colour change reaches 7:1").contains("#1B1B1B").contains("#FFFFFF");
+    }
+
+    @Test
     @DisplayName("a missing key is an error: nothing is ever written partially")
     void missingKey() {
         Map<String, String> input = valid();

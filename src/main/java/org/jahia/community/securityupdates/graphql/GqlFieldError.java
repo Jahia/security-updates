@@ -6,6 +6,9 @@ import graphql.annotations.annotationTypes.GraphQLName;
 import graphql.annotations.annotationTypes.GraphQLNonNull;
 import org.jahia.community.securityupdates.service.FieldError;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 /**
  * GraphQL view of a refused setting.
  */
@@ -41,5 +44,14 @@ public class GqlFieldError {
     @GraphQLDescription("Description of the problem, in English")
     public String getMessage() {
         return error.getMessage();
+    }
+
+    @GraphQLField
+    @GraphQLName("suggestions")
+    @GraphQLNonNull
+    @GraphQLDescription("Values that would fix the error (for LOW_CONTRAST: a text colour and a background colour), "
+            + "possibly none")
+    public List<GqlSuggestion> getSuggestions() {
+        return error.getSuggestions().stream().map(GqlSuggestion::new).collect(Collectors.toList());
     }
 }

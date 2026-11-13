@@ -151,13 +151,31 @@ public final class SettingsValidator {
         }
         double ratio = Colors.contrastRatio(background.get(), text.get());
         if (ratio < Colors.MIN_CONTRAST) {
-            String message = String.format(Locale.ROOT, "The contrast ratio is %.2f:1; at least %.0f:1 is required", ratio,
-                    Colors.MIN_CONTRAST);
-            errors.add(new FieldError(SettingsKeys.BANNER_BACKGROUND_COLOR, "LOW_CONTRAST", message));
-            errors.add(new FieldError(SettingsKeys.BANNER_TEXT_COLOR, "LOW_CONTRAST", message));
+            List<FieldError.SuggestedValue> suggestions = new ArrayList<>();
+            ContrastSuggestions.suggest(background.get(), text.get()).ifPresent(s -> suggestions.add(
+                    new FieldError.SuggestedValue(SettingsKeys.BANNER_TEXT_COLOR, s.getValue(), s.getRatio())));
+            ContrastSuggestions.suggest(text.get(), background.get()).ifPresent(s -> suggestions.add(
+                    new FieldError.SuggestedValue(SettingsKeys.BANNER_BACKGROUND_COLOR, s.getValue(), s.getRatio())));
+            String message = String.format(Locale.ROOT, "The contrast ratio is %.2f:1; at least %.0f:1 is required. %s", ratio,
+                    Colors.MIN_CONTRAST, suggestionText(suggestions));
+            errors.add(new FieldError(SettingsKeys.BANNER_BACKGROUND_COLOR, "LOW_CONTRAST", message, suggestions));
+            errors.add(new FieldError(SettingsKeys.BANNER_TEXT_COLOR, "LOW_CONTRAST", message, suggestions));
             return;
         }
         values.put(SettingsKeys.BANNER_BACKGROUND_COLOR, background.get());
         values.put(SettingsKeys.BANNER_TEXT_COLOR, text.get());
+    }
+
+    private static String suggestionText(List<FieldError.SuggestedValue> suggestions) {
+        if (suggestions.isEmpty()) {
+            return "No single colour change reaches 7:1; for example the default pair " + BannerSettings.DEFAULT_BACKGROUND_COLOR
+                    + " (background) / " + BannerSettings.DEFAULT_TEXT_COLOR + " (text) does.";
+        }
+        List<String> parts = new ArrayList<>();
+        for (FieldError.SuggestedValue suggestion : suggestions) {
+            String which = SettingsKeys.BANNER_TEXT_COLOR.equals(suggestion.getField()) ? "text" : "background";
+            parts.add(which + " " + suggestion.getValue() + " (" + suggestion.getRatio() + ":1)");
+        }
+        return "Suggested: " + String.join(" or ", parts) + ".";
     }
 }

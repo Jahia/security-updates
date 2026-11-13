@@ -1,0 +1,145 @@
+[
+  {
+    "background": "#1B1B1B",
+    "text": "#333333",
+    "ratio": "1.36",
+    "textSuggestion": {
+      "value": "#A6A6A6",
+      "ratio": "7.07"
+    },
+    "backgroundSuggestion": {
+      "value": "#C1C1C1",
+      "ratio": "7.01"
+    }
+  },
+  {
+    "background": "#EEEEEE",
+    "text": "#DDDDDD",
+    "ratio": "1.17",
+    "textSuggestion": {
+      "value": "#4F4F4F",
+      "ratio": "7.05"
+    },
+    "backgroundSuggestion": {
+      "value": "#454545",
+      "ratio": "7.05"
+    }
+  },
+  {
+    "background": "#777777",
+    "text": "#888888",
+    "ratio": "1.26",
+    "textSuggestion": null,
+    "backgroundSuggestion": null
+  },
+  {
+    "background": "#0B3D91",
+    "text": "#1E5BC6",
+    "ratio": "1.61",
+    "textSuggestion": {
+      "value": "#C8D9F7",
+      "ratio": "7.04"
+    },
+    "backgroundSuggestion": null
+  },
+  {
+    "background": "#FF0000",
+    "text": "#00FF00",
+    "ratio": "2.91",
+    "textSuggestion": null,
+    "backgroundSuggestion": {
+      "value": "#900000",
+      "ratio": "7.00"
+    }
+  },
+  {
+    "background": "#FFD400",
+    "text": "#FFFFFF",
+    "ratio": "1.43",
+    "textSuggestion": {
+      "value": "#424242",
+      "ratio": "7.02"
+    },
+    "backgroundSuggestion": {
+      "value": "#695700",
+      "ratio": "7.08"
+    }
+  },
+  {
+    "background": "#1B1B1B",
+    "text": "#FFFFFF",
+    "ratio": "17.22",
+    "textSuggestion": null,
+    "backgroundSuggestion": null
+  },
+  {
+    "background": "#0B3D91",
+    "text": "#FFFFFF",
+    "ratio": "10.04",
+    "textSuggestion": null,
+    "backgroundSuggestion": null
+  },
+  {
+    "background": "#2E7D32",
+    "text": "#A5D6A7",
+    "ratio": "3.11",
+    "textSuggestion": null,
+    "backgroundSuggestion": {
+      "value": "#18411A",
+      "ratio": "7.05"
+    }
+  },
+  {
+    "background": "#6A1B9A",
+    "text": "#E1BEE7",
+    "ratio": "5.68",
+    "textSuggestion": {
+      "value": "#EDD8F0",
+      "ratio": "7.01"
+    },
+    "backgroundSuggestion": {
+      "value": "#56167D",
+      "ratio": "7.04"
+    }
+  },
+  {
+    "background": "#595959",
+    "text": "#FFFFFF",
+    "ratio": "7.00",
+    "textSuggestion": null,
+    "backgroundSuggestion": null
+  },
+  {
+    "background": "#5A5A5A",
+    "text": "#FFFFFF",
+    "ratio": "6.89",
+    "textSuggestion": null,
+    "backgroundSuggestion": {
+      "value": "#595959",
+      "ratio": "7.00"
+    }
+  },
+  {
+    "background": "#FFFFFF",
+    "text": "#767676",
+    "ratio": "4.54",
+    "textSuggestion": {
+      "value": "#595959",
+      "ratio": "7.00"
+    },
+    "backgroundSuggestion": null
+  },
+  {
+    "background": "#123456",
+    "text": "#654321",
+    "ratio": "1.44",
+    "textSuggestion": {
+      "value": "#DDBB98",
+      "ratio": "7.04"
+    },
+    "backgroundSuggestion": {
+      "value": "#D7E7F7",
+      "ratio": "7.00"
+    }
+  }
+]

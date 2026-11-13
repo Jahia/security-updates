@@ -103,6 +103,19 @@ class SecurityUpdatesSettingsGraphQLTest {
     }
 
     @Test
+    @DisplayName("a low contrast error carries the suggested colours")
+    void lowContrastSuggestions() {
+        GqlSettingsResult result = new SecurityUpdatesMutation().updateSettings(input("#1B1B1B", "#333333", 24, ""));
+
+        GqlFieldError error = result.getErrors().get(0);
+        assertThat(error.getCode()).isEqualTo("LOW_CONTRAST");
+        assertThat(error.getSuggestions()).extracting(GqlSuggestion::getField, GqlSuggestion::getValue, GqlSuggestion::getRatio)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("bannerTextColor", "#A6A6A6", "7.07"),
+                        org.assertj.core.groups.Tuple.tuple("bannerBackgroundColor", "#C1C1C1", "7.01"));
+        assertThat(GqlSuggestion.class.getAnnotation(GraphQLName.class).value()).isEqualTo("SecurityUpdatesSuggestedValue");
+    }
+
+    @Test
     @DisplayName("a write failure is reported without details")
     void writeFailure() throws IOException {
         doThrow(new IOException("/var/jahia/karaf/etc is read-only")).when(store).save(any());
