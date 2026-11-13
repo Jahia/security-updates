@@ -1,0 +1,23 @@
+{"schemaVersion": 1,
+ "advisories": [
+  {"id": "JSA-2026-0011", "title": "Injection in GraphQL provider", "severity": "high", "cvss": 7.5,
+   "cves": ["CVE-2026-1234"], "url": "https://academy.jahia.com/jsa-2026-0011", "published": "2026-11-03",
+   "summary": "A summary",
+   "fixes": [{"component": "graphql-dxm-provider", "groupId": "org.jahia.modules", "fixedVersions": ["3.10.0", "2.24.0"]},
+             {"component": "jahia-core", "fixedVersions": ["8.2.3.7"]}]},
+  {"id": "JSA-2026-0012", "title": "Minimal advisory", "severity": "critical",
+   "fixes": [{"component": "jcontent", "fixedVersions": ["3.5.1"]}]},
+  {"id": "JSA-2026-0013", "title": "Unknown severity", "severity": "catastrophic",
+   "fixes": [{"component": "jcontent", "fixedVersions": ["3.5.2"]}]},
+  {"title": "no id, skipped", "severity": "low", "fixes": [{"component": "x", "fixedVersions": ["1.0"]}]},
+  {"id": "JSA-NOFIX", "title": "no fixes, skipped", "severity": "low"},
+  {"id": "JSA-BADFIX", "title": "fix without component is dropped", "severity": "low",
+   "fixes": [{"fixedVersions": ["1.0"]}, {"component": "ok-module", "fixedVersions": ["2.0", 3, null]}]},
+  "not an object"
+ ],
+ "flaggedVersions": [
+  {"groupId": "org.jahia.community", "name": "my-module", "version": "1.4.2", "severity": "medium",
+   "references": ["GHSA-aaaa-bbbb-cccc"], "note": "Fixes an XSS"},
+  {"name": "minimal-module", "version": "2.0.0"},
+  {"name": "no-version"}
+ ]}
