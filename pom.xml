@@ -12,6 +12,12 @@
     <packaging>bundle</packaging>
     <name>Security updates</name>
     <description>Lists the installed Jahia components (core and modules) that have updates fixing security issues, from the Jahia Store security feed</description>
+    <scm>
+        <connection>scm:git:git@github.com:Jahia/security-updates.git</connection>
+        <developerConnection>scm:git:git@github.com:Jahia/security-updates.git</developerConnection>
+        <url>https://github.com/Jahia/security-updates</url>
+        <tag>HEAD</tag>
+    </scm>
     <properties>
         <yarn.arguments>build:production</yarn.arguments>
         <jahia-module-type>system</jahia-module-type>
