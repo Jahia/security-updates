@@ -53,8 +53,11 @@ Section.propTypes = {children: PropTypes.node.isRequired};
  * The settings of the module. Users who cannot change them (settings.canEdit false) see them read-only. The form is
  * filled once from the query, then from the values returned by each save or reset (no refetch that could overwrite
  * edits in progress).
+ *
+ * @param {{onSettingsChanged: function}} props onSettingsChanged is called after each successful save or reset (the
+ *        page reads its report again)
  */
-export const SettingsForm = () => {
+export const SettingsForm = ({onSettingsChanged}) => {
     const {t} = useTranslation(NS);
     const {data, error} = useQuery(GET_SETTINGS, {fetchPolicy: QUERY_FETCH_POLICY});
     const [updateSettings] = useMutation(UPDATE_SETTINGS);
@@ -151,6 +154,7 @@ export const SettingsForm = () => {
             setFormError(null);
             setStatus(t(restartsSchedule(saved, result.settings) ? `settings.${done}` : `settings.${done}Now`));
             window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
+            onSettingsChanged?.();
             return;
         }
 
@@ -252,5 +256,7 @@ export const SettingsForm = () => {
         </Section>
     );
 };
+
+SettingsForm.propTypes = {onSettingsChanged: PropTypes.func};
 
 export default SettingsForm;

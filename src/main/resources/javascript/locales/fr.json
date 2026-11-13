@@ -5,6 +5,7 @@
     "intro": "Cette page liste les composants installés (Jahia et ses modules) qui ont une mise à jour corrigeant un problème de sécurité, d’après les données de sécurité publiées par les stores.",
     "loading": "Chargement du rapport de sécurité…",
     "error": "Le rapport de sécurité n’a pas pu être chargé. Rechargez la page pour réessayer.",
+    "updateError": "Le rapport de sécurité n’a pas pu être mis à jour : le dernier rapport chargé est affiché. Rechargez la page pour réessayer.",
     "refresh": "Vérifier maintenant",
     "checking": "Vérification…",
     "refreshing": "Interrogation des stores… Cela peut prendre quelques minutes.",

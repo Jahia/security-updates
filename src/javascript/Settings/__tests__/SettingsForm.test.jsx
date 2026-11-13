@@ -208,6 +208,22 @@ describe('SettingsForm', () => {
             window.removeEventListener(CHANGED_EVENT, changed);
         });
 
+        test('a successful save calls onSettingsChanged, so that the page reads its report again; a refused one does not', async () => {
+            const onSettingsChanged = jest.fn();
+            update.mockImplementationOnce(() => Promise.resolve({data: {securityUpdates: {updateSettings: {
+                ok: false, settings: null, errors: [{field: 'refreshIntervalHours', code: 'OUT_OF_RANGE'}]
+            }}}}));
+            render(<SettingsForm onSettingsChanged={onSettingsChanged}/>);
+
+            fireEvent.click(save());
+            await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+            expect(onSettingsChanged).not.toHaveBeenCalled();
+
+            fireEvent.click(save());
+            await waitFor(() => expect(status()).toHaveTextContent('settings.saved'));
+            expect(onSettingsChanged).toHaveBeenCalledTimes(1);
+        });
+
         test('Save is the submit button of the form: submitting with Enter saves once', async () => {
             render(<SettingsForm/>);
             expect(save()).toHaveAttribute('type', 'submit');

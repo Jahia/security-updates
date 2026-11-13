@@ -5,6 +5,7 @@
     "intro": "This page lists the installed components (Jahia and its modules) that have an update fixing a security problem, from the security data that the stores publish.",
     "loading": "Loading the security report…",
     "error": "The security report could not be loaded. Reload the page to try again.",
+    "updateError": "The security report could not be updated: the last report loaded is shown. Reload the page to try again.",
     "refresh": "Check now",
     "checking": "Checking…",
     "refreshing": "Checking the stores… This can take a few minutes.",

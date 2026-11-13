@@ -5,7 +5,8 @@ import {useMutation, useQuery} from '@apollo/client';
 import {SecurityUpdates} from '../SecurityUpdates';
 import {CHANGED_EVENT, JAHIA_UPGRADE_URL, PAGE_EVENT} from '../../common/constants';
 
-jest.mock('../../Settings/SettingsForm', () => ({SettingsForm: () => <section aria-label="settings"/>}));
+const mockSettingsForm = jest.fn(() => <section aria-label="settings"/>);
+jest.mock('../../Settings/SettingsForm', () => ({SettingsForm: props => mockSettingsForm(props)}));
 
 const advisory = (id, url, extra = {}) => ({id, title: `Title ${id}`, url, cves: ['CVE-2026-1234'], severity: 'HIGH', ...extra});
 
@@ -91,6 +92,70 @@ describe('SecurityUpdates page', () => {
 
             render(<SecurityUpdates/>);
             expect(status()).toHaveTextContent('page.loading');
+        });
+    });
+
+    describe('after a settings change', () => {
+        test('the report is read again when the settings form saves or resets, so that the status and Check now follow', async () => {
+            mockReport(report({status: 'DISABLED'}));
+            const {rerender} = render(<SecurityUpdates/>);
+            expect(screen.queryByRole('button', {name: 'page.refresh'})).toBeNull();
+            const {onSettingsChanged} = mockSettingsForm.mock.calls.at(-1)[0];
+
+            await act(async () => {
+                onSettingsChanged();
+            });
+
+            expect(refetch).toHaveBeenCalledTimes(1);
+            mockReport(report());
+            rerender(<SecurityUpdates/>);
+            expect(screen.getByRole('button', {name: 'page.refresh'})).toBeInTheDocument();
+            expect(screen.getByText('page.statusLabel.UP_TO_DATE')).toBeInTheDocument();
+        });
+
+        test('the window event the check sends is not listened to: only the settings form asks for a new report', () => {
+            mockReport(report());
+            render(<SecurityUpdates/>);
+
+            window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
+
+            expect(refetch).not.toHaveBeenCalled();
+        });
+
+        test('a failed refetch after a settings change is not an unhandled rejection', async () => {
+            refetch.mockImplementation(() => Promise.reject(new Error('offline')));
+            mockReport(report());
+            render(<SecurityUpdates/>);
+
+            await act(async () => {
+                mockSettingsForm.mock.calls.at(-1)[0].onSettingsChanged();
+            });
+
+            expect(refetch).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('a failed refetch', () => {
+        test('keeps the last report, its findings and their filter, with the error beside them', () => {
+            const findings = [finding('m', 'HIGH'), finding('o', 'HIGH', 'OWNER_REPORTED')];
+            mockReport(report({findings}));
+            const {rerender} = render(<SecurityUpdates/>);
+            fireEvent.click(screen.getByLabelText('page.filter.advisories {n=1}'));
+
+            useQuery.mockReturnValue({data: undefined, previousData: answer(report({findings})).data, loading: false, error: new Error('offline'), refetch});
+            rerender(<SecurityUpdates/>);
+
+            expect(screen.getByRole('alert')).toHaveTextContent('page.updateError');
+            expect(screen.getByRole('table')).toBeInTheDocument();
+            expect(screen.getByLabelText('page.filter.advisories {n=1}')).toBeChecked();
+        });
+
+        test('without any report yet, says the report could not be loaded', () => {
+            useQuery.mockReturnValue({data: undefined, previousData: undefined, loading: false, error: new Error('offline'), refetch});
+            render(<SecurityUpdates/>);
+
+            expect(screen.getByRole('alert')).toHaveTextContent('page.error');
+            expect(screen.queryByRole('table')).toBeNull();
         });
     });
 

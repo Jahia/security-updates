@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useCallback, useEffect, useState} from 'react';
 import PropTypes from 'prop-types';
 import {useMutation, useQuery} from '@apollo/client';
 import {useTranslation} from 'react-i18next';
@@ -83,13 +83,21 @@ PageStatus.propTypes = {
 
 export const SecurityUpdates = () => {
     const {t, i18n} = useTranslation(NS);
-    const {data, loading, error, refetch} = useQuery(GET_SECURITY_REPORT, {fetchPolicy: QUERY_FETCH_POLICY});
+    const {data, previousData, loading, error, refetch} = useQuery(GET_SECURITY_REPORT, {fetchPolicy: QUERY_FETCH_POLICY});
     const [refreshReport] = useMutation(REFRESH_SECURITY_REPORT);
-    const report = data?.securityUpdates?.report;
+    // A refetch that fails (a poll during a check, a server restart) keeps the last report on the page, with the error
+    // beside it: the findings and their filter stay as they were.
+    const shown = data?.securityUpdates?.report ? data : previousData;
+    const report = shown?.securityUpdates?.report;
     const check = useCheck({report, refetch, refreshReport, t, language: i18n?.language});
     const isMounted = useMounted();
     useDocumentTitle(t('page.documentTitle', values({title: t('label')})));
     usePageEvents();
+    // A saved or reset setting can change the whole report (checks turned off or on, the banner threshold): it is read
+    // again. A failure shows as the query error, beside the report already shown.
+    const onSettingsChanged = useCallback(() => {
+        Promise.resolve().then(() => refetch()).catch(() => undefined);
+    }, [refetch]);
 
     const findings = sortFindings(report?.findings);
     const isDisabled = report?.status === 'DISABLED';
@@ -121,21 +129,25 @@ export const SecurityUpdates = () => {
                 {isMounted && <PageStatus isLoading={Boolean(loading)} check={check}/>}
             </div>
 
-            {loading && <div className={styles.loader} aria-hidden="true"><Loader size="big"/></div>}
+            {loading && !report && <div className={styles.loader} aria-hidden="true"><Loader size="big"/></div>}
 
-            {error && <StatusMessage tone="warning" role="alert">{t('page.error')}</StatusMessage>}
+            {error && (
+                <StatusMessage tone="warning" role="alert" data-testid="security-updates-error">
+                    {t(report ? 'page.updateError' : 'page.error')}
+                </StatusMessage>
+            )}
 
-            {!loading && !error && report && (
+            {report && (
                 <>
                     <ReportDates report={report}/>
                     <Typography component="a" className={styles.link} href={adminUrl('manageModules')}>{t('page.manageModules')}</Typography>
                     <ReportStatus report={{...report, findings}}/>
                     <StoreErrors errors={report.errors}/>
-                    {findings.length > 0 && !isDisabled && <Findings findings={findings} banner={data?.securityUpdates?.banner}/>}
+                    {findings.length > 0 && !isDisabled && <Findings findings={findings} banner={shown?.securityUpdates?.banner}/>}
                 </>
             )}
 
-            <SettingsForm/>
+            <SettingsForm onSettingsChanged={onSettingsChanged}/>
         </div>
     );
 
