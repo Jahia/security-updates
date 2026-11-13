@@ -196,7 +196,8 @@ describe('SettingsForm', () => {
 
             fireEvent.click(save());
 
-            await waitFor(() => expect(status()).toHaveTextContent('settings.saved'));
+            // The check settings changed: the schedule restarts.
+            await waitFor(() => expect(status().textContent).toBe('settings.saved'));
             const input = update.mock.calls[0][0].variables.input;
             expect(input.refreshIntervalHours).toBe(6);
             expect(input.enabled).toBe(true);
@@ -216,6 +217,33 @@ describe('SettingsForm', () => {
 
             await waitFor(() => expect(status()).toHaveTextContent('settings.saved'));
             expect(update).toHaveBeenCalledTimes(1);
+        });
+
+        test.each([
+            ['only banner settings changed: they apply at once', {bannerMinimumSeverity: 'CRITICAL', bannerTextColor: '#EEEEEE'}, 'settings.savedNow'],
+            ['a check setting changed: the next check runs in about one minute', {extraFeedUrls: 'https://feed.example/a.json'}, 'settings.saved'],
+            ['checks turned on again', {enabled: true}, 'settings.saved'],
+            ['checks turned off: nothing runs, the change applies at once', {enabled: false, refreshIntervalHours: 6}, 'settings.savedNow']
+        ])('the saved message depends on what changed: %s', async (name, changes, message) => {
+            const before = changes.enabled === true ? {...settings, enabled: false} : settings;
+            useQuery.mockReturnValue(loaded(before));
+            update.mockImplementation(() => Promise.resolve({data: {securityUpdates: {updateSettings: {ok: true, errors: [], settings: {...settings, ...changes}}}}}));
+            render(<SettingsForm/>);
+
+            fireEvent.click(save());
+
+            await waitFor(() => expect(status().textContent).toBe(message));
+        });
+
+        test('a second save compares with what the first one saved', async () => {
+            update.mockImplementation(() => Promise.resolve({data: {securityUpdates: {updateSettings: {ok: true, errors: [], settings: {...settings, refreshIntervalHours: 6}}}}}));
+            render(<SettingsForm/>);
+            fireEvent.click(save());
+            await waitFor(() => expect(status().textContent).toBe('settings.saved'));
+
+            fireEvent.click(save());
+
+            await waitFor(() => expect(status().textContent).toBe('settings.savedNow'));
         });
 
         test('a new answer of the settings query does not overwrite the edits in progress', () => {
@@ -262,6 +290,69 @@ describe('SettingsForm', () => {
             expect({}.code).toBeUndefined();
             expect(Object.prototype.code).toBeUndefined();
             document.querySelectorAll('input, select, textarea').forEach(control => expect(control).not.toHaveAttribute('aria-invalid'));
+        });
+
+        test('editing a field clears its error at once, and the focus stays in it', async () => {
+            update.mockImplementation(() => Promise.resolve({data: {securityUpdates: {updateSettings: {ok: false, settings: null, errors: [
+                {field: 'refreshIntervalHours', code: 'OUT_OF_RANGE', message: 'x'},
+                {field: 'extraFeedUrls', code: 'NOT_HTTPS', message: 'x'}
+            ]}}}}));
+            render(<SettingsForm/>);
+            fireEvent.click(save());
+            await screen.findByRole('alert');
+            const interval = field('refreshIntervalHours');
+            expect(document.activeElement).toBe(interval);
+
+            fireEvent.change(interval, {target: {value: '12'}});
+
+            expect(interval).not.toHaveAttribute('aria-invalid');
+            expect(interval.getAttribute('aria-describedby')).toBe('security-updates-setting-refreshIntervalHours-help');
+            expect(document.getElementById('security-updates-setting-refreshIntervalHours-error')).toBeNull();
+            expect(document.activeElement).toBe(interval);
+            expect(field('extraFeedUrls')).toHaveAttribute('aria-invalid', 'true');
+        });
+
+        test('editing one colour clears the low contrast error of both, not another error of the other colour', async () => {
+            update.mockImplementation(() => Promise.resolve({data: {securityUpdates: {updateSettings: {ok: false, settings: null, errors: [
+                {field: 'bannerBackgroundColor', code: 'LOW_CONTRAST', message: 'x'},
+                {field: 'bannerTextColor', code: 'LOW_CONTRAST', message: 'x'}
+            ]}}}}));
+            render(<SettingsForm/>);
+            fireEvent.click(save());
+            await screen.findByRole('alert');
+
+            fireEvent.change(field('bannerTextColor'), {target: {value: '#EEEEEE'}});
+
+            expect(field('bannerTextColor')).not.toHaveAttribute('aria-invalid');
+            expect(field('bannerBackgroundColor')).not.toHaveAttribute('aria-invalid');
+        });
+
+        test('a colour that is not valid keeps its error when the other colour is edited', async () => {
+            update.mockImplementation(() => Promise.resolve({data: {securityUpdates: {updateSettings: {ok: false, settings: null, errors: [
+                {field: 'bannerBackgroundColor', code: 'INVALID_COLOR', message: 'x'},
+                {field: 'bannerTextColor', code: 'LOW_CONTRAST', message: 'x'}
+            ]}}}}));
+            render(<SettingsForm/>);
+            fireEvent.click(save());
+            await screen.findByRole('alert');
+
+            fireEvent.change(field('bannerTextColor'), {target: {value: '#EEEEEE'}});
+
+            expect(field('bannerTextColor')).not.toHaveAttribute('aria-invalid');
+            expect(field('bannerBackgroundColor')).toHaveAttribute('aria-invalid', 'true');
+        });
+
+        test('help texts and errors are body text, not the 12px caption', async () => {
+            update.mockImplementation(() => Promise.resolve({data: {securityUpdates: {updateSettings: {ok: false, settings: null, errors: [
+                {field: 'refreshIntervalHours', code: 'OUT_OF_RANGE', message: 'x'}
+            ]}}}}));
+            render(<SettingsForm/>);
+            fireEvent.click(save());
+            await screen.findByRole('alert');
+
+            expect(document.getElementById('security-updates-setting-refreshIntervalHours-help')).toHaveAttribute('data-variant', 'body');
+            expect(document.getElementById('security-updates-setting-refreshIntervalHours-error')).toHaveAttribute('data-variant', 'body');
+            expect(screen.getByText('settings.intro')).not.toHaveAttribute('data-variant', 'caption');
         });
 
         test('a number field that is not a whole number is refused without calling the server', async () => {
@@ -339,20 +430,35 @@ describe('SettingsForm', () => {
 
             fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', {name: 'settings.resetConfirm.confirm'}));
 
-            await waitFor(() => expect(status()).toHaveTextContent('settings.resetDone'));
+            await waitFor(() => expect(status().textContent).toBe('settings.resetDoneNow'));
             expect(reset).toHaveBeenCalledTimes(1);
             expect(field('refreshIntervalHours')).toHaveValue(24);
             expect(screen.queryByRole('dialog')).toBeNull();
         });
     });
 
-    test('the dismissal duration is only offered with the HOURS policy', () => {
+    test('a reset that changes the check settings says when the next check runs', async () => {
+        useQuery.mockReturnValue(loaded({...settings, refreshIntervalHours: 12}));
         render(<SettingsForm/>);
-        expect(field('bannerDismissHours')).toBeDisabled();
+        fireEvent.click(screen.getByRole('button', {name: 'settings.reset'}));
+
+        fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', {name: 'settings.resetConfirm.confirm'}));
+
+        await waitFor(() => expect(status().textContent).toBe('settings.resetDone'));
+    });
+
+    test('the dismissal duration is only offered with the HOURS policy, and says so while it is disabled', () => {
+        render(<SettingsForm/>);
+        const hours = field('bannerDismissHours');
+        expect(hours).toBeDisabled();
+        const note = document.getElementById('security-updates-setting-bannerDismissHours-note');
+        expect(note).toHaveTextContent('settings.fields.bannerDismissHours.disabled');
+        expect(hours.getAttribute('aria-describedby').split(' ')).toContain(note.id);
 
         fireEvent.change(field('bannerDismissPolicy'), {target: {value: 'HOURS'}});
 
         expect(field('bannerDismissHours')).not.toBeDisabled();
+        expect(document.getElementById('security-updates-setting-bannerDismissHours-note')).toBeNull();
     });
 
     test('is built from Moonstone Switch, Input, Textarea and Button; selects are native', () => {
@@ -403,6 +509,8 @@ describe('SettingsForm', () => {
             expect(screen.getByTestId('security-updates-contrast')).toHaveTextContent('settings.preview.pass');
             expect(status()).toHaveTextContent('settings.suggest.appliedText');
             expect(screen.queryByTestId('security-updates-suggestions')).toBeNull();
+            // The button is gone: the focus is on the field it changed.
+            expect(document.activeElement).toBe(field('bannerTextColor'));
         });
 
         test('using the background suggestion fills the background field', () => {
@@ -412,6 +520,7 @@ describe('SettingsForm', () => {
 
             expect(field('bannerBackgroundColor')).toHaveValue('#C1C1C1');
             expect(status()).toHaveTextContent('settings.suggest.appliedBackground');
+            expect(document.activeElement).toBe(field('bannerBackgroundColor'));
         });
 
         test('when no single change can reach 7:1, the default colours are offered', () => {
@@ -423,6 +532,7 @@ describe('SettingsForm', () => {
             expect(field('bannerBackgroundColor')).toHaveValue('#1B1B1B');
             expect(field('bannerTextColor')).toHaveValue('#FFFFFF');
             expect(status()).toHaveTextContent('settings.suggest.appliedDefaults');
+            expect(document.activeElement).toBe(field('bannerBackgroundColor'));
         });
     });
 });

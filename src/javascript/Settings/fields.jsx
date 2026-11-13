@@ -8,13 +8,16 @@ import {normalizeHex} from './colorUtils';
 
 export const idOf = field => `security-updates-setting-${field}`;
 
-/** Help text, then the error when there is one: both are read with the control. */
-const describedBy = (field, errors) => [`${idOf(field)}-help`, errors[field] ? `${idOf(field)}-error` : null]
-    .filter(Boolean).join(' ');
+/** Help text, the note (why a control is disabled), then the error when there is one: all are read with the control. */
+const describedBy = (field, errors, note) => [
+    `${idOf(field)}-help`,
+    note ? `${idOf(field)}-note` : null,
+    errors[field] ? `${idOf(field)}-error` : null
+].filter(Boolean).join(' ');
 
-const controlProps = (field, errors) => ({
+const controlProps = (field, errors, note) => ({
     id: idOf(field),
-    'aria-describedby': describedBy(field, errors),
+    'aria-describedby': describedBy(field, errors, note),
     'aria-invalid': errors[field] ? 'true' : undefined
 });
 
@@ -26,10 +29,11 @@ const fieldPropTypes = {
 };
 
 /**
- * A setting: a native label bound to the control (clicking it focuses the control), the control, the help text and
- * the error, both with ids for aria-describedby. Moonstone's Field is not used: it does not bind its label.
+ * A setting: a native label bound to the control (clicking it focuses the control), the control, the help text, a
+ * note and the error, with ids for aria-describedby. Moonstone's Field is not used: it does not bind its label. Help,
+ * note and error are body text (Moonstone's caption is 12px), sized in rem by the stylesheet.
  */
-const SettingField = ({field, errors, ratio, className, children}) => {
+const SettingField = ({field, errors, ratio, note, className, children}) => {
     const {t} = useTranslation(NS);
     return (
         <div className={className || styles.field}>
@@ -37,9 +41,10 @@ const SettingField = ({field, errors, ratio, className, children}) => {
                 {t(`settings.fields.${field}.label`)}
             </Typography>
             {children}
-            <Typography id={`${idOf(field)}-help`} variant="caption" className={styles.help}>{t(`settings.fields.${field}.help`)}</Typography>
+            <Typography id={`${idOf(field)}-help`} variant="body" className={styles.help}>{t(`settings.fields.${field}.help`)}</Typography>
+            {note && <Typography id={`${idOf(field)}-note`} variant="body" weight="bold" className={styles.help}>{note}</Typography>}
             {errors[field] && (
-                <Typography id={`${idOf(field)}-error`} variant="caption" weight="bold" className={styles.error}>
+                <Typography id={`${idOf(field)}-error`} variant="body" weight="bold" className={styles.error}>
                     {t(`settings.errors.${errors[field]}`, errors[field] === 'LOW_CONTRAST' ? values({ratio}) : undefined)}
                 </Typography>
             )}
@@ -51,6 +56,7 @@ SettingField.propTypes = {
     field: PropTypes.string.isRequired,
     errors: PropTypes.object.isRequired,
     ratio: PropTypes.string,
+    note: PropTypes.string,
     className: PropTypes.string,
     children: PropTypes.node.isRequired
 };
@@ -68,8 +74,8 @@ export const SwitchField = ({field, form, errors, onChange}) => (
 
 SwitchField.propTypes = fieldPropTypes;
 
-export const TextField = ({field, form, errors, onChange, type, isDisabled}) => {
-    const props = {...controlProps(field, errors), value: form[field], isDisabled, onChange: event => onChange(field, event.target.value)};
+export const TextField = ({field, form, errors, onChange, type, isDisabled, note}) => {
+    const props = {...controlProps(field, errors, note), value: form[field], isDisabled, onChange: event => onChange(field, event.target.value)};
     let control;
     if (type === 'textarea') {
         control = <Textarea {...props} rows={3}/>;
@@ -79,13 +85,14 @@ export const TextField = ({field, form, errors, onChange, type, isDisabled}) => 
         control = <Input {...props} type="text" spellCheck={false} autoComplete="off"/>;
     }
 
-    return <SettingField field={field} errors={errors}>{control}</SettingField>;
+    return <SettingField field={field} errors={errors} note={note}>{control}</SettingField>;
 };
 
 TextField.propTypes = {
     ...fieldPropTypes,
     type: PropTypes.oneOf(['text', 'number', 'textarea']),
-    isDisabled: PropTypes.bool
+    isDisabled: PropTypes.bool,
+    note: PropTypes.string
 };
 
 /**

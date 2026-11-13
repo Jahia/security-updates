@@ -5,7 +5,7 @@ import {useTranslation} from 'react-i18next';
 import {Button, Loader, Separator, Typography} from '@jahia/moonstone';
 import styles from './SettingsForm.scss';
 import {GET_SETTINGS, RESET_SETTINGS, UPDATE_SETTINGS} from './Settings.gql';
-import {FIELDS, fromSettings, toInput} from './settingsValues';
+import {FIELDS, fromSettings, restartsSchedule, toInput} from './settingsValues';
 import {contrastRatio, formatRatio} from './colorUtils';
 import {requestErrorCode, splitErrors} from './settingsResult';
 import {ColorField, idOf, SelectField, SwitchField, TextField} from './fields';
@@ -24,6 +24,17 @@ import {
 import {values} from '../common/i18n';
 
 const TITLE_ID = 'security-updates-settings-title';
+const COLOR_FIELDS = ['bannerBackgroundColor', 'bannerTextColor'];
+
+/**
+ * The errors left once a field is edited: its own, and, for a colour, the low contrast error of the other colour (the
+ * contrast is that of the pair). The same object when there is nothing to clear.
+ */
+const withoutErrorsOf = (errors, field) => {
+    const cleared = Object.keys(errors).filter(key => key === field ||
+        (COLOR_FIELDS.includes(field) && COLOR_FIELDS.includes(key) && errors[key] === 'LOW_CONTRAST'));
+    return cleared.length === 0 ? errors : Object.fromEntries(Object.entries(errors).filter(([key]) => !cleared.includes(key)));
+};
 
 const Section = ({children}) => {
     const {t} = useTranslation(NS);
@@ -53,22 +64,38 @@ export const SettingsForm = () => {
     const [formError, setFormError] = useState(null);
     const [status, setStatus] = useState('');
     const [isConfirming, setConfirming] = useState(false);
+    // The settings as the server last returned them: a save says when the check schedule restarts.
+    const [saved, setSaved] = useState(null);
     const busy = useRef(false);
+    const isFocusOnError = useRef(false);
+    const focusNext = useRef(null);
     const loaded = data?.securityUpdates?.settings;
     const isReadOnly = loaded ? loaded.canEdit !== true : true;
 
     useEffect(() => {
         if (loaded && !form) {
             setForm(fromSettings(loaded));
+            setSaved(loaded);
         }
     }, [loaded, form]);
 
+    // After a refused save only (not when an edit clears an error): the first invalid field gets the focus.
     useEffect(() => {
         const first = FIELDS.find(field => errors[field]);
-        if (first) {
+        if (isFocusOnError.current && first) {
             document.getElementById(idOf(first))?.focus();
         }
+
+        isFocusOnError.current = false;
     }, [errors]);
+
+    // A colour suggestion removes the button that applied it: the focus goes to the colour field it changed.
+    useEffect(() => {
+        if (focusNext.current) {
+            document.getElementById(focusNext.current)?.focus();
+            focusNext.current = null;
+        }
+    });
 
     if (!form) {
         return (
@@ -85,32 +112,44 @@ export const SettingsForm = () => {
         );
     }
 
-    const onChange = (field, value) => setForm(previous => ({...previous, [field]: value}));
+    // An edited field loses its error (and its aria-invalid) at once.
+    const onChange = (field, value) => {
+        setForm(previous => ({...previous, [field]: value}));
+        setErrors(previous => withoutErrorsOf(previous, field));
+    };
+
     const ratio = formatRatio(contrastRatio(form.bannerBackgroundColor, form.bannerTextColor));
 
-    // Applies a suggested colour (or, with a null field, the default pair) and says so in the status region.
+    // Applies a suggested colour (or, with a null field, the default pair), says so in the status region, and moves the
+    // focus to the colour field that changed (the background one for the default pair).
     const onApply = (field, value) => {
         if (field) {
             onChange(field, value);
             setStatus(t(field === 'bannerTextColor' ? 'settings.suggest.appliedText' : 'settings.suggest.appliedBackground', values({value})));
         } else {
-            setForm(previous => ({...previous, bannerBackgroundColor: DEFAULT_BANNER_BACKGROUND, bannerTextColor: DEFAULT_BANNER_TEXT}));
+            onChange('bannerBackgroundColor', DEFAULT_BANNER_BACKGROUND);
+            onChange('bannerTextColor', DEFAULT_BANNER_TEXT);
             setStatus(t('settings.suggest.appliedDefaults'));
         }
+
+        focusNext.current = idOf(field || 'bannerBackgroundColor');
     };
 
     const showErrors = (byField, general) => {
+        isFocusOnError.current = true;
         setErrors(byField);
         setFormError(general || 'invalid');
         setStatus('');
     };
 
+    // The message says when the next check runs only when the change restarted the check schedule.
     const handleResult = (result, done) => {
         if (result?.ok && result.settings) {
             setForm(fromSettings(result.settings));
+            setSaved(result.settings);
             setErrors({});
             setFormError(null);
-            setStatus(done);
+            setStatus(t(restartsSchedule(saved, result.settings) ? `settings.${done}` : `settings.${done}Now`));
             window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
             return;
         }
@@ -148,18 +187,18 @@ export const SettingsForm = () => {
             return;
         }
 
-        run(() => updateSettings({variables: {input}}), r => r?.updateSettings, t('settings.saved'));
+        run(() => updateSettings({variables: {input}}), r => r?.updateSettings, 'saved');
     };
 
     const onConfirmReset = () => {
         setConfirming(false);
-        run(() => resetSettings(), r => r?.resetSettings, t('settings.resetDone'));
+        run(() => resetSettings(), r => r?.resetSettings, 'resetDone');
     };
 
     const fieldProps = {form, errors, onChange};
     return (
         <Section>
-            <Typography variant="caption" className={styles.text}>{t('settings.intro')}</Typography>
+            <Typography className={styles.text}>{t('settings.intro')}</Typography>
             {isReadOnly && <StatusMessage tone="info">{t('settings.readOnly')}</StatusMessage>}
             <form noValidate className={styles.form} onSubmit={onSubmit}>
                 {/* A disabled fieldset disables every control in it: the read-only view. */}
@@ -185,7 +224,13 @@ export const SettingsForm = () => {
                         <SelectField field="bannerDismissPolicy" {...fieldProps}>
                             {DISMISS_POLICIES.map(policy => <option key={policy} value={policy}>{t(`settings.dismiss.${policy}`)}</option>)}
                         </SelectField>
-                        <TextField field="bannerDismissHours" type="number" isDisabled={form.bannerDismissPolicy !== 'HOURS'} {...fieldProps}/>
+                        <TextField
+                            field="bannerDismissHours"
+                            type="number"
+                            isDisabled={form.bannerDismissPolicy !== 'HOURS'}
+                            note={form.bannerDismissPolicy === 'HOURS' ? undefined : t('settings.fields.bannerDismissHours.disabled')}
+                            {...fieldProps}
+                        />
                     </fieldset>
                 </fieldset>
                 {formError && (
@@ -196,7 +241,8 @@ export const SettingsForm = () => {
                 <p role="status" aria-live="polite" data-testid="security-updates-settings-status" className={styles.status}>{status}</p>
                 {!isReadOnly && (
                     <div className={styles.actions}>
-                        {/* The form's only submit path: Enter in a field or this button. */}
+                        {/* The form's only submit path: Enter in a field or this button. Moonstone's Button calls onClick
+                            unconditionally (a missing one throws on click), hence the no-op: the submit does the work. */}
                         <Button size="big" color="accent" type="submit" className={styles.target} label={t('settings.save')} onClick={() => undefined}/>
                         <Button size="big" variant="ghost" className={styles.target} label={t('settings.reset')} onClick={() => setConfirming(true)}/>
                     </div>

@@ -119,6 +119,14 @@ $focus-color: var(--color-accent_dark_contrast, #004781);
   color: var(--color-danger_dark, #840d0f);
 }
 
+// Help, notes and errors at Moonstone's body size, in rem so that they follow the user's text size, with a line height
+// of 1.5 (WCAG 1.4.8). Moonstone sizes its typography in px with two classes: three classes win over them.
+.settings .help.help,
+.settings .error.error {
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
 .select {
   font: inherit;
   font-family: var(--moon-font-family, inherit);

@@ -170,7 +170,7 @@
   },
   "settings": {
     "title": "Settings",
-    "intro": "Changes are saved in the Jahia configuration and apply at once, on every server of the cluster.",
+    "intro": "Changes are saved in the Jahia configuration, for every server of the cluster. Banner changes apply at once. After a change to the checks, the next check runs about one minute later.",
     "loading": "Loading the settings…",
     "loadError": "The settings could not be loaded. Reload the page to try again.",
     "readOnly": "Only server administrators can change these settings. They are shown here for information.",
@@ -227,7 +227,8 @@
       },
       "bannerDismissHours": {
         "label": "Hours the banner stays hidden",
-        "help": "A whole number from 1 to 720, used only with \"Hidden for a number of hours\"."
+        "help": "A whole number from 1 to 720, used only with \"Hidden for a number of hours\".",
+        "disabled": "Not used now: choose \"Hidden for a number of hours\" above to set it."
       }
     },
     "dismiss": {
@@ -250,7 +251,9 @@
     "reset": "Reset to defaults",
     "saving": "Saving…",
     "saved": "Settings saved. The next check runs in about one minute.",
+    "savedNow": "Settings saved. They apply at once.",
     "resetDone": "Default settings restored. The next check runs in about one minute.",
+    "resetDoneNow": "Default settings restored. They apply at once.",
     "invalid": "Some settings are not valid: nothing was saved. See the fields marked with an error.",
     "resetConfirm": {
       "title": "Reset every setting to its default value?",

@@ -170,7 +170,7 @@
   },
   "settings": {
     "title": "Paramètres",
-    "intro": "Les modifications sont enregistrées dans la configuration de Jahia et s’appliquent immédiatement, sur tous les serveurs du cluster.",
+    "intro": "Les modifications sont enregistrées dans la configuration de Jahia, pour tous les serveurs du cluster. Les modifications du bandeau s’appliquent immédiatement. Après une modification des vérifications, la vérification suivante a lieu environ une minute plus tard.",
     "loading": "Chargement des paramètres…",
     "loadError": "Les paramètres n’ont pas pu être chargés. Rechargez la page pour réessayer.",
     "readOnly": "Seuls les administrateurs du serveur peuvent modifier ces paramètres. Ils sont affichés ici pour information.",
@@ -227,7 +227,8 @@
       },
       "bannerDismissHours": {
         "label": "Heures pendant lesquelles le bandeau reste masqué",
-        "help": "Un nombre entier de 1 à 720, utilisé seulement avec « Masqué pendant un nombre d’heures »."
+        "help": "Un nombre entier de 1 à 720, utilisé seulement avec « Masqué pendant un nombre d’heures ».",
+        "disabled": "Non utilisé pour l’instant : choisissez « Masqué pendant un nombre d’heures » ci-dessus pour le régler."
       }
     },
     "dismiss": {
@@ -250,7 +251,9 @@
     "reset": "Rétablir les valeurs par défaut",
     "saving": "Enregistrement…",
     "saved": "Paramètres enregistrés. La prochaine vérification a lieu dans environ une minute.",
+    "savedNow": "Paramètres enregistrés. Ils s’appliquent immédiatement.",
     "resetDone": "Paramètres par défaut rétablis. La prochaine vérification a lieu dans environ une minute.",
+    "resetDoneNow": "Paramètres par défaut rétablis. Ils s’appliquent immédiatement.",
     "invalid": "Certains paramètres ne sont pas valides : rien n’a été enregistré. Voir les champs signalés en erreur.",
     "resetConfirm": {
       "title": "Rétablir la valeur par défaut de chaque paramètre ?",

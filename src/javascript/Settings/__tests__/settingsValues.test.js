@@ -1,4 +1,4 @@
-import {FIELDS, fromSettings, toInput} from '../settingsValues';
+import {FIELDS, fromSettings, restartsSchedule, SCHEDULE_FIELDS, toInput} from '../settingsValues';
 
 const settings = {
     enabled: true,
@@ -59,5 +59,29 @@ describe('settings form values', () => {
 
         expect(input).toBeNull();
         expect(errors).toEqual({bannerDismissHours: 'INVALID_NUMBER'});
+    });
+});
+
+describe('restartsSchedule', () => {
+    const before = {enabled: true, refreshIntervalHours: 24, useForgeSettings: true, defaultStoreUrl: 'https://store.jahia.com', extraFeedUrls: '', bannerMinimumSeverity: 'HIGH'};
+
+    test('the schedule fields are those of Settings.sameSchedule', () => {
+        expect(SCHEDULE_FIELDS).toEqual(['enabled', 'refreshIntervalHours', 'useForgeSettings', 'defaultStoreUrl', 'extraFeedUrls']);
+    });
+
+    test.each(SCHEDULE_FIELDS.filter(field => field !== 'enabled'))('a change of %s restarts the schedule', field => {
+        expect(restartsSchedule(before, {...before, [field]: field === 'useForgeSettings' ? false : 'changed'})).toBe(true);
+    });
+
+    test('a banner change, or no change, does not', () => {
+        expect(restartsSchedule(before, {...before, bannerMinimumSeverity: 'LOW'})).toBe(false);
+        expect(restartsSchedule(before, before)).toBe(false);
+    });
+
+    test('checks turned off never announce a next check; unknown previous settings with checks on do', () => {
+        expect(restartsSchedule(before, {...before, enabled: false, refreshIntervalHours: 1})).toBe(false);
+        expect(restartsSchedule(null, before)).toBe(true);
+        expect(restartsSchedule(before, null)).toBe(false);
+        expect(restartsSchedule({enabled: true}, {enabled: true})).toBe(false);
     });
 });

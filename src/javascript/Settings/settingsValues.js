@@ -15,6 +15,20 @@ export const FIELDS = [
     'bannerDismissHours'
 ];
 
+/** The settings whose change restarts the check schedule on the server (Settings.sameSchedule). */
+export const SCHEDULE_FIELDS = ['enabled', 'refreshIntervalHours', 'useForgeSettings', 'defaultStoreUrl', 'extraFeedUrls'];
+
+/**
+ * Whether a save or a reset restarted the check schedule while checks are on: the next check then runs about one
+ * minute later. Other changes (the banner) apply at once.
+ *
+ * @param {object} before the settings returned by the server before the change
+ * @param {object} after the settings returned by the change
+ * @returns {boolean}
+ */
+export const restartsSchedule = (before, after) => Boolean(after?.enabled) &&
+    SCHEDULE_FIELDS.some(field => String(before?.[field] ?? '') !== String(after?.[field] ?? ''));
+
 export const BOOLEAN_FIELDS = ['enabled', 'useForgeSettings', 'bannerEnabled', 'bannerIncludeOwnerReports'];
 export const NUMBER_FIELDS = ['refreshIntervalHours', 'bannerDismissHours'];
 
