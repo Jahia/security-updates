@@ -64,7 +64,7 @@ describe('locales', () => {
     });
 
     test('every report status, view status, error kind, error detail, compatibility and source has a text', () => {
-        ['NOT_CHECKED', 'DISABLED', 'PARTIAL', 'PARTIAL_EMPTY', 'UNAVAILABLE', 'NOT_PUBLISHED', 'STALE']
+        ['NOT_CHECKED', 'DISABLED', 'PARTIAL', 'PARTIAL_EMPTY', 'UNAVAILABLE', 'NOT_PUBLISHED', 'NOT_PUBLISHED_OTHER', 'STALE']
             .forEach(s => expect(en.page.status[s]).toBeTruthy());
         ['NOT_CHECKED', 'DISABLED', 'UP_TO_DATE', 'UPDATES_NEEDED', 'PARTIAL', 'NO_DATA', 'NOT_AVAILABLE_YET']
             .forEach(s => expect(en.page.statusLabel[s]).toBeTruthy());

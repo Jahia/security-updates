@@ -49,10 +49,12 @@
       "PARTIAL_EMPTY": "Some stores could not be checked. The stores that answered report no security update for this Jahia, but the others might.",
       "UNAVAILABLE": "No security data could be read, so this page cannot tell whether this Jahia needs security updates.",
       "NOT_PUBLISHED": "The Jahia Store does not publish security data yet. There is nothing to configure: this page will show results once the data is published.",
+      "NOT_PUBLISHED_OTHER": "The store addresses checked have no security data yet. Check them in the settings below or in Manage modules. If they are right, this page will show results once the data is published.",
       "STALE": "The results may be out of date: no check has reached every store since {{date}}."
     },
     "errors": {
       "title": "Problems found during the last check",
+      "infoTitle": "Store details",
       "store": "Store: {{url}}",
       "technical": "Technical details: {{message}}"
     },

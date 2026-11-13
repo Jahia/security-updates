@@ -120,6 +120,34 @@ describe('SecurityUpdates page', () => {
             expect(screen.queryByText('page.empty')).toBeNull();
         });
 
+        test('stores that do not publish yet are listed as neutral store details, not as problems', () => {
+            mockReport(report({status: 'UNAVAILABLE', errors: [{storeUrl: 'https://store.jahia.com', kind: 'NOT_PUBLISHED', detail: null, message: 'HTTP 404'}]}));
+            render(<SecurityUpdates/>);
+            expect(screen.queryByRole('heading', {name: 'page.errors.title'})).toBeNull();
+            expect(screen.queryByText('page.errorHelp.NOT_PUBLISHED')).toBeNull();
+            const details = screen.getByRole('list', {name: 'page.errors.infoTitle'});
+            const item = within(details).getByText('page.errorKind.NOT_PUBLISHED').closest('[data-tone]');
+            expect(item).toHaveAttribute('data-tone', 'info');
+            expect(item).toHaveTextContent('page.errors.store {url=https://store.jahia.com}');
+            expect(screen.getByRole('heading', {level: 2, name: 'page.errors.infoTitle'})).toBeInTheDocument();
+        });
+
+        test('a store without address that does not publish yet is listed without address', () => {
+            mockReport(report({status: 'UNAVAILABLE', errors: [{storeUrl: null, kind: 'NOT_PUBLISHED', detail: null, message: null}]}));
+            render(<SecurityUpdates/>);
+            expect(screen.getByText('page.status.NOT_PUBLISHED_OTHER')).toBeInTheDocument();
+            expect(screen.queryByText(/page\.errors\.store/)).toBeNull();
+        });
+
+        test('a store problem next to a store that does not publish yet keeps the problems heading', () => {
+            mockReport(report({status: 'PARTIAL', errors: [
+                {storeUrl: 'https://store.jahia.com', kind: 'NOT_PUBLISHED', detail: null, message: 'HTTP 404'},
+                {storeUrl: 'https://a.example', kind: 'UNAVAILABLE', detail: 'TIMEOUT', message: 'x'}
+            ]}));
+            render(<SecurityUpdates/>);
+            expect(screen.getByRole('heading', {name: 'page.errors.title'})).toBeInTheDocument();
+        });
+
         test.each(['UNAVAILABLE', 'NOT_CHECKED'])('a %s report is not shown as up to date', s => {
             mockReport(report({status: s, errors: [{storeUrl: 'https://store.jahia.com', kind: 'UNAVAILABLE', detail: 'TIMEOUT', message: 'Read timed out'}]}));
             render(<SecurityUpdates/>);

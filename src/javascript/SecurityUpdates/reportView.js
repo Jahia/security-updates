@@ -3,7 +3,13 @@
 
 import {SEVERITIES} from '../common/constants';
 
-const isNotPublishedOnly = errors => (errors || []).length > 0 && errors.every(error => error.kind === 'NOT_PUBLISHED');
+/** Whether the only problems of a check are stores that do not publish security data yet (HTTP 404). */
+export const isNotPublishedOnly = errors => (errors || []).length > 0 && errors.every(error => error.kind === 'NOT_PUBLISHED');
+
+const JAHIA_STORE_HOST = 'store.jahia.com';
+
+// Same rule as StoreUrls.isJahiaStore: the host of the address is the Jahia Store's.
+const isJahiaStore = url => (hostOf(url) || '').toLowerCase() === JAHIA_STORE_HOST;
 
 /**
  * What the report means, as a statusLabel key: DISABLED, NOT_CHECKED, UPDATES_NEEDED (findings, even from a partial
@@ -57,9 +63,15 @@ export const statusMessage = report => {
         case 'NOT_CHECKED':
             return {key: 'page.status.NOT_CHECKED', tone: 'warning'};
         case 'UNAVAILABLE':
-            return isNotPublishedOnly(report.errors) ?
+            if (!isNotPublishedOnly(report.errors)) {
+                return {key: 'page.status.UNAVAILABLE', tone: 'warning'};
+            }
+
+            // The Jahia Store is named only when it is the store that has no data yet: another store may simply have
+            // a wrong address.
+            return report.errors.every(error => isJahiaStore(error.storeUrl)) ?
                 {key: 'page.status.NOT_PUBLISHED', tone: 'info'} :
-                {key: 'page.status.UNAVAILABLE', tone: 'warning'};
+                {key: 'page.status.NOT_PUBLISHED_OTHER', tone: 'info'};
         default:
             break;
     }

@@ -4,17 +4,47 @@ import {Typography} from '@jahia/moonstone';
 import styles from './SecurityUpdates.scss';
 import {NS} from '../common/constants';
 import {values} from '../common/i18n';
-import {errorTexts} from './reportView';
+import {errorTexts, isNotPublishedOnly} from './reportView';
 import {StatusMessage} from './StatusMessage';
 import {storeErrorShape} from './propTypes';
 
 const TITLE_ID = 'security-updates-errors-title';
+
+/**
+ * Stores that do not publish security data yet: the expected state before the data is published, explained by the
+ * status line. Only the stores concerned are listed, as neutral information.
+ */
+const StoreDetails = ({errors}) => {
+    const {t} = useTranslation(NS);
+    return (
+        <div className={styles.section}>
+            <Typography component="h2" variant="heading" id={TITLE_ID}>{t('page.errors.infoTitle')}</Typography>
+            <ul className={styles.list} aria-labelledby={TITLE_ID}>
+                {errors.map((error, index) => (
+                    // eslint-disable-next-line react/no-array-index-key
+                    <li key={`${index}:${error.storeUrl}`}>
+                        <StatusMessage tone="info">
+                            <strong>{t('page.errorKind.NOT_PUBLISHED')}</strong>
+                            {error.storeUrl && <span className={styles.block}>{t('page.errors.store', values({url: error.storeUrl}))}</span>}
+                        </StatusMessage>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+};
+
+StoreDetails.propTypes = {errors: PropTypes.arrayOf(storeErrorShape).isRequired};
 
 /** The problems of the last check, localised from their kind and detail; the server's English text is a detail. */
 export const StoreErrors = ({errors}) => {
     const {t} = useTranslation(NS);
     if (!errors || errors.length === 0) {
         return null;
+    }
+
+    if (isNotPublishedOnly(errors)) {
+        return <StoreDetails errors={errors}/>;
     }
 
     return (

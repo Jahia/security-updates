@@ -76,6 +76,14 @@ describe('statusMessage', () => {
 
     test('NOT_PUBLISHED only is neutral information, nothing to configure', () => {
         expect(statusMessage(report({status: 'UNAVAILABLE', errors: [notPublished]}))).toEqual({key: 'page.status.NOT_PUBLISHED', tone: 'info'});
+        expect(statusMessage(report({status: 'UNAVAILABLE', errors: [{...notPublished, storeUrl: 'https://STORE.jahia.com/'}]})))
+            .toEqual({key: 'page.status.NOT_PUBLISHED', tone: 'info'});
+    });
+
+    test('NOT_PUBLISHED from another store (or without address) does not name the Jahia Store', () => {
+        const other = {...notPublished, storeUrl: 'https://store.partner.example'};
+        expect(statusMessage(report({status: 'UNAVAILABLE', errors: [notPublished, other]}))).toEqual({key: 'page.status.NOT_PUBLISHED_OTHER', tone: 'info'});
+        expect(statusMessage(report({status: 'UNAVAILABLE', errors: [{...notPublished, storeUrl: null}]}))).toEqual({key: 'page.status.NOT_PUBLISHED_OTHER', tone: 'info'});
     });
 
     test.each(['UNAVAILABLE', 'NOT_CHECKED'])('%s is a warning', status => {

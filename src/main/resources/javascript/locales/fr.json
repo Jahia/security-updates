@@ -49,10 +49,12 @@
       "PARTIAL_EMPTY": "Certains stores n’ont pas pu être interrogés. Les stores qui ont répondu ne signalent aucune mise à jour de sécurité pour ce Jahia, mais les autres pourraient en signaler.",
       "UNAVAILABLE": "Aucune donnée de sécurité n’a pu être lue : cette page ne peut pas dire si ce Jahia a besoin de mises à jour de sécurité.",
       "NOT_PUBLISHED": "Le Jahia Store ne publie pas encore de données de sécurité. Il n’y a rien à configurer : cette page affichera des résultats dès que ces données seront publiées.",
+      "NOT_PUBLISHED_OTHER": "Les adresses de store vérifiées n’ont pas encore de données de sécurité. Vérifiez-les dans les paramètres ci-dessous ou dans la gestion des modules. Si elles sont correctes, cette page affichera des résultats dès que les données seront publiées.",
       "STALE": "Les résultats ne sont peut-être plus à jour : aucune vérification n’a interrogé tous les stores depuis le {{date}}."
     },
     "errors": {
       "title": "Problèmes constatés lors de la dernière vérification",
+      "infoTitle": "Détails des stores",
       "store": "Store : {{url}}",
       "technical": "Détails techniques : {{message}}"
     },
