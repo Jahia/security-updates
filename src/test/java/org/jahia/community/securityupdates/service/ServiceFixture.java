@@ -24,6 +24,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -116,11 +117,11 @@ final class ServiceFixture {
         final List<String> requested = new CopyOnWriteArrayList<>();
         final Map<String, Map<String, String>> headers = new ConcurrentHashMap<>();
         final AtomicInteger cancelled = new AtomicInteger();
-        private volatile Throwable failure;
-        private volatile Runnable onGet;
+        private final AtomicReference<Throwable> failure = new AtomicReference<>();
+        private final AtomicReference<Runnable> onGet = new AtomicReference<>();
 
         void onGet(Runnable hook) {
-            onGet = hook;
+            onGet.set(hook);
         }
 
         void answer(String url, Object answer) {
@@ -128,21 +129,21 @@ final class ServiceFixture {
         }
 
         void failWith(Throwable e) {
-            failure = e;
+            failure.set(e);
         }
 
         @Override
         public HttpResult get(String url, Map<String, String> requestHeaders, int maxBytes) throws IOException {
-            Runnable hook = onGet;
+            Runnable hook = onGet.getAndSet(null);
             if (hook != null) {
-                onGet = null;
                 hook.run();
             }
-            if (failure instanceof RuntimeException) {
-                throw (RuntimeException) failure;
+            Throwable error = failure.get();
+            if (error instanceof RuntimeException) {
+                throw (RuntimeException) error;
             }
-            if (failure instanceof Error) {
-                throw (Error) failure;
+            if (error instanceof Error) {
+                throw (Error) error;
             }
             requested.add(url);
             headers.put(url, requestHeaders);
@@ -161,8 +162,8 @@ final class ServiceFixture {
 
     /** The stores of the module manager. */
     static final class FakeForges implements ForgeSettingsReader {
-        volatile List<org.jahia.community.securityupdates.feed.StoreTarget> stores = Collections.emptyList();
-        volatile ForgeSettingsException failure;
+        List<org.jahia.community.securityupdates.feed.StoreTarget> stores = Collections.emptyList();
+        ForgeSettingsException failure;
         final AtomicInteger reads = new AtomicInteger();
 
         @Override
@@ -176,14 +177,14 @@ final class ServiceFixture {
     }
 
     static final class MutableClock extends Clock {
-        private volatile Instant now;
+        private final AtomicReference<Instant> now;
 
         MutableClock(Instant now) {
-            this.now = now;
+            this.now = new AtomicReference<>(now);
         }
 
         void advance(Duration duration) {
-            now = now.plus(duration);
+            now.updateAndGet(current -> current.plus(duration));
         }
 
         @Override
@@ -198,7 +199,7 @@ final class ServiceFixture {
 
         @Override
         public Instant instant() {
-            return now;
+            return now.get();
         }
     }
 }
