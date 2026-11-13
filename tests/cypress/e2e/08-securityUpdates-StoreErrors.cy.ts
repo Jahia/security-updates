@@ -83,6 +83,9 @@ describe('Security updates: store errors', () => {
 
         openPage();
         cy.contains('Not available yet').should('be.visible');
+        // A store that has simply not published its feed yet is listed as neutral store details, not as a problem.
+        cy.get('#security-updates-store-details-title').should('be.visible').and('have.text', 'Store details');
+        cy.get(ERRORS_TITLE).should('not.exist');
         cy.get(FINDING_ROWS).should('not.exist');
     });
 

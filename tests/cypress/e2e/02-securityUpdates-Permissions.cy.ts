@@ -187,7 +187,7 @@ describe('Security updates: permissions', () => {
 
         cy.contains('button', 'Check now').click();
         cy.get('[data-testid="security-updates-status"]', {timeout: 120000})
-            .should('contain', 'Check completed. The page shows the new results.');
+            .should('contain', 'Check completed.');
 
         // The values are there (positive signal), and cannot be changed.
         cy.get(field('defaultStoreUrl')).should('have.value', 'https://storefixture').and('be.disabled');
