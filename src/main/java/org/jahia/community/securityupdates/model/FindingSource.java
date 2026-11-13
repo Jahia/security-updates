@@ -11,6 +11,6 @@ import graphql.annotations.annotationTypes.GraphQLName;
 public enum FindingSource {
     /** A Jahia security advisory of the store feed. */
     ADVISORY,
-    /** A version flagged by the module owner on the store; not reviewed by Jahia. */
+    /** A version flagged by the module owner on the store. */
     OWNER_REPORTED
 }

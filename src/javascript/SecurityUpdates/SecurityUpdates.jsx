@@ -258,7 +258,6 @@ export const SecurityUpdates = () => {
                                     {t('page.filter.all')}
                                 </label>
                             </fieldset>
-                            {filter === 'all' && <p className={styles.secondary}>{t('page.ownerReportedNote')}</p>}
                             {shown.length > 0 ? <FindingsTable findings={shown}/> : <p className={styles.notice}>{t('page.filteredEmpty')}</p>}
                         </>
                     )}

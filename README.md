@@ -175,7 +175,6 @@ only when they start with `https://`.
   (`extraFeedUrls`) gives no compatibility.
 - `store.jahia.com` does not publish the security feed yet: until it does, the report is
   `UNAVAILABLE` with a `NOT_PUBLISHED` error.
-- Owner-flagged versions are declared by module developers and not reviewed by Jahia.
 - **Check now** (the `refresh` mutation) runs the check in the GraphQL request: with several slow or
   unreachable stores it can take minutes (each request is bounded by the timeouts above).
 - Jahia's HTTP client refuses hosts that resolve to an internal address (loopback, private networks),

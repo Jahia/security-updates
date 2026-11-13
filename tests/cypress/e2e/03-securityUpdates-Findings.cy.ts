@@ -128,6 +128,5 @@ describe('Security updates findings from a known store', () => {
         cy.contains('label', 'All, including reports by module owners').click()
         cy.get('table tbody tr').should('have.length', 3)
         cy.get('table tbody').contains('tr', '1.0.1').should('contain', 'Reported by the module owner')
-        cy.contains('not reviewed by Jahia').should('be.visible')
     })
 })

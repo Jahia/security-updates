@@ -17,7 +17,6 @@
     "manageModules": "Open Manage modules",
     "empty": "No known security update for this Jahia.",
     "filteredEmpty": "No Jahia advisory concerns this Jahia. Select \"All\" to see the reports of module owners.",
-    "ownerReportedNote": "Reports by module owners are published by the module developers on the store and are not reviewed by Jahia.",
     "newTab": "(opens in a new tab)",
     "requires": "Requires Jahia {{version}}",
     "status": {

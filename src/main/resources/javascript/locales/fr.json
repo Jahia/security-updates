@@ -17,7 +17,6 @@
     "manageModules": "Ouvrir la gestion des modules",
     "empty": "Aucune mise à jour de sécurité connue pour ce Jahia.",
     "filteredEmpty": "Aucun bulletin Jahia ne concerne ce Jahia. Choisissez « Tout » pour voir les signalements des propriétaires de modules.",
-    "ownerReportedNote": "Les signalements des propriétaires de modules sont publiés sur le store par les développeurs des modules et ne sont pas vérifiés par Jahia.",
     "newTab": "(s'ouvre dans un nouvel onglet)",
     "requires": "Nécessite Jahia {{version}}",
     "status": {
