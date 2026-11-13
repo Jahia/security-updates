@@ -9,9 +9,10 @@
     "checking": "Checking…",
     "refreshing": "Checking the stores… This can take a few minutes.",
     "running": "A check is running. This page updates when it ends.",
-    "refreshed": "Check completed. The page shows the new results.",
+    "alreadyRunning": "A check is already running.",
+    "refreshed": "Check completed. {{result}}",
     "notRefreshed": "A check ran a moment ago, so no new check was started. Try again in a minute.",
-    "refreshError": "The check could not be started. Try again, or see the Jahia log.",
+    "refreshError": "The check failed, or the server stopped answering. Try again, or see the Jahia log.",
     "refreshSlow": "The check is still running. Reload this page in a few minutes to see the results.",
     "jahiaVersion": "Jahia version",
     "checkedAt": "Last check",
@@ -94,7 +95,11 @@
       "legend": "Show",
       "hint": "Jahia advisories are published by Jahia. Module owners can also report that a version of their module fixes a security problem: Jahia has not reviewed those reports.",
       "advisories": "Jahia advisories only ({{n}})",
-      "all": "All, including reports by module owners ({{n}})"
+      "all": "All, including reports by module owners ({{n}})",
+      "showing": {
+        "one": "Showing {{n}} component.",
+        "other": "Showing {{n}} components."
+      }
     },
     "table": {
       "caption": "Components with security updates, most severe first",

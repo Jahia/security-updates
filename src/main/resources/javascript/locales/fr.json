@@ -9,9 +9,10 @@
     "checking": "Vérification…",
     "refreshing": "Interrogation des stores… Cela peut prendre quelques minutes.",
     "running": "Une vérification est en cours. Cette page se met à jour quand elle se termine.",
-    "refreshed": "Vérification terminée. La page affiche les nouveaux résultats.",
+    "alreadyRunning": "Une vérification est déjà en cours.",
+    "refreshed": "Vérification terminée. {{result}}",
     "notRefreshed": "Une vérification vient d’avoir lieu : aucune nouvelle vérification n’a été lancée. Réessayez dans une minute.",
-    "refreshError": "La vérification n’a pas pu être lancée. Réessayez, ou consultez le journal de Jahia.",
+    "refreshError": "La vérification a échoué, ou le serveur ne répond plus. Réessayez, ou consultez le journal de Jahia.",
     "refreshSlow": "La vérification est toujours en cours. Rechargez cette page dans quelques minutes pour voir les résultats.",
     "jahiaVersion": "Version de Jahia",
     "checkedAt": "Dernière vérification",
@@ -94,7 +95,11 @@
       "legend": "Afficher",
       "hint": "Les bulletins Jahia sont publiés par Jahia. Les propriétaires de modules peuvent aussi signaler qu’une version de leur module corrige un problème de sécurité : Jahia n’a pas examiné ces signalements.",
       "advisories": "Bulletins Jahia uniquement ({{n}})",
-      "all": "Tout, y compris les signalements des propriétaires de modules ({{n}})"
+      "all": "Tout, y compris les signalements des propriétaires de modules ({{n}})",
+      "showing": {
+        "one": "{{n}} composant affiché.",
+        "other": "{{n}} composants affichés."
+      }
     },
     "table": {
       "caption": "Composants ayant des mises à jour de sécurité, les plus graves d’abord",

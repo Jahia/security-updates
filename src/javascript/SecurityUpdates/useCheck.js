@@ -1,29 +1,49 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react';
 import {CHANGED_EVENT} from '../common/constants';
+import {pluralKey, values} from '../common/i18n';
+import {checkOutcome} from './reportView';
+import {statusText} from './ReportOverview';
 
 export const POLL_INTERVAL_MS = 2000;
 /** About three minutes of polling, then the page says how to see the results later. */
 export const MAX_POLLS = 90;
+/** Polls failing in a row before the page stops and says the check could not be followed (the server is gone). */
+export const MAX_POLL_FAILURES = 3;
 
 const reportOf = result => result?.data?.securityUpdates?.report;
+
+/** What a finished check found, in one sentence: the number of components to update, or what the report means. */
+const outcomeText = (report, t, language) => {
+    const outcome = checkOutcome(report);
+    if (outcome.count) {
+        return t(`page.summary.${pluralKey(outcome.count, language)}`, values({n: outcome.count}));
+    }
+
+    return statusText(outcome, report, t, language);
+};
 
 /**
  * "Check now" and the polling of a running check. The refresh mutation only starts a check; the report query is then
  * polled until inProgress is false (the query stays the only source of the report shown). A check already running
- * when the page opens is followed the same way.
+ * when the page opens is followed the same way. One message per action: the outcome when the check ends (after the
+ * page has the new report), a failure after MAX_POLL_FAILURES failed polls in a row, and, once per check, that a
+ * check is already running when Check now is used again.
  *
- * @param {{report: object, refetch: function, refreshReport: function, t: function}} options
- * @returns {{isChecking: boolean, isUserCheck: boolean, hasFailed: boolean, announcement: string, onRefresh: function}}
+ * @param {{report: object, refetch: function, refreshReport: function, t: function, language: string}} options
+ * @returns {{isChecking: boolean, isUserCheck: boolean, hasFailed: boolean, isAlreadyRunning: boolean,
+ *            announcement: string, onRefresh: function}}
  */
-export const useCheck = ({report, refetch, refreshReport, t}) => {
+export const useCheck = ({report, refetch, refreshReport, t, language}) => {
     const [isChecking, setChecking] = useState(false);
     const [isUserCheck, setUserCheck] = useState(false);
     const [hasFailed, setFailed] = useState(false);
+    const [isAlreadyRunning, setAlreadyRunning] = useState(false);
     const [announcement, setAnnouncement] = useState('');
     const busy = useRef(false);
     const mounted = useRef(true);
     const timer = useRef(null);
     const polls = useRef(0);
+    const failures = useRef(0);
     const poll = useRef(() => undefined);
 
     useEffect(() => {
@@ -34,46 +54,74 @@ export const useCheck = ({report, refetch, refreshReport, t}) => {
         };
     }, []);
 
-    const finish = useCallback(key => {
+    const finish = useCallback(text => {
         busy.current = false;
         clearTimeout(timer.current);
         setChecking(false);
-        setAnnouncement(key ? t(key) : '');
-    }, [t]);
+        setAlreadyRunning(false);
+        setAnnouncement(text);
+    }, []);
 
-    const completed = useCallback(() => {
-        finish('page.refreshed');
+    const fail = useCallback(() => {
+        setFailed(true);
+        finish(t('page.refreshError'));
+    }, [finish, t]);
+
+    const completed = useCallback(next => {
+        finish(t('page.refreshed', values({result: outcomeText(next, t, language)})));
         window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
-    }, [finish]);
+    }, [finish, t, language]);
 
-    poll.current = () => {
-        clearTimeout(timer.current);
-        timer.current = setTimeout(() => {
-            polls.current += 1;
-            Promise.resolve()
-                .then(() => refetch())
-                .then(reportOf, () => null)
-                .then(next => {
-                    if (!mounted.current) {
-                        return;
-                    }
+    // The latest refetch and callbacks, read by the timer: set after each render, never during it.
+    useLayoutEffect(() => {
+        const onPollFailed = () => {
+            failures.current += 1;
+            if (failures.current >= MAX_POLL_FAILURES) {
+                fail();
+            } else if (polls.current >= MAX_POLLS) {
+                finish(t('page.refreshSlow'));
+            } else {
+                poll.current();
+            }
+        };
 
-                    if (next && !next.inProgress) {
-                        completed();
-                    } else if (polls.current >= MAX_POLLS) {
-                        finish('page.refreshSlow');
-                    } else {
-                        poll.current();
-                    }
-                });
-        }, POLL_INTERVAL_MS);
-    };
+        const onPolled = next => {
+            if (!next) {
+                // An answer without a report is no better than no answer.
+                onPollFailed();
+                return;
+            }
+
+            failures.current = 0;
+            if (!next.inProgress) {
+                completed(next);
+            } else if (polls.current >= MAX_POLLS) {
+                finish(t('page.refreshSlow'));
+            } else {
+                poll.current();
+            }
+        };
+
+        poll.current = () => {
+            clearTimeout(timer.current);
+            timer.current = setTimeout(() => {
+                polls.current += 1;
+                Promise.resolve()
+                    .then(() => refetch())
+                    .then(result => mounted.current && onPolled(reportOf(result)), () => mounted.current && onPollFailed());
+            }, POLL_INTERVAL_MS);
+        };
+    });
 
     const start = useCallback(isUser => {
         busy.current = true;
         polls.current = 0;
+        failures.current = 0;
         setChecking(true);
         setUserCheck(isUser);
+        setFailed(false);
+        setAlreadyRunning(false);
+        setAnnouncement('');
     }, []);
 
     const isRunning = Boolean(report?.inProgress);
@@ -84,15 +132,31 @@ export const useCheck = ({report, refetch, refreshReport, t}) => {
         }
     }, [isRunning, start]);
 
+    // The check ended before the mutation answered: the outcome is announced once the page shows the new report.
+    const followEndedCheck = ended => {
+        Promise.resolve()
+            .then(() => refetch())
+            .then(result => {
+                if (mounted.current) {
+                    completed(reportOf(result) || ended);
+                }
+            }, () => {
+                if (mounted.current) {
+                    window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
+                    fail();
+                }
+            });
+    };
+
     const onRefresh = () => {
-        // The button stays enabled (disabling it would drop the keyboard focus): a click during a check is ignored.
+        // The button stays enabled (disabling it would drop the keyboard focus): a click during a check says, once,
+        // that a check is already running.
         if (busy.current) {
+            setAlreadyRunning(true);
             return;
         }
 
         start(true);
-        setFailed(false);
-        setAnnouncement(t('page.refreshing'));
         const previousCheck = report?.checkedAt;
         let started;
         try {
@@ -111,19 +175,17 @@ export const useCheck = ({report, refetch, refreshReport, t}) => {
                 if (next?.inProgress) {
                     poll.current();
                 } else if (next && next.checkedAt !== previousCheck) {
-                    Promise.resolve().then(() => refetch()).catch(() => undefined);
-                    completed();
+                    followEndedCheck(next);
                 } else {
-                    finish('page.notRefreshed');
+                    finish(t('page.notRefreshed'));
                 }
             })
             .catch(() => {
                 if (mounted.current) {
-                    setFailed(true);
-                    finish('page.refreshError');
+                    fail();
                 }
             });
     };
 
-    return {isChecking, isUserCheck, hasFailed, announcement, onRefresh};
+    return {isChecking, isUserCheck, hasFailed, isAlreadyRunning, announcement, onRefresh};
 };

@@ -1,5 +1,6 @@
 import {
     actionFor,
+    checkOutcome,
     chipColor,
     countBySource,
     defaultFilter,
@@ -83,6 +84,18 @@ describe('statusMessage', () => {
 
     test('DISABLED is information', () => {
         expect(statusMessage(report({status: 'DISABLED'}))).toEqual({key: 'page.status.DISABLED', tone: 'info'});
+    });
+});
+
+describe('checkOutcome', () => {
+    test('findings give the number of distinct components, even from a partial check', () => {
+        expect(checkOutcome(report({status: 'PARTIAL', findings: [finding('a', 'HIGH'), finding('a', 'LOW', 'OWNER_REPORTED'), finding('b', 'LOW')]})))
+            .toEqual({count: 2});
+    });
+
+    test('no finding gives the status line of the report', () => {
+        expect(checkOutcome(report())).toEqual({key: 'page.empty', tone: 'info'});
+        expect(checkOutcome(report({status: 'UNAVAILABLE', errors: [notPublished]}))).toEqual(statusMessage(report({status: 'UNAVAILABLE', errors: [notPublished]})));
     });
 });
 

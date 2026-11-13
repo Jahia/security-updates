@@ -127,6 +127,17 @@ export const defaultFilter = (findings, search) => {
     return (findings || []).some(finding => finding.source !== 'ADVISORY') ? 'all' : 'advisories';
 };
 
+/**
+ * What a finished check found, for its announcement: the number of distinct components to update when there are
+ * findings (even from a partial check), otherwise the status line of the report.
+ *
+ * @returns {{count: number}|{key: string, tone: string, isStale?: boolean}}
+ */
+export const checkOutcome = report => {
+    const {total} = severitySummary(report.findings);
+    return total > 0 ? {count: total} : statusMessage(report);
+};
+
 /** Distinct components, each counted once at its highest severity, most severe first. */
 export const severitySummary = findings => {
     const highest = new Map();

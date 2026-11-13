@@ -1,4 +1,5 @@
-import {useEffect} from 'react';
+import {useEffect, useState} from 'react';
+import PropTypes from 'prop-types';
 import {useMutation, useQuery} from '@apollo/client';
 import {useTranslation} from 'react-i18next';
 import {Button, Chip, Header, LayoutContent, Loader, Typography} from '@jahia/moonstone';
@@ -36,12 +37,57 @@ const usePageEvents = () => {
     }, []);
 };
 
-export const SecurityUpdates = () => {
+// Live regions announce changes, not the content they are created with: the status region starts empty and is filled
+// once the page is in the document.
+const useMounted = () => {
+    const [isMounted, setMounted] = useState(false);
+    useEffect(() => setMounted(true), []);
+    return isMounted;
+};
+
+/**
+ * The content of the status region, its one visible indicator: the loading, then the running check (with a loader),
+ * then the last announcement (the outcome of the check, or why it did not run).
+ */
+const PageStatus = ({isLoading, check}) => {
     const {t} = useTranslation(NS);
+    if (isLoading) {
+        return t('page.loading');
+    }
+
+    if (check.isChecking) {
+        return (
+            <span className={styles.checking} data-testid="security-updates-checking">
+                <span aria-hidden="true"><Loader size="small"/></span>
+                <Typography component="span">
+                    {t(check.isUserCheck ? 'page.refreshing' : 'page.running')}
+                    {check.isAlreadyRunning && <> {t('page.alreadyRunning')}</>}
+                </Typography>
+            </span>
+        );
+    }
+
+    return check.announcement ? <StatusMessage tone={check.hasFailed ? 'warning' : 'info'}>{check.announcement}</StatusMessage> : null;
+};
+
+PageStatus.propTypes = {
+    isLoading: PropTypes.bool,
+    check: PropTypes.shape({
+        isChecking: PropTypes.bool.isRequired,
+        isUserCheck: PropTypes.bool.isRequired,
+        isAlreadyRunning: PropTypes.bool.isRequired,
+        hasFailed: PropTypes.bool.isRequired,
+        announcement: PropTypes.string.isRequired
+    }).isRequired
+};
+
+export const SecurityUpdates = () => {
+    const {t, i18n} = useTranslation(NS);
     const {data, loading, error, refetch} = useQuery(GET_SECURITY_REPORT, {fetchPolicy: QUERY_FETCH_POLICY});
     const [refreshReport] = useMutation(REFRESH_SECURITY_REPORT);
     const report = data?.securityUpdates?.report;
-    const check = useCheck({report, refetch, refreshReport, t});
+    const check = useCheck({report, refetch, refreshReport, t, language: i18n?.language});
+    const isMounted = useMounted();
     useDocumentTitle(t('page.documentTitle', values({title: t('label')})));
     usePageEvents();
 
@@ -70,22 +116,14 @@ export const SecurityUpdates = () => {
         <div className={styles.page}>
             <Typography className={styles.text}>{t('page.intro')}</Typography>
 
-            {/* Always in the page, so that screen readers follow it from the start. */}
-            <p role="status" aria-live="polite" aria-atomic="true" className={styles.announcement} data-testid="security-updates-status">
-                {loading ? t('page.loading') : check.announcement}
-            </p>
+            {/* Always in the page, so that screen readers follow it from the start; empty until the page is mounted. */}
+            <div role="status" aria-live="polite" aria-atomic="true" className={styles.announcement} data-testid="security-updates-status">
+                {isMounted && <PageStatus isLoading={Boolean(loading)} check={check}/>}
+            </div>
 
             {loading && <div className={styles.loader} aria-hidden="true"><Loader size="big"/></div>}
 
             {error && <StatusMessage tone="warning" role="alert">{t('page.error')}</StatusMessage>}
-
-            {check.isChecking && (
-                <div className={styles.checking} data-testid="security-updates-checking">
-                    <span aria-hidden="true"><Loader size="small"/></span>
-                    <Typography component="span">{t(check.isUserCheck ? 'page.refreshing' : 'page.running')}</Typography>
-                </div>
-            )}
-            {check.hasFailed && <StatusMessage tone="warning">{t('page.refreshError')}</StatusMessage>}
 
             {!loading && !error && report && (
                 <>

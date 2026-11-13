@@ -36,8 +36,16 @@ Summary.propTypes = {findings: PropTypes.arrayOf(findingShape).isRequired};
 
 /** The "Components to update" section: summary, filter (Jahia advisories / all), table and what to do next. */
 export const Findings = ({findings}) => {
-    const {t} = useTranslation(NS);
+    const {t, i18n} = useTranslation(NS);
     const [filter, setFilter] = useState(() => defaultFilter(findings, window.location.search));
+    // Said after a change of filter only (one short message per change), never when the page opens.
+    const [filterStatus, setFilterStatus] = useState('');
+    const onFilter = value => {
+        setFilter(value);
+        const {total} = severitySummary(filterFindings(findings, value));
+        setFilterStatus(t(`page.filter.showing.${pluralKey(total, i18n?.language)}`, values({n: total})));
+    };
+
     const shown = filterFindings(findings, filter);
     const counts = countBySource(findings);
     return (
@@ -46,8 +54,8 @@ export const Findings = ({findings}) => {
             <Summary findings={shown}/>
             <fieldset className={styles.filter} aria-describedby={HINT_ID}>
                 <Typography component="legend" weight="bold">{t('page.filter.legend')}</Typography>
-                <Typography id={HINT_ID} variant="caption" className={styles.hint}>{t('page.filter.hint')}</Typography>
-                <RadioGroup name="security-updates-filter" value={filter} onChange={(event, value) => setFilter(value)}>
+                <Typography id={HINT_ID} className={styles.hint}>{t('page.filter.hint')}</Typography>
+                <RadioGroup name="security-updates-filter" value={filter} onChange={(event, value) => onFilter(value)}>
                     <RadioItem
                         id="security-updates-filter-advisories"
                         className={styles.radio}
@@ -62,6 +70,7 @@ export const Findings = ({findings}) => {
                     />
                 </RadioGroup>
             </fieldset>
+            <p role="status" className={styles.srOnly} data-testid="security-updates-filter-status">{filterStatus}</p>
             {shown.length > 0 ?
                 <FindingsTable findings={shown} labelledBy={TITLE_ID}/> :
                 <StatusMessage tone="info">{t('page.filteredEmpty')}</StatusMessage>}

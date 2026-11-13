@@ -1,4 +1,5 @@
 import {act, fireEvent, render, screen, within} from '@testing-library/react';
+import {renderToStaticMarkup} from 'react-dom/server.node';
 import {axe} from 'jest-axe';
 import {useMutation, useQuery} from '@apollo/client';
 import {SecurityUpdates} from '../SecurityUpdates';
@@ -81,6 +82,15 @@ describe('SecurityUpdates page', () => {
             mockReport(report());
             render(<SecurityUpdates/>);
             expect(status()).toBeEmptyDOMElement();
+        });
+
+        test('the status region is empty in the first render, and filled once mounted (first content is not announced)', () => {
+            useQuery.mockReturnValue({data: undefined, loading: true, error: undefined, refetch});
+            const html = renderToStaticMarkup(<SecurityUpdates/>);
+            expect(html).toMatch(/<div role="status" aria-live="polite" aria-atomic="true" class="announcement" data-testid="security-updates-status"><\/div>/);
+
+            render(<SecurityUpdates/>);
+            expect(status()).toHaveTextContent('page.loading');
         });
     });
 
@@ -283,8 +293,16 @@ describe('SecurityUpdates page', () => {
             expect(screen.getByLabelText('page.filter.advisories {n=1}')).not.toBeChecked();
             expect(screen.getByRole('group', {name: 'page.filter.legend'})).toHaveAccessibleDescription('page.filter.hint');
 
+            const filterStatus = screen.getByTestId('security-updates-filter-status');
+            expect(filterStatus).toHaveAttribute('role', 'status');
+            expect(filterStatus).toBeEmptyDOMElement();
+
             fireEvent.click(screen.getByLabelText('page.filter.advisories {n=1}'));
             expect(screen.queryByText('owner-module')).toBeNull();
+            expect(filterStatus).toHaveTextContent('page.filter.showing.one {n=1}');
+
+            fireEvent.click(screen.getByLabelText('page.filter.all {n=2}'));
+            expect(filterStatus).toHaveTextContent('page.filter.showing.other {n=2}');
         });
 
         test('shows Jahia advisories only when there is no owner report', () => {
@@ -329,7 +347,9 @@ describe('SecurityUpdates page', () => {
             expect(button()).toHaveAttribute('aria-busy', 'true');
             expect(button()).not.toBeDisabled();
             expect(status()).toHaveTextContent('page.refreshing');
-            expect(screen.getByTestId('security-updates-checking')).toBeInTheDocument();
+            // One visible indicator: the running check is shown in the status region only.
+            expect(within(status()).getByTestId('security-updates-checking')).toBeInTheDocument();
+            expect(screen.getAllByText('page.refreshing')).toHaveLength(1);
 
             await act(() => jest.advanceTimersByTimeAsync(2000));
             expect(refetch).toHaveBeenCalledTimes(1);
@@ -337,22 +357,55 @@ describe('SecurityUpdates page', () => {
 
             await act(() => jest.advanceTimersByTimeAsync(2000));
             expect(refetch).toHaveBeenCalledTimes(2);
-            expect(status()).toHaveTextContent('page.refreshed');
+            expect(status()).toHaveTextContent('page.refreshed {result=page.empty}');
+            expect(screen.queryByTestId('security-updates-checking')).toBeNull();
             expect(button()).toHaveTextContent('page.refresh');
             expect(button()).not.toHaveAttribute('aria-busy');
             expect(changed).toHaveBeenCalledTimes(1);
             window.removeEventListener(CHANGED_EVENT, changed);
         });
 
-        test('a second click during a check does not start another', async () => {
+        test('a second click during a check does not start another, and says once that a check is already running', async () => {
             refresh.mockImplementation(() => new Promise(() => {}));
             mockReport(report());
             render(<SecurityUpdates/>);
 
             fireEvent.click(button());
+            expect(status()).not.toHaveTextContent('page.alreadyRunning');
+            fireEvent.click(button());
             fireEvent.click(button());
 
             expect(refresh).toHaveBeenCalledTimes(1);
+            expect(status()).toHaveTextContent('page.refreshing page.alreadyRunning');
+            expect(screen.getAllByText(/page\.alreadyRunning/)).toHaveLength(1);
+        });
+
+        test('the outcome says how many components need an update', async () => {
+            jest.useFakeTimers();
+            refetch.mockImplementation(() => Promise.resolve(answer(report({findings: [finding('a', 'HIGH'), finding('b', 'LOW'), finding('a', 'LOW', 'OWNER_REPORTED')]}))));
+            mockReport(report());
+            render(<SecurityUpdates/>);
+
+            await act(async () => {
+                fireEvent.click(button());
+            });
+            await act(() => jest.advanceTimersByTimeAsync(2000));
+
+            expect(status()).toHaveTextContent('page.refreshed {result=page.summary.other {n=2}}');
+        });
+
+        test('the outcome of a check without findings that is not complete says so (stale here, with its date)', async () => {
+            jest.useFakeTimers();
+            refetch.mockImplementation(() => Promise.resolve(answer(report({status: 'PARTIAL', stale: true, lastSuccess: null}))));
+            mockReport(report());
+            render(<SecurityUpdates/>);
+
+            await act(async () => {
+                fireEvent.click(button());
+            });
+            await act(() => jest.advanceTimersByTimeAsync(2000));
+
+            expect(status()).toHaveTextContent('page.refreshed {result=page.status.STALE {date=page.never}}');
         });
 
         test('when no check was started (one ran a moment ago), says so', async () => {
@@ -377,8 +430,108 @@ describe('SecurityUpdates page', () => {
                 fireEvent.click(button());
             });
 
-            expect(status()).toHaveTextContent('page.refreshed');
+            expect(status()).toHaveTextContent('page.refreshed {result=page.empty}');
             expect(refetch).toHaveBeenCalledTimes(1);
+        });
+
+        test('a check that already ended is announced only once the page has the new report', async () => {
+            let answerRefetch;
+            refetch.mockImplementation(() => new Promise(resolve => {
+                answerRefetch = resolve;
+            }));
+            refresh.mockImplementation(() => Promise.resolve({data: {securityUpdates: {refresh: report({checkedAt: '2026-11-13T12:00:00Z'})}}}));
+            mockReport(report());
+            render(<SecurityUpdates/>);
+
+            await act(async () => {
+                fireEvent.click(button());
+            });
+            expect(status()).not.toHaveTextContent('page.refreshed');
+            expect(button()).toHaveTextContent('page.checking');
+
+            await act(async () => {
+                answerRefetch(answer(report({checkedAt: '2026-11-13T12:00:00Z', findings: [finding('m', 'HIGH')]})));
+            });
+            expect(status()).toHaveTextContent('page.refreshed {result=page.summary.one {n=1}}');
+        });
+
+        test('a check that already ended, whose new report cannot be read, is reported as a failure', async () => {
+            const changed = jest.fn();
+            window.addEventListener(CHANGED_EVENT, changed);
+            refetch.mockImplementation(() => Promise.reject(new Error('offline')));
+            refresh.mockImplementation(() => Promise.resolve({data: {securityUpdates: {refresh: report({checkedAt: '2026-11-13T12:00:00Z'})}}}));
+            mockReport(report());
+            render(<SecurityUpdates/>);
+
+            await act(async () => {
+                fireEvent.click(button());
+            });
+
+            expect(status()).toHaveTextContent('page.refreshError');
+            expect(within(status()).getByText('page.refreshError').closest('[data-tone]')).toHaveAttribute('data-tone', 'warning');
+            expect(changed).toHaveBeenCalledTimes(1);
+            window.removeEventListener(CHANGED_EVENT, changed);
+        });
+
+        test('three failed polls in a row stop the check and say it failed, instead of running until "slow"', async () => {
+            jest.useFakeTimers();
+            refetch.mockImplementation(() => Promise.reject(new Error('server down')));
+            mockReport(report());
+            render(<SecurityUpdates/>);
+
+            await act(async () => {
+                fireEvent.click(button());
+            });
+            await act(() => jest.advanceTimersByTimeAsync(4000));
+            expect(button()).toHaveTextContent('page.checking');
+
+            await act(() => jest.advanceTimersByTimeAsync(2000));
+            expect(refetch).toHaveBeenCalledTimes(3);
+            expect(status()).toHaveTextContent('page.refreshError');
+            expect(button()).toHaveTextContent('page.refresh');
+
+            await act(() => jest.advanceTimersByTimeAsync(10000));
+            expect(refetch).toHaveBeenCalledTimes(3);
+        });
+
+        test('failures that are not in a row, or an answer without a report, do not stop the check', async () => {
+            jest.useFakeTimers();
+            const running = () => Promise.resolve(answer(report({inProgress: true})));
+            const failing = () => Promise.reject(new Error('blip'));
+            refetch
+                .mockImplementationOnce(failing)
+                .mockImplementationOnce(() => Promise.resolve({data: null}))
+                .mockImplementationOnce(running)
+                .mockImplementationOnce(failing)
+                .mockImplementationOnce(failing)
+                .mockImplementationOnce(() => Promise.resolve(answer(report())));
+            mockReport(report());
+            render(<SecurityUpdates/>);
+
+            await act(async () => {
+                fireEvent.click(button());
+            });
+            await act(() => jest.advanceTimersByTimeAsync(12000));
+
+            expect(refetch).toHaveBeenCalledTimes(6);
+            expect(status()).toHaveTextContent('page.refreshed {result=page.empty}');
+        });
+
+        test('failed polls at the end of the polling time give the "slow" message', async () => {
+            jest.useFakeTimers();
+            refetch.mockImplementation(() => (refetch.mock.calls.length % 2 === 0 ?
+                Promise.reject(new Error('blip')) :
+                Promise.resolve(answer(report({inProgress: true})))));
+            mockReport(report());
+            render(<SecurityUpdates/>);
+
+            await act(async () => {
+                fireEvent.click(button());
+            });
+            await act(() => jest.advanceTimersByTimeAsync(4 * 60 * 1000));
+
+            expect(refetch).toHaveBeenCalledTimes(90);
+            expect(status()).toHaveTextContent('page.refreshSlow');
         });
 
         test('a poll that fails is retried', async () => {
@@ -395,7 +548,7 @@ describe('SecurityUpdates page', () => {
             await act(() => jest.advanceTimersByTimeAsync(4000));
 
             expect(refetch).toHaveBeenCalledTimes(2);
-            expect(status()).toHaveTextContent('page.refreshed');
+            expect(status()).toHaveTextContent('page.refreshed {result=page.empty}');
         });
 
         test('closing the page while a check starts or fails changes nothing', async () => {
@@ -434,7 +587,9 @@ describe('SecurityUpdates page', () => {
             });
 
             expect(status()).toHaveTextContent('page.refreshError');
-            expect(screen.getAllByText('page.refreshError')).toHaveLength(2);
+            // Shown once, as a warning, in the status region.
+            expect(screen.getAllByText('page.refreshError')).toHaveLength(1);
+            expect(within(status()).getByText('page.refreshError').closest('[data-tone]')).toHaveAttribute('data-tone', 'warning');
         });
 
         test('stops polling after about three minutes and says how to see the results', async () => {

@@ -32,6 +32,12 @@ export const ReportDates = ({report}) => {
 
 ReportDates.propTypes = {report: reportShape.isRequired};
 
+/** The text of a status line of reportView.statusMessage (the stale one says since when). */
+export const statusText = (message, report, t, language) => {
+    const vars = message.isStale ? values({date: formatDateTime(report.lastSuccess, language) || t('page.never')}) : undefined;
+    return t(message.key, vars);
+};
+
 /** What the report means, in one sentence (none when the table says it all). */
 export const ReportStatus = ({report}) => {
     const {t, i18n} = useTranslation(NS);
@@ -40,8 +46,7 @@ export const ReportStatus = ({report}) => {
         return null;
     }
 
-    const vars = message.isStale ? values({date: formatDateTime(report.lastSuccess, i18n?.language) || t('page.never')}) : undefined;
-    return <StatusMessage tone={message.tone}>{t(message.key, vars)}</StatusMessage>;
+    return <StatusMessage tone={message.tone}>{statusText(message, report, t, i18n?.language)}</StatusMessage>;
 };
 
 ReportStatus.propTypes = {report: reportShape.isRequired};
