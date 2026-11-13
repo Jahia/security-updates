@@ -30,9 +30,9 @@ public class SecurityUpdatesMutation {
     @GraphQLField
     @GraphQLName("refresh")
     @GraphQLNonNull
-    @GraphQLDescription("Starts a check of the stores in the background (unless one runs, or one started less than "
-            + "onDemandMinIntervalSeconds ago, 30 by default) and returns the current report at once: poll the report "
-            + "until inProgress is false")
+    @GraphQLDescription("Starts a check of the stores in the background (unless one runs, or the previous check "
+            + "started or ended less than onDemandMinIntervalSeconds ago, 30 by default, counted from the later of the "
+            + "two) and returns the current report at once: poll the report until inProgress is false")
     @GraphQLRequiresPermission(Permissions.ADMIN_TEMPLATES)
     public GqlSecurityReport refresh() {
         return ServiceLocator.withService(service -> new GqlSecurityReport(service.refresh()),

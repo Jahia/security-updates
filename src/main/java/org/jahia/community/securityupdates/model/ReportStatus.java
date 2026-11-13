@@ -13,9 +13,17 @@ public enum ReportStatus {
     NOT_CHECKED,
     /** The module is disabled by configuration. */
     DISABLED,
-    /** Every configured store returned a security feed this module understands. */
+    /**
+     * Every configured store returned a fresh security feed this module understands, every installed component
+     * was compared, and the report is not stale. A module list that could not be read
+     * ({@link StoreErrorKind#CATALOGUE_UNAVAILABLE}) does not prevent it: compatibility is then unknown.
+     */
     OK,
-    /** Some stores returned a usable feed (fresh or kept from an earlier check), others failed. */
+    /**
+     * A feed is usable (fresh, or kept from an earlier check) but the check is incomplete: a store failed or was
+     * only partly understood, a component could not be compared, or the report is stale (its last check is older
+     * than twice the refresh interval).
+     */
     PARTIAL,
     /** No usable security feed is available: findings cannot be trusted to be complete. */
     UNAVAILABLE

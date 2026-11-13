@@ -17,7 +17,10 @@ import java.util.function.Consumer;
  */
 public final class Settings {
 
-    /** Hidden key (not in the settings UI): seconds between two on-demand checks, 0 to 3600. */
+    /**
+     * Hidden key (not in the settings UI): seconds before an on-demand check may start, counted from the later of the
+     * start and the end of the previous check, 0 to 3600.
+     */
     public static final String ON_DEMAND_MIN_INTERVAL_SECONDS = "onDemandMinIntervalSeconds";
     static final int DEFAULT_REFRESH_INTERVAL_HOURS = 24;
     static final String DEFAULT_STORE_URL = "https://store.jahia.com";
@@ -149,7 +152,10 @@ public final class Settings {
         return defaultStoreUrl;
     }
 
-    /** @return the shortest time between the starts of two checks run on demand */
+    /**
+     * @return the shortest time between the later of the start and the end of the previous check and the start of an
+     * on-demand check
+     */
     public Duration getOnDemandMinInterval() {
         return Duration.ofSeconds(onDemandMinIntervalSeconds);
     }
