@@ -6,11 +6,12 @@ modules) for which the Jahia Store publishes updates that fix security issues, m
 version, whether that version runs on this Jahia, the severity and the advisories (id, title, link,
 CVEs).
 
-> **Status: the Jahia Store does not publish the security feed yet.** Until it does, the page shows
-> **Not available yet** and the report status is `UNAVAILABLE` with a `NOT_PUBLISHED` error. This is
-> expected. There is nothing to configure and nothing is broken. The module starts finding updates by
-> itself on the first check after the store publishes the feed. In the meantime you can point it at a
-> store or a feed of your own (see [Data sources](#data-sources)).
+> **Status: the Jahia Store does not publish the security feed yet.** It will publish it in a later
+> version. Until then, the page shows **Not available yet** and the report status is `UNAVAILABLE` with a
+> `NOT_PUBLISHED` error. This is expected. There is nothing to configure and nothing is broken. The module
+> starts finding updates by itself on the first check after the store publishes the feed. In the meantime
+> you can point it at a store or a feed of your own (see [Data sources](#data-sources) and
+> [Hosting a feed](#hosting-a-feed)).
 
 ## Requirements
 
@@ -18,7 +19,7 @@ CVEs).
 |---|---|
 | Jahia | 8.2.3.7 or later (`Jahia-Required-Version` in the module manifest, from the `jahia-modules` parent in `pom.xml`) |
 | Modules | `serverSettings` and `graphql-dxm-provider` (`Jahia-Depends`), both part of a standard Jahia |
-| Network | Outbound HTTPS from every Jahia node to the stores (`store.jahia.com` by default), through the Jahia proxy settings if any |
+| Network | Outbound HTTPS from every Jahia node to the stores (on a standard Jahia, `store.jahia.com`, the store of the module manager), through the Jahia proxy settings if any |
 | To see the page, the banner and the report | The `adminTemplates` permission (the permission that gives access to module management) |
 | To change the settings | The `admin` permission, held by the server administrators. A user with only `adminTemplates` (for example the web designer role) sees the settings read-only. |
 
@@ -27,15 +28,13 @@ internal addresses at connect time (see [Security](#security)). Earlier 8.2 rele
 
 ## Installation
 
-- Download `security-updates-<version>.jar`: _download link to add when the first release is published_.
-  Or build it yourself (see [Build](#build)).
+- Get `security-updates-<version>.jar` from the Jahia Store or from the GitHub releases of the project,
+  or build it yourself (see [Build](#build)).
 - In Jahia, go to **Administration > Server settings > System components > Modules**, upload the JAR
   and check that the module is started.
 - Open **Administration > Server settings > System components > Security updates**.
 
 The first check runs about one minute after the module starts. **Check now** starts one at once.
-
-_Screenshots to add: the Security updates page with findings, the settings section, the banner._
 
 ## What the page shows
 
@@ -59,8 +58,10 @@ _Screenshots to add: the Security updates page with findings, the settings secti
 
 ## Banner
 
-Users with `adminTemplates` also get a notice (the banner) at the top or bottom of the Jahia UI, for example
+Users with `adminTemplates` also get a notice (the banner) in the Jahia UI, for example
 "3 components need a security update (high severity or above).", with a link to the Security updates page.
+It is a fixed box at the bottom right of the window. It moves to the top right when it would cover the
+focused element.
 
 The server decides whether it is shown, from the current report and the `banner*` settings (see
 [Configuration](#configuration)), and exposes the decision as `Query.securityUpdates.banner`:
@@ -78,8 +79,11 @@ The browser only renders the decision. It never filters findings itself. A confi
 the next query, without waiting for a check. Any error (network, permission, unexpected answer) leaves the
 UI unchanged. Users without `adminTemplates` never see it.
 
-The banner reads the server again every 15 minutes, when the browser tab becomes visible again, and when the
-page changes the report or the settings. It is hidden on the Security updates page itself.
+The banner reads the server again every 15 minutes, when the browser tab becomes visible again (no request
+if the last one is less than 30 seconds old), and when the page changes the report or the settings. It is
+hidden on the Security updates page itself. A screen reader hears it only when its count or its dismissal
+keys change. After **Hide this banner**, a status message tells when it comes back and focus returns to the
+previous element.
 
 **Colours.** The background and text colours are configurable (`#RRGGBB`). Their contrast ratio must be at
 least 7:1 (WCAG 2.2 AAA, relative luminance formula). The link, the button border and the 3px focus ring
@@ -115,12 +119,13 @@ user information, query or fragment. A plain `http://` URL is refused everywhere
 `INVALID_URL` error with the detail `NOT_HTTPS`. A feed read over http could be altered on the way and
 hide a vulnerability.
 
-**Form of the store URL.** `B` is the base of the store: the module appends `/contents/...` to it. The
-default is `https://store.jahia.com`. A store such as `https://storedev.jahia.com` works the same way. The
-module manager's default store is registered with a longer base (`https://store.jahia.com/en/sites/private-app-store`):
-the module appends the same paths to whatever base the module manager holds. Check that the feed exists
-at the resulting address before relying on it: it is not verified that the store serves the feed below
-that longer base.
+**Form of the store URL.** `B` is the base of the store: the module appends `/contents/...` to it. On a
+standard Jahia, the module reads the store of the module manager,
+`https://store.jahia.com/en/sites/private-app-store`. The module manager appends
+`/contents/modules-repository.moduleList.json` to that same base, so the security feed is read at
+`https://store.jahia.com/en/sites/private-app-store/contents/modules-repository.securityUpdates.json`.
+`defaultStoreUrl` (default `https://store.jahia.com`) is used only when the module manager holds no store,
+or when `useForgeSettings=false`. The module appends the paths to whatever base it is given.
 
 The stores read, in order:
 
@@ -131,12 +136,18 @@ The stores read, in order:
      `karaf/etc/org.jahia.modules.modulemanager.forge.configuration-<name>.cfg` (keys `url`, `user`, `password`);
    - module manager 2.12 and earlier: JCR nodes `jnt:forgeServerSettings` under `/settings/forgesSettings`.
 
-   When neither can be read, the report shows `UNAVAILABLE` with the detail `FORGE_SETTINGS_UNREADABLE`
-   (status `PARTIAL`), and the default store is used instead;
+   When neither can be read, the report has an error of kind `UNAVAILABLE` with the detail
+   `FORGE_SETTINGS_UNREADABLE`, and the default store is used instead. The report status is then at best
+   `PARTIAL`;
 2. otherwise, or when none is configured, `defaultStoreUrl`;
 3. plus every URL of `extraFeedUrls` (at most 10), read as a security feed only: no catalogue, no credentials.
 
 At most 20 stores and feeds are read in one check. The Jahia Store (`store.jahia.com`) is read first.
+
+**A store that answers 404.** A store with no security feed gives the error `NOT_PUBLISHED`. When another
+feed answers, that error still keeps the report `PARTIAL`. To read only your own feed, set
+`useForgeSettings=false`, empty `defaultStoreUrl`, and list your feed in `extraFeedUrls`: no other store is
+then read.
 
 **Trust boundary.** The stores of the module manager can be edited by every user who holds `adminTemplates`
 in the module manager. That is the module manager's own trust boundary, not this module's. Those users
@@ -147,19 +158,39 @@ and configure `defaultStoreUrl` (editable by server administrators only).
 official Jahia Store (`store.jahia.com`) wins. Between other feeds the first one in the order above wins.
 A private store or an extra feed cannot replace an advisory of the Jahia Store.
 
+### Hosting a feed
+
+To publish your own feed, serve these documents:
+
+- The feed at `<base>/contents/modules-repository.securityUpdates.json` (a store), or at any https URL
+  listed in `extraFeedUrls`. Answer HTTP 200 with a JSON body of at most 2 MB, in the
+  [Feed format](#feed-format). Use https only, and no redirect: a redirect is not followed (`REDIRECT`).
+  Answer 404 when nothing is published: the module reports `NOT_PUBLISHED`.
+- Optional Basic credentials are sent only to a store of the module manager, never to `extraFeedUrls`.
+- For compatibility, the module catalogue at `<base>/contents/modules-repository.moduleList.json`, read only
+  for a store (not for a feed of `extraFeedUrls`) that has a security feed, at most 4 MB. It is the document
+  of the module manager: a JSON array whose first element has a `modules` array of
+  `{"name", "groupId", "versions": [{"version", "requiredVersion"}]}`. `requiredVersion` carries the prefix
+  `version-`, for example `version-8.2.3.7`, and the module removes it. Without a catalogue,
+  compatibility is `Unknown`.
+
 ## When checks run
 
 - The first check runs about one minute after the module starts, then every `refreshIntervalHours`
   (default 24).
 - A change of `enabled`, `refreshIntervalHours`, `useForgeSettings`, `extraFeedUrls` or `defaultStoreUrl`
-  restarts the schedule: the next check runs about one minute later. A change of the `banner*` settings
-  does not start a check. It applies on the next query.
+  restarts the schedule: the next check runs about one minute later. When such a change arrives during a
+  check, that check publishes nothing and one new check runs as soon as it ends. A change of the `banner*`
+  settings does not start a check and does not cancel one. It applies on the next query.
+- Re-enabling the module shows `NOT_CHECKED` until the first check, and keeps `lastSuccess`.
 - **Check now** (the `refresh` mutation) never blocks: it starts a check in the background and returns
   at once, and the page shows the progress and polls the report. It starts nothing when a check is
-  already running, when checks are disabled, or when the previous check started or ended less than
-  `onDemandMinIntervalSeconds` ago (30 seconds by default, a hidden key, see
+  already running, when checks are disabled, or when less than `onDemandMinIntervalSeconds` have passed
+  since the later of the start and the end of the previous check (30 seconds by default, a hidden key, see
   [Configuration](#configuration)). The page then says that no new check was started.
-- One check runs at a time. A scheduled check that falls due during another one is skipped.
+- One check runs at a time. A scheduled check that falls due during another one is skipped: one check runs
+  as soon as the running one ends, and `nextCheckAt` is the time of the skip plus the interval.
+- The page polls the report every 2 seconds, at most 90 times, and stops after 3 failed polls in a row.
 - **Stale report.** A report whose last check is older than twice the refresh interval is stale: the
   scheduled check may have stopped. Its status is then at best `PARTIAL`, it carries a `STALE` error, and the
   page does not say "up to date". `nextCheckAt` tells when the next scheduled check is due (null when the
@@ -196,11 +227,11 @@ translates the kind and the detail.
 
 | Kind | When | Details |
 |---|---|---|
-| `NOT_PUBLISHED` | The store answers 404 for the feed: it does not publish security data. | |
-| `UNAVAILABLE` | The store cannot be read, or the check could not run. Also when more than 20 stores and feeds are configured. | `SSRF_BLOCKED` (Jahia refused to connect, see [Security](#security)), `TIMEOUT`, `CONNECTION` (DNS, TLS, refused, reset), `REDIRECT` (not followed), `AUTH` (401 or 403), `HTTP_STATUS` (any other error status), `TOO_LARGE`, `FORGE_SETTINGS_UNREADABLE`, `CHECK_FAILED` (see the Jahia log) |
-| `NOT_UNDERSTOOD` | The feed was received but not understood, or some entries or references were ignored. | `INVALID_JSON`, `SCHEMA_UNSUPPORTED` (the feed's `schemaVersion` is not 1: a newer module may understand it), `ENTRIES_SKIPPED` |
-| `INVALID_URL` | A configured URL is refused and not fetched. | `NOT_HTTPS` for a plain http URL |
-| `CATALOGUE_UNAVAILABLE` | The module catalogue could not be read or was truncated. Non blocking. | as for `UNAVAILABLE`, `ENTRIES_SKIPPED` |
+| `NOT_PUBLISHED` | The store answers 404 for the feed: it does not publish security data. With another working feed, the report is `PARTIAL`. | |
+| `UNAVAILABLE` | The store cannot be read, or the check could not run. Also when more than 20 stores and feeds are configured (no detail). | `SSRF_BLOCKED` (Jahia refused to connect, see [Security](#security)), `TIMEOUT` (60 s for the whole request), `CONNECTION` (DNS, TLS, refused, reset), `REDIRECT` (not followed), `AUTH` (401 or 403), `HTTP_STATUS` (any other error status), `TOO_LARGE`, `FORGE_SETTINGS_UNREADABLE`, `CHECK_FAILED` (see the Jahia log) |
+| `NOT_UNDERSTOOD` | The feed was received but not understood, or some entries, references or an invalid `introducedVersion` were ignored, or the feed was truncated (only the first 10,000 advisories and 10,000 flagged versions are read). | `INVALID_JSON`, `SCHEMA_UNSUPPORTED` (the feed's `schemaVersion` is not 1: a newer module may understand it), `ENTRIES_SKIPPED` |
+| `INVALID_URL` | A configured URL is refused and not fetched. | `NOT_HTTPS` for a plain http URL, none for another invalid URL |
+| `CATALOGUE_UNAVAILABLE` | The module catalogue could not be read or was truncated. Non blocking. | as for `UNAVAILABLE`, plus `INVALID_JSON`, `ENTRIES_SKIPPED` |
 | `MALFORMED_VERSION` | An installed version (or the running Jahia version) cannot be compared: that component is not checked. | |
 | `NO_STORE` | No store is configured (for example an empty `defaultStoreUrl` and no module manager store). | |
 | `STALE` | The last check is older than twice the refresh interval. | |
@@ -214,15 +245,22 @@ For each advisory fix whose `component` is an installed module (bundle symbolic 
 version and the *line* of a version being its major for a module and `major.minor.servicePack` for
 `jahia-core`:
 
-- X is **not affected** when a fixed version on X's line is <= X, or when X >= every fixed version.
+- X is **not affected** when it is below the fix's `introducedVersion` (when the fix has one), when a fixed
+  version on X's line is <= X, or when X >= every fixed version.
 - Otherwise X is affected, and the recommended version is the smallest fixed version on X's line that
   is above X, else the smallest fixed version above X.
 
 Examples, fixes `[2.24.0, 3.10.0]`: 2.20.0 -> 2.24.0; 2.30.0 not affected; 3.5.0 -> 3.10.0; 1.4.0 -> 2.24.0;
 4.0.0 not affected. For `jahia-core` with fixes `[8.2.3.7, 8.1.9.3]`: 8.1.9.1 -> 8.1.9.3; 8.2.2.1 -> 8.2.3.7.
 
-An owner-flagged version V affects X when they share name (and `groupId` when both are known) and
-major, and X < V.
+`introducedVersion` is optional. With introduced in 2.0.0 and fixed in 2.24.0 and 3.10.0: 1.4.0 is not
+affected; 2.0.0 -> 2.24.0; 2.30.0 not affected; 3.0.0 -> 3.10.0. It applies to modules and to `jahia-core`. A
+malformed `introducedVersion` is ignored: the fix is kept, as if the field was absent (the conservative
+choice), and the value is counted as skipped (`ENTRIES_SKIPPED`, status `PARTIAL`). JSON `null` counts as
+absent.
+
+In a flagged version, `version` is the **first fixed version**. An owner-flagged version V affects X when they
+share name (and `groupId` when both are known) and major, and X < V. The finding recommends V.
 
 Findings are grouped per component and source (Jahia advisory or owner report): one row with the
 highest severity and every advisory. The row's recommended version is one at which no advisory of the
@@ -234,7 +272,8 @@ the version is not in any catalogue. `jahia-core` findings read "Jahia upgrade r
 
 Versions are compared with Jahia's `org.jahia.utils.comparator.VersionComparator` (Maven
 `ComparableVersion` ordering). A version that does not start with a number, is longer than 64
-characters or has a segment longer than 9 digits is "malformed". A malformed fixed version is ignored. A fix
+characters (checked before any cut) or has a segment longer than 9 digits is "malformed". A malformed fixed
+version or flagged version is skipped and counted. A fix
 entry with no well-formed version is ignored and reported. A malformed installed version (or running Jahia
 version) is reported as `MALFORMED_VERSION` and that component is not checked. The rest of the report is
 still built, and its status is `PARTIAL`.
@@ -257,17 +296,17 @@ A feed is a JSON object. A minimal valid example:
       "cves": ["CVE-2026-12345"],
       "url": "https://example.com/advisories/JSA-2026-0001",
       "fixes": [
-        {"component": "example-module", "groupId": "org.example", "fixedVersions": ["2.4.1", "3.1.0"]}
+        {"component": "example-module", "groupId": "org.example", "introducedVersion": "2.0.0", "fixedVersions": ["2.4.1", "3.1.0"]}
       ]
     }
   ],
   "flaggedVersions": [
     {
       "name": "example-module",
-      "version": "2.3.0",
+      "version": "2.4.0",
       "severity": "medium",
-      "references": ["CVE-2026-54321", "https://example.com/notes/2.3.0"],
-      "note": "Known issue fixed in 2.4.0"
+      "references": ["CVE-2026-54321", "https://example.com/notes/2.4.0"],
+      "note": "Fixes a known issue of the earlier versions"
     }
   ]
 }
@@ -281,19 +320,23 @@ Rules:
 - `advisories[]`: `id` (required), `fixes[]` (required, at least one valid fix), `title` (defaults to the
   id), `severity`, `cvss`, `cves[]`, `url`, `published`. The `summary` field is not read.
   - A fix needs `component` (the bundle symbolic name of the module, or `jahia-core`) and `fixedVersions[]`
-    with at least one well-formed version. `groupId` is optional.
+    with at least one well-formed version. `groupId` and `introducedVersion` are optional.
+  - `cvss` and `published` are accepted but not shown.
 - `flaggedVersions[]`: `name` and `version` are required. `groupId`, `severity`, `references[]` and
-  `note` are optional.
+  `note` are optional. `version` is the **first fixed version**: the installed versions below it on the same
+  major are reported, and `version` is the recommended one.
 - `severity` is `CRITICAL`, `HIGH`, `MEDIUM` or `LOW`, in any case. Anything else, or none, is `UNKNOWN`. A finding
   of unknown severity is listed but never counted by the banner.
 - Entries that cannot be used (a missing required field, no valid fix, not an object) are skipped and
   counted: `NOT_UNDERSTOOD` with the detail `ENTRIES_SKIPPED`, status `PARTIAL`. Unknown keys are ignored.
 - Limits: 2 MB per feed; at most 10,000 advisories and 10,000 flagged versions; at most 100 fixes per
-  advisory and 100 items per list; text values are cut at 500 characters, ids and CVEs at 100, URLs at 2,048.
-  Control characters are removed. An `url` that is not `http(s)` is dropped, and only `https://` links are
+  advisory and 100 items per list; text values are cut at 500 characters, ids and CVEs at 100, names (component, `groupId`, flagged `name`)
+  at 200, URLs at 2,048. Tab, CR and LF become spaces; other control characters and format characters are
+  removed. An `url` that is not `http(s)` is dropped, and only `https://` links are
   shown.
 - A report lists at most 50 advisory references per finding and about 2,000 in all, and at most 500 fixed
-  versions per component are considered. When a cap applies, the report says so (`ENTRIES_SKIPPED`).
+  versions per component are considered. When a cap applies, or the feed holds more than 10,000 advisories or flagged versions, the report says so
+  (`ENTRIES_SKIPPED`).
 - **Owner references.** In an owner flag, each reference that looks like `CVE-YYYY-NNNN` or `JSA-YYYY-NNNN`
   is shown in the CVE list of the finding (a JSA id is shown there too). The first reference that starts with
   `https://` is the link. The id of an owner report is the references joined with commas, cut at 200
@@ -313,7 +356,7 @@ changes survive restarts and redeployments.
 | `refreshIntervalHours` | `24` | 1 to 720 | Hours between two scheduled checks. |
 | `useForgeSettings` | `true` | `true`, `false` | Read the stores of the module manager. |
 | `extraFeedUrls` | (empty) | at most 10 https URLs | Full URLs of additional security feeds, separated by commas or spaces. |
-| `defaultStoreUrl` | `https://store.jahia.com` | https base URL, or empty | Store used when no store is configured in the module manager, or when `useForgeSettings=false`. Empty means none. |
+| `defaultStoreUrl` | `https://store.jahia.com` | https base URL, or empty | Store used only when the module manager holds no store, or when `useForgeSettings=false`. Empty means none. |
 | `bannerEnabled` | `true` | `true`, `false` | Show the banner in the Jahia UI. The page is not affected. |
 | `bannerMinimumSeverity` | `HIGH` | `LOW`, `MEDIUM`, `HIGH`, `CRITICAL` | Lowest severity the banner counts. |
 | `bannerIncludeOwnerReports` | `true` | `true`, `false` | Count owner-reported findings in the banner, not only Jahia advisories. |
@@ -321,12 +364,15 @@ changes survive restarts and redeployments.
 | `bannerTextColor` | `#FFFFFF` | `#RRGGBB` | Banner text (also link, button and focus ring). The pair needs a contrast of at least 7:1. |
 | `bannerDismissPolicy` | `SESSION` | `SESSION`, `HOURS`, `UNTIL_CHANGE`, `NEVER` | See [Banner](#banner). |
 | `bannerDismissHours` | `24` | 1 to 720 | Hours a dismissal lasts with `HOURS`. |
-| `onDemandMinIntervalSeconds` | `30` | 0 to 3600 | Hidden key, not shown in the settings page. Seconds between the starts of two **Check now** checks. The e2e tests set it to 0. The page never changes it. |
+| `onDemandMinIntervalSeconds` | `30` | 0 to 3600 | Hidden key, not shown in the settings page. Seconds from the later of the start and the end of the previous check before **Check now** may start another. The e2e tests set it to 0. The page never changes it. |
 
-**A `.cfg` file edited by hand is read leniently**, so a typo never stops the module:
+**A `.cfg` file edited by hand is read leniently**, so a typo never stops the module. The service reads the
+raw values: an unreadable value takes its default and the module still starts.
+
 
 - A missing key takes its default, silently.
-- A boolean or a number that cannot be read takes its default, with one WARN in the log.
+- A boolean or a number that cannot be read takes its default, with one WARN in the log, for example
+  `Invalid enabled 'ture': using true` or `Invalid refreshIntervalHours 'abc': using 24`.
 - A number out of range is clamped to the nearest limit (for example `refreshIntervalHours=0` becomes 1), with
   one WARN.
 - `extraFeedUrls` accepts commas or spaces. Beyond 10 URLs only the first 10 are used, with one WARN.
@@ -343,7 +389,11 @@ The settings form (Settings section of the page, server administrators only) is 
 **Save settings** sends the whole set, the server checks every rule (https URLs, at most 10 feeds, ranges, the
 7:1 contrast) and refuses an invalid set with an error per field, so nothing is written. **Reset to defaults**
 asks for confirmation, then writes the default values. For a user without `admin` the section is read-only.
-Saving takes effect on the next check, about one minute later.
+A change to the checks (`enabled`, `refreshIntervalHours`, `useForgeSettings`, `defaultStoreUrl`,
+`extraFeedUrls`) restarts the schedule. The page then says "Settings saved. The next check runs in about one
+minute." when checks are on. Otherwise (for example a banner change) it says "Settings saved. They apply at
+once." If the `.cfg` file exists but is not loaded yet, the save fails with `WRITE_FAILED` and the file is
+not overwritten: try again in a few seconds.
 
 ## GraphQL API
 
@@ -415,7 +465,8 @@ Example of variables for `updateSettings`:
 
 Notes:
 
-- `settings` returns the values stored in the configuration (after the lenient reading above), and
+- `settings` returns the values stored in the configuration (after the lenient reading above, and without the
+  `user:password@` part of a URL), and
   `canEdit`, true only for users who hold `admin`. `updateSettings` and `resetSettings` return the values
   they saved.
 - Field error codes of `updateSettings`: `OUT_OF_RANGE`, `INVALID_URL`, `NOT_HTTPS`, `TOO_MANY`
@@ -433,7 +484,8 @@ Notes:
   `Security updates settings saved by <user>: <key>: <old> -> <new>; ...`. Store credentials are not settings of
   this module and never appear in it.
 - **HTTP.** All requests go through Jahia's `HttpClientService` (Jahia proxy settings apply) with a 10 s
-  connect timeout, a 30 s read timeout, a 60 s deadline per body, no redirects, and size limits (2 MB for
+  connect timeout, a 30 s read timeout, a 60 s deadline for the whole request (a watchdog thread cancels it),
+  no redirects, and size limits (2 MB for
   the feed, 4 MB for the catalogue, 4 KB kept of an error body).
 - **Outbound request screening (SSRF).** Jahia 8.2.3.7 refuses, at connect time, to connect to an
   internal address (loopback, private networks, link-local, cloud metadata), even if the host name resolves
@@ -446,7 +498,7 @@ Notes:
     resolve but a proxy could is blocked.
 - **Credentials.** Store credentials are sent only to the store they belong to, as Basic authentication, only
   over https. They are never logged nor returned, and transport errors are reported by exception type only.
-- **Untrusted text.** All feed text is untrusted: control characters are removed and lengths bounded on
+- **Untrusted text.** All feed text is untrusted: control characters are removed (tab, CR and LF become spaces) and lengths bounded on
   parsing, remote text is never echoed in error messages, and the UI renders it as React text (no
   `dangerouslySetInnerHTML`).
 - **CSRF.** The GraphQL mutations rely on the Jahia security filter profile, which is on by default. Do not
@@ -470,7 +522,6 @@ See [SECURITY.md](SECURITY.md) to report a vulnerability.
   (its first line is `# default configuration - won't be overridden`). The new version runs a check one minute
   after it starts.
 - A new key added by a release is read with its default until you set it.
-- Starting with 1.0.0 the module requires Jahia 8.2.3.7.
 
 ## Uninstall
 
@@ -487,7 +538,7 @@ and `log:set INFO org.jahia.community.securityupdates.feed` to go back.
 
 | Symptom | Cause | Action |
 |---|---|---|
-| "Not available yet", `NOT_PUBLISHED` | The store does not publish the security feed yet. | Nothing. Wait for the store to publish it, or add an `extraFeedUrls` feed. |
+| "Not available yet", `NOT_PUBLISHED` | The store does not publish the security feed yet. | Nothing. Wait for the store to publish it, or add an `extraFeedUrls` feed. If another feed works and you want no `PARTIAL` status, set `useForgeSettings=false` and empty `defaultStoreUrl`. |
 | "No security data" with `UNAVAILABLE`, detail `SSRF_BLOCKED` | The store name resolves to an internal address. | Add the host to `jahia.httpClient.allowedInternalHosts` and restart Jahia. |
 | Detail `CONNECTION` or `TIMEOUT` | No route, proxy, DNS or TLS problem from this node. | Check the outbound HTTPS and the proxy from the node, and the DEBUG log. |
 | Detail `AUTH` | The store refused the credentials. | Fix the store user and password in the module manager. |
@@ -496,7 +547,7 @@ and `log:set INFO org.jahia.community.securityupdates.feed` to go back.
 | `NOT_UNDERSTOOD` with `SCHEMA_UNSUPPORTED` | The feed uses a newer `schemaVersion`. | Update this module. |
 | `FORGE_SETTINGS_UNREADABLE` | The module manager stores could not be read. | See the log; set `useForgeSettings=false` to use only `defaultStoreUrl`. |
 | `STALE` | No check finished within twice the interval. | Look for errors in the log, use **Check now**, check that the module is started. |
-| Check now does nothing | A check is running, or one started less than `onDemandMinIntervalSeconds` ago, or checks are disabled. | Wait a minute. |
+| Check now does nothing | A check is running, or the previous one started or ended less than `onDemandMinIntervalSeconds` ago, or checks are disabled. | Wait a minute. |
 | A known vulnerable module is not listed | The feed names it differently from its bundle symbolic name, or it is stopped. | See the FAQ. |
 | No banner | `bannerEnabled=false`, no counted finding, banner dismissed, user without `adminTemplates`, or you are on the Security updates page. | Check `bannerMinimumSeverity` and the dismissal policy. |
 | Settings are read-only | The user holds `adminTemplates` but not `admin`. | Ask a server administrator. |
@@ -518,7 +569,7 @@ feed gives one, must match.
 ## Build
 
 ```bash
-mvn clean install        # Java build + unit tests, then yarn lint, jest and the production webpack build
+mvn clean install        # frontend first (yarn lint, jest, webpack, in generate-resources), then Java compile, tests, package
 ```
 
 Maven installs Node 22.20.0 and Yarn 1.22.22 under `node/` (frontend-maven-plugin) and runs the frontend
@@ -541,10 +592,11 @@ level; build with a JDK 11 or 17.
   1. Build the module: `mvn clean install` (the harness copies `target/*-SNAPSHOT.jar`).
   2. Create `tests/.env` from `tests/.env.example`, which holds placeholders only, and fill it with your
      values (image names, Jahia license, super user password, Nexus credentials if your images need them).
-     `tests/.env` is not committed.
+     Never commit `tests/.env`.
   3. `cd tests && bash ci.build.sh && bash ci.startup.sh`.
 
-  The tests use a store fixture served over https with a certificate that Jahia trusts, set the hidden key
+  The tests use a store fixture served over https with a certificate that Jahia trusts (and a test-only njs
+  switch on port 8081, used by spec 08), bind Jahia to 127.0.0.1, set the hidden key
   `onDemandMinIntervalSeconds` to 0 so they never wait, run accessibility checks with `cypress-axe`, and do
   not print the super user password.
 
