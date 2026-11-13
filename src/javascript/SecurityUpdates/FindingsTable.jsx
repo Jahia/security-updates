@@ -57,40 +57,44 @@ const Compatibility = ({finding}) => {
 
 Compatibility.propTypes = {finding: findingShape.isRequired};
 
-/** The findings, in a table scrolling horizontally inside a focusable region named by the section heading. */
+/**
+ * The findings, in a table scrolling horizontally inside a focusable region named by the section heading. Moonstone
+ * lays its table out with flex boxes (display: flex on the rows): the explicit table roles keep the table semantics
+ * for assistive technologies whatever the CSS display, and the module's row class lets rows grow with their content.
+ */
 export const FindingsTable = ({findings, labelledBy}) => {
     const {t} = useTranslation(NS);
     return (
         // A scrolling region must be reachable with the keyboard to be scrolled.
         <div className={styles.tableWrapper} role="region" tabIndex={0} aria-labelledby={labelledBy}>
-            <Table>
+            <Table role="table" className={styles.table}>
                 <caption className={styles.caption}>
                     <Typography component="span" variant="subheading" weight="bold">{t('page.table.caption')}</Typography>
                 </caption>
-                <TableHead>
+                <TableHead role="rowgroup">
                     {/* Moonstone makes every row a tab stop; these rows have no action of their own, their links do. */}
-                    <TableRow tabIndex={-1}>
-                        {COLUMNS.map(column => <TableHeadCell key={column} scope="col">{t(`page.table.${column}`)}</TableHeadCell>)}
+                    <TableRow role="row" className={styles.row} tabIndex={-1}>
+                        {COLUMNS.map(column => <TableHeadCell key={column} role="columnheader" scope="col">{t(`page.table.${column}`)}</TableHeadCell>)}
                     </TableRow>
                 </TableHead>
-                <TableBody>
+                <TableBody role="rowgroup">
                     {findings.map(finding => (
-                        <TableRow key={`${finding.groupId}:${finding.component}:${finding.source}:${finding.installedVersion}`} tabIndex={-1}>
-                            <TableBodyCell component="th" scope="row" verticalAlign="top">
+                        <TableRow key={`${finding.groupId}:${finding.component}:${finding.source}:${finding.installedVersion}`} role="row" className={styles.row} tabIndex={-1}>
+                            <TableBodyCell component="th" role="rowheader" scope="row" verticalAlign="top">
                                 <Typography component="span" weight="bold">{finding.component}</Typography>
                                 {finding.groupId && <Typography component="span" variant="caption" className={styles.block}>{finding.groupId}</Typography>}
                             </TableBodyCell>
-                            <TableBodyCell verticalAlign="top"><SeverityChip severity={finding.severity}/></TableBodyCell>
-                            <TableBodyCell verticalAlign="top">{finding.installedVersion}</TableBodyCell>
-                            <TableBodyCell verticalAlign="top">{finding.recommendedVersion}</TableBodyCell>
-                            <TableBodyCell verticalAlign="top"><Compatibility finding={finding}/></TableBodyCell>
-                            <TableBodyCell verticalAlign="top">
+                            <TableBodyCell role="cell" verticalAlign="top"><SeverityChip severity={finding.severity}/></TableBodyCell>
+                            <TableBodyCell role="cell" verticalAlign="top">{finding.installedVersion}</TableBodyCell>
+                            <TableBodyCell role="cell" verticalAlign="top">{finding.recommendedVersion}</TableBodyCell>
+                            <TableBodyCell role="cell" verticalAlign="top"><Compatibility finding={finding}/></TableBodyCell>
+                            <TableBodyCell role="cell" verticalAlign="top">
                                 <Chip color={chipColor(finding.source === 'ADVISORY' ? 'MEDIUM' : 'other')} label={t(`page.source.${finding.source}`)}/>
                             </TableBodyCell>
-                            <TableBodyCell verticalAlign="top">
+                            <TableBodyCell role="cell" verticalAlign="top">
                                 <AdvisoryList advisories={finding.advisories} isOwner={finding.source !== 'ADVISORY'}/>
                             </TableBodyCell>
-                            <TableBodyCell verticalAlign="top"><Action finding={finding}/></TableBodyCell>
+                            <TableBodyCell role="cell" verticalAlign="top"><Action finding={finding}/></TableBodyCell>
                         </TableRow>
                     ))}
                 </TableBody>

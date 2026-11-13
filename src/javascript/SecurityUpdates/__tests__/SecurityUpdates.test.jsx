@@ -195,6 +195,26 @@ describe('SecurityUpdates page', () => {
             expect(within(region).getByRole('table')).toBeInTheDocument();
         });
 
+        test('rows carry the module class that lets them grow, and explicit table roles (Moonstone lays the table out with flex boxes)', () => {
+            mockReport(report({findings: [finding('m', 'HIGH'), finding('n', 'LOW')]}));
+            const {container} = render(<SecurityUpdates/>);
+
+            const table = container.querySelector('table');
+            expect(table).toHaveAttribute('role', 'table');
+            expect(table).toHaveClass('table');
+            container.querySelectorAll('thead, tbody').forEach(group => expect(group).toHaveAttribute('role', 'rowgroup'));
+            const rows = container.querySelectorAll('tr');
+            expect(rows).toHaveLength(3);
+            rows.forEach(row => {
+                expect(row).toHaveAttribute('role', 'row');
+                expect(row).toHaveClass('row');
+            });
+            container.querySelectorAll('thead th').forEach(cell => expect(cell).toHaveAttribute('role', 'columnheader'));
+            container.querySelectorAll('tbody th').forEach(cell => expect(cell).toHaveAttribute('role', 'rowheader'));
+            expect(container.querySelectorAll('tbody td')).toHaveLength(14);
+            container.querySelectorAll('tbody td').forEach(cell => expect(cell).toHaveAttribute('role', 'cell'));
+        });
+
         test('each row says what to do: a module is updated in Manage modules, Jahia follows the upgrade documentation', () => {
             mockReport(report({findings: [finding('jcontent', 'HIGH'), finding('jahia-core', 'CRITICAL', 'ADVISORY', {groupId: null})]}));
             render(<SecurityUpdates/>);

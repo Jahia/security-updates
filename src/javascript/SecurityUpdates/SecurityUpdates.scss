@@ -27,6 +27,20 @@ $focus-color: var(--color-accent_dark_contrast, #004781);
   .radio:has(input:focus-visible) {
     @include focus-ring;
   }
+
+  // Moonstone gives every table row a fixed height of 48px (64px with hasMultipleLines) and centres the cells: rows
+  // with a group id, a minimum Jahia version or several advisories would overflow onto the next row. The rows grow
+  // with their content instead, cells aligned at the top (two classes: more specific than Moonstone's).
+  .row {
+    height: auto;
+    min-height: 3rem;
+    align-items: flex-start;
+  }
+
+  // Columns keep a readable width: the focusable region around the table scrolls instead of squeezing them.
+  .table {
+    min-width: 60rem;
+  }
 }
 
 // Running text stays within a readable line length.
