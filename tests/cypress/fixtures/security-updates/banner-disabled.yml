@@ -1,7 +1,12 @@
+# Fixture store, banner turned off.
+# Every key is set, so that this file alone gives a known state whatever ran before.
 - editConfiguration: "org.jahia.community.securityupdates"
   properties:
+    enabled: "true"
+    refreshIntervalHours: "24"
     useForgeSettings: "false"
-    defaultStoreUrl: "http://storefixture"
+    defaultStoreUrl: "https://storefixture"
+    extraFeedUrls: ""
     bannerEnabled: "false"
     bannerMinimumSeverity: "HIGH"
     bannerIncludeOwnerReports: "true"
@@ -9,3 +14,4 @@
     bannerTextColor: "#FFFFFF"
     bannerDismissPolicy: "SESSION"
     bannerDismissHours: "24"
+    onDemandMinIntervalSeconds: "0"

@@ -1,10 +1,12 @@
+# The module defaults (META-INF/configurations/org.jahia.community.securityupdates.cfg), set back after a spec.
+# Every key is set, so that this file alone gives a known state whatever ran before.
 - editConfiguration: "org.jahia.community.securityupdates"
   properties:
     enabled: "true"
     refreshIntervalHours: "24"
     useForgeSettings: "true"
-    extraFeedUrls: ""
     defaultStoreUrl: "https://store.jahia.com"
+    extraFeedUrls: ""
     bannerEnabled: "true"
     bannerMinimumSeverity: "HIGH"
     bannerIncludeOwnerReports: "true"
@@ -12,3 +14,4 @@
     bannerTextColor: "#FFFFFF"
     bannerDismissPolicy: "SESSION"
     bannerDismissHours: "24"
+    onDemandMinIntervalSeconds: "30"

@@ -2,12 +2,16 @@ query getSecurityUpdatesReport {
     securityUpdates {
         report {
             status
+            inProgress
+            stale
             checkedAt
             lastSuccess
+            nextCheckAt
             jahiaVersion
             errors {
                 storeUrl
                 kind
+                detail
                 message
             }
             findings {

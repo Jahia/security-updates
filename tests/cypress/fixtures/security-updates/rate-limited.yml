@@ -1,0 +1,17 @@
+# Fixture store, "Check now" limited to one check per hour (onDemandMinIntervalSeconds=3600).
+# Every key is set, so that this file alone gives a known state whatever ran before.
+- editConfiguration: "org.jahia.community.securityupdates"
+  properties:
+    enabled: "true"
+    refreshIntervalHours: "24"
+    useForgeSettings: "false"
+    defaultStoreUrl: "https://storefixture"
+    extraFeedUrls: ""
+    bannerEnabled: "true"
+    bannerMinimumSeverity: "HIGH"
+    bannerIncludeOwnerReports: "true"
+    bannerBackgroundColor: "#1B1B1B"
+    bannerTextColor: "#FFFFFF"
+    bannerDismissPolicy: "SESSION"
+    bannerDismissHours: "24"
+    onDemandMinIntervalSeconds: "3600"

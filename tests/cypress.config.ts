@@ -2,8 +2,8 @@ import {defineConfig} from 'cypress';
 import fs from 'fs';
 
 export default defineConfig({
-    // DefaultCommandTimeout: 10000,
-    // videoUploadOnPasses: false,
+    // The Jahia UI and its GraphQL answers can take more than the 4 s default on a CI runner.
+    defaultCommandTimeout: 20000,
     reporter: 'cypress-multi-reporters',
     reporterOptions: {
         configFile: 'reporter-config.json'

@@ -11,8 +11,10 @@
     "types": [
       "cypress",
       "node",
-      "@jahia/cypress"
+      "@jahia/cypress",
+      "cypress-axe",
+      "cypress-wait-until"
     ],
-    "lib": [ "es2015" ]
+    "lib": [ "es2019", "dom" ]
   }
 }

@@ -1,0 +1,33 @@
+mutation resetSecurityUpdatesSettings {
+    securityUpdates {
+        resetSettings {
+            ok
+            errors {
+                field
+                code
+                message
+                suggestions {
+                    field
+                    value
+                    ratio
+                }
+            }
+            settings {
+                enabled
+                refreshIntervalHours
+                useForgeSettings
+                defaultStoreUrl
+                extraFeedUrls
+                bannerEnabled
+                bannerMinimumSeverity
+                bannerIncludeOwnerReports
+                bannerBackgroundColor
+                bannerTextColor
+                bannerDismissPolicy
+                bannerDismissHours
+                contrastRatio
+                canEdit
+            }
+        }
+    }
+}

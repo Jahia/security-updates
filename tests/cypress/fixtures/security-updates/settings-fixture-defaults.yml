@@ -1,9 +1,12 @@
+# The known state of the specs: the https fixture store only, default banner settings, and no rate limit
+# on "Check now" (hidden key onDemandMinIntervalSeconds=0), so that no spec waits for it.
+# Every key is set, so that this file alone gives a known state whatever ran before.
 - editConfiguration: "org.jahia.community.securityupdates"
   properties:
     enabled: "true"
     refreshIntervalHours: "24"
     useForgeSettings: "false"
-    defaultStoreUrl: "http://storefixture"
+    defaultStoreUrl: "https://storefixture"
     extraFeedUrls: ""
     bannerEnabled: "true"
     bannerMinimumSeverity: "HIGH"
@@ -12,3 +15,4 @@
     bannerTextColor: "#FFFFFF"
     bannerDismissPolicy: "SESSION"
     bannerDismissHours: "24"
+    onDemandMinIntervalSeconds: "0"

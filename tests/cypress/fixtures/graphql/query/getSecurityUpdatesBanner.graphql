@@ -5,6 +5,7 @@ query getSecurityUpdatesBanner {
             count
             minimumSeverity
             components
+            dismissalKeys
             backgroundColor
             textColor
             dismissPolicy
