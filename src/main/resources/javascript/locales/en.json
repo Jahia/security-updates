@@ -98,7 +98,7 @@
       "CHECK_FAILED": "The check failed. See the Jahia log."
     },
     "filter": {
-      "legend": "Show",
+      "legend": "Show findings from",
       "hint": "Jahia advisories are published by Jahia. Module owners can also report that a version of their module fixes a security problem: Jahia has not reviewed those reports.",
       "advisories": "Jahia advisories only ({{n}})",
       "all": "All, including reports by module owners ({{n}})",
@@ -127,7 +127,7 @@
     },
     "compatibility": {
       "COMPATIBLE": "Compatible with this Jahia",
-      "INCOMPATIBLE": "Needs a newer Jahia",
+      "INCOMPATIBLE": "Needs another Jahia version",
       "UNKNOWN": "Not known: the module is not in the store's module list",
       "JAHIA_UPGRADE": "Jahia upgrade required"
     },
@@ -214,7 +214,7 @@
       "bannerBackgroundColor": {
         "label": "Banner background colour",
         "picker": "Pick the banner background colour",
-        "help": "A colour code such as #1B1B1B. The text must stand out against it with a contrast of at least 7 to 1, the highest level of the accessibility guidelines (WCAG AAA)."
+        "help": "A colour code such as #1B1B1B. The contrast with the text colour must be at least 7 to 1: the highest accessibility level (WCAG AAA)."
       },
       "bannerTextColor": {
         "label": "Banner text colour",
@@ -223,7 +223,7 @@
       },
       "bannerDismissPolicy": {
         "label": "After a user hides the banner",
-        "help": "Except with \"Cannot be hidden\", the banner comes back as soon as a component that was not listed before needs an update."
+        "help": "Except with \"Cannot be hidden\", the banner comes back as soon as a new advisory or a new component is counted."
       },
       "bannerDismissHours": {
         "label": "Hours the banner stays hidden",
@@ -234,7 +234,7 @@
     "dismiss": {
       "SESSION": "Hidden until the browser tab is closed",
       "HOURS": "Hidden for a number of hours",
-      "UNTIL_CHANGE": "Hidden until a new component needs an update",
+      "UNTIL_CHANGE": "Hidden until a new advisory or a new component is counted",
       "NEVER": "Cannot be hidden"
     },
     "preview": {
@@ -266,7 +266,7 @@
       "INVALID_BOOLEAN": "Must be turned on or off.",
       "INVALID_NUMBER": "Enter a whole number.",
       "OUT_OF_RANGE": "Enter a whole number from 1 to 720.",
-      "INVALID_URL": "Enter complete https addresses, without user name, password, query or fragment.",
+      "INVALID_URL": "Enter full https addresses, with nothing after a ? or #, and without a user name or password.",
       "NOT_HTTPS": "Enter https addresses only: http addresses are refused.",
       "TOO_MANY": "Enter at most 10 addresses.",
       "INVALID_VALUE": "Choose one of the proposed values.",

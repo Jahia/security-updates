@@ -98,7 +98,7 @@
       "CHECK_FAILED": "La vérification a échoué. Consultez le journal de Jahia."
     },
     "filter": {
-      "legend": "Afficher",
+      "legend": "Afficher les résultats issus de",
       "hint": "Les bulletins Jahia sont publiés par Jahia. Les propriétaires de modules peuvent aussi signaler qu’une version de leur module corrige un problème de sécurité : Jahia n’a pas examiné ces signalements.",
       "advisories": "Bulletins Jahia uniquement ({{n}})",
       "all": "Tout, y compris les signalements des propriétaires de modules ({{n}})",
@@ -127,7 +127,7 @@
     },
     "compatibility": {
       "COMPATIBLE": "Compatible avec ce Jahia",
-      "INCOMPATIBLE": "Nécessite un Jahia plus récent",
+      "INCOMPATIBLE": "Nécessite une autre version de Jahia",
       "UNKNOWN": "Inconnue : le module n’est pas dans la liste des modules du store",
       "JAHIA_UPGRADE": "Mise à jour de Jahia nécessaire"
     },
@@ -214,7 +214,7 @@
       "bannerBackgroundColor": {
         "label": "Couleur de fond du bandeau",
         "picker": "Choisir la couleur de fond du bandeau",
-        "help": "Un code couleur comme #1B1B1B. Le texte doit s’en détacher avec un contraste d’au moins 7 pour 1, le niveau le plus élevé des règles d’accessibilité (WCAG AAA)."
+        "help": "Un code couleur comme #1B1B1B. Le contraste avec la couleur du texte doit être d’au moins 7 pour 1 : le niveau d’accessibilité le plus élevé (WCAG AAA)."
       },
       "bannerTextColor": {
         "label": "Couleur du texte du bandeau",
@@ -223,7 +223,7 @@
       },
       "bannerDismissPolicy": {
         "label": "Quand un utilisateur masque le bandeau",
-        "help": "Sauf avec « Ne peut pas être masqué », le bandeau revient dès qu’un composant qui n’était pas listé a besoin d’une mise à jour."
+        "help": "Sauf avec « Ne peut pas être masqué », le bandeau revient dès qu’un nouveau bulletin ou un nouveau composant est compté."
       },
       "bannerDismissHours": {
         "label": "Heures pendant lesquelles le bandeau reste masqué",
@@ -234,7 +234,7 @@
     "dismiss": {
       "SESSION": "Masqué jusqu’à la fermeture de l’onglet du navigateur",
       "HOURS": "Masqué pendant un nombre d’heures",
-      "UNTIL_CHANGE": "Masqué jusqu’à ce qu’un nouveau composant ait besoin d’une mise à jour",
+      "UNTIL_CHANGE": "Masqué jusqu’à ce qu’un nouveau bulletin ou un nouveau composant soit compté",
       "NEVER": "Ne peut pas être masqué"
     },
     "preview": {
@@ -266,7 +266,7 @@
       "INVALID_BOOLEAN": "Doit être activé ou désactivé.",
       "INVALID_NUMBER": "Saisissez un nombre entier.",
       "OUT_OF_RANGE": "Saisissez un nombre entier de 1 à 720.",
-      "INVALID_URL": "Saisissez des adresses https complètes, sans nom d’utilisateur, mot de passe, paramètres ni fragment.",
+      "INVALID_URL": "Saisissez des adresses https complètes, sans rien après un ? ou un #, et sans nom d’utilisateur ni mot de passe.",
       "NOT_HTTPS": "Saisissez uniquement des adresses https : les adresses http sont refusées.",
       "TOO_MANY": "Saisissez au plus 10 adresses.",
       "INVALID_VALUE": "Choisissez une des valeurs proposées.",
@@ -282,7 +282,7 @@
       "background": "Couleur de fond {{value}}, contraste {{ratio}}:1",
       "use_text": "Utiliser cette couleur de texte {{value}}",
       "use_background": "Utiliser cette couleur de fond {{value}}",
-      "none": "Aucune modification d’une seule couleur n’atteint 7:1 avec ces couleurs. Les couleurs par défaut, si.",
+      "none": "Aucune modification d’une seule couleur n’atteint 7:1 avec ces couleurs. Les couleurs par défaut atteignent ce niveau.",
       "useDefaults": "Utiliser les couleurs par défaut {{background}} et {{text}}",
       "appliedText": "Couleur du texte {{value}} appliquée. Enregistrez les paramètres pour la conserver.",
       "appliedBackground": "Couleur de fond {{value}} appliquée. Enregistrez les paramètres pour la conserver.",
