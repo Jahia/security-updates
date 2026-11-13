@@ -80,8 +80,7 @@ public class SecurityUpdateService {
     private static final long SHUTDOWN_WAIT_SECONDS = 5;
     private static final String STALE_SUFFIX = " (showing the data of the last successful check of this store)";
     /** Error kinds that do not make the report incomplete. */
-    private static final Set<StoreErrorKind> NON_BLOCKING = EnumSet.of(StoreErrorKind.CATALOGUE_UNAVAILABLE,
-            StoreErrorKind.MALFORMED_VERSION);
+    private static final Set<StoreErrorKind> NON_BLOCKING = EnumSet.of(StoreErrorKind.CATALOGUE_UNAVAILABLE);
 
     private final Clock clock;
     private final Supplier<String> jahiaVersion;
@@ -226,9 +225,13 @@ public class SecurityUpdateService {
             SecurityReport next;
             try {
                 next = check(settings, clock.instant());
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | StackOverflowError e) {
                 logger.error("The security updates check failed unexpectedly", e);
                 next = failedReport(clock.instant());
+            }
+            if (!settings.isEnabled()) {
+                // disabled while the check ran: the configuration wins
+                next = disabledReport();
             }
             report = next;
             return next;
@@ -250,7 +253,7 @@ public class SecurityUpdateService {
     private void scheduledRefresh() {
         try {
             refreshNow();
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | StackOverflowError e) {
             // never let an exception escape: it would cancel the periodic schedule
             logger.error("The scheduled security updates check failed", e);
         }
@@ -288,6 +291,8 @@ public class SecurityUpdateService {
         List<InstalledComponent> modules = installedComponentsProvider.installedModules();
         MatchResult match = new SecurityMatcher(version).match(modules, feeds, ModuleCatalog.merge(catalogs));
         errors.addAll(match.getProblems());
+        // a component that could not be compared was not checked: the report is not complete
+        complete &= match.getProblems().isEmpty();
         logNewFindings(match.getFindings());
 
         ReportStatus status;
@@ -327,7 +332,7 @@ public class SecurityUpdateService {
         for (StoreError error : result.getErrors()) {
             boolean feedError = !NON_BLOCKING.contains(error.getKind());
             blocking |= feedError;
-            boolean stale = feedError ? feed != null : catalog != null;
+            boolean stale = feedError ? !usable && feed != null : result.getCatalog() == null && catalog != null;
             errors.add(stale ? new StoreError(error.getStoreUrl(), error.getKind(), error.getMessage() + STALE_SUFFIX) : error);
         }
         return usable && !blocking;

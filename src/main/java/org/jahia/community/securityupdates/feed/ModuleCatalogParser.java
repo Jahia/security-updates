@@ -68,6 +68,8 @@ public final class ModuleCatalogParser {
             return ((JSONObject) first).getJSONArray("modules");
         } catch (JSONException e) {
             throw new FeedFormatException("The module list is not valid JSON", e);
+        } catch (StackOverflowError e) {
+            throw new FeedFormatException("The module list is nested too deeply");
         }
     }
 

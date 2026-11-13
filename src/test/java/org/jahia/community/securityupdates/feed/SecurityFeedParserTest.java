@@ -128,4 +128,27 @@ class SecurityFeedParserTest {
         assertThat(advisory.getTitle()).hasSizeLessThanOrEqualTo(SecurityFeedParser.MAX_TEXT);
         assertThat(advisory.getUrl()).isNull();
     }
+
+    @Test
+    @DisplayName("a fix whose fixed versions are all malformed is dropped and counted, not read as 'not affected'")
+    void malformedFixedVersionsAreSkipped() throws Exception {
+        String json = "{\"schemaVersion\":1,\"advisories\":[{\"id\":\"JSA-1\",\"severity\":\"high\",\"fixes\":["
+                + "{\"component\":\"a\",\"fixedVersions\":[\"latest\",\"v2\"]},"
+                + "{\"component\":\"b\",\"fixedVersions\":[\"bogus\",\"2.0.0\"]}]}]}";
+
+        SecurityFeed feed = SecurityFeedParser.parse(json);
+
+        assertThat(feed.getAdvisories()).singleElement().satisfies(a -> assertThat(a.getFixes())
+                .singleElement().satisfies(f -> assertThat(f.getFixedVersions()).containsExactly("2.0.0")));
+        // the fix of "a" is dropped; the malformed version of "b" is ignored but its fix entry is kept
+        assertThat(feed.getSkippedEntries()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("deeply nested JSON is refused, not a StackOverflowError")
+    void deepNestingIsRefused() {
+        String json = "{\"schemaVersion\":1,\"advisories\":" + "[".repeat(200_000);
+        assertThatThrownBy(() -> SecurityFeedParser.parse(json)).isInstanceOf(FeedFormatException.class);
+        assertThatThrownBy(() -> ModuleCatalogParser.parse("[".repeat(200_000))).isInstanceOf(FeedFormatException.class);
+    }
 }

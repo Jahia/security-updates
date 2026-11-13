@@ -1,5 +1,6 @@
 package org.jahia.community.securityupdates.feed;
 
+import org.jahia.community.securityupdates.matching.Versions;
 import org.jahia.community.securityupdates.model.Advisory;
 import org.jahia.community.securityupdates.model.AdvisoryFix;
 import org.jahia.community.securityupdates.model.FlaggedVersion;
@@ -84,6 +85,9 @@ public final class SecurityFeedParser {
             return (JSONObject) value;
         } catch (JSONException e) {
             throw new FeedFormatException("The security feed is not valid JSON", e);
+        } catch (StackOverflowError e) {
+            // an org.json without a nesting limit recurses on deeply nested input
+            throw new FeedFormatException("The security feed is nested too deeply");
         }
     }
 
@@ -132,7 +136,13 @@ public final class SecurityFeedParser {
         }
         JSONObject object = (JSONObject) value;
         String component = Json.string(object, "component", MAX_NAME);
-        List<String> fixedVersions = Json.strings(object, "fixedVersions", MAX_ITEMS, MAX_VERSION);
+        List<String> fixedVersions = new ArrayList<>();
+        for (String version : Json.strings(object, "fixedVersions", MAX_ITEMS, MAX_VERSION)) {
+            if (Versions.isWellFormed(version)) {
+                fixedVersions.add(version);
+            }
+        }
+        // a fix with no comparable version would read as "not affected": it is dropped and counted instead
         if (component == null || fixedVersions.isEmpty()) {
             return null;
         }

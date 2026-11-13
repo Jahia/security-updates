@@ -36,6 +36,7 @@ public final class StoreClient {
 
     private static final Logger logger = LoggerFactory.getLogger(StoreClient.class);
     private static final int MAX_STORE_MESSAGE = 200;
+    private static final String HTTPS = "https:";
     private static final int SC_OK = 200;
     private static final int SC_NOT_FOUND = 404;
     private static final int SC_UNAUTHORIZED = 401;
@@ -63,8 +64,13 @@ public final class StoreClient {
                     StoreErrorKind.INVALID_URL, "Not an absolute http(s) URL without credentials, query or fragment")));
         }
         String base = url.get();
-        Map<String, String> headers = headers(target);
         List<StoreError> errors = new ArrayList<>();
+        boolean secure = base.regionMatches(true, 0, HTTPS, 0, HTTPS.length());
+        if (!target.isFeedOnly() && target.hasCredentials() && !secure) {
+            errors.add(new StoreError(base, StoreErrorKind.INVALID_URL,
+                    "The store credentials are not sent over plain http: configure an https store URL"));
+        }
+        Map<String, String> headers = headers(target, secure);
 
         String feedUrl = target.isFeedOnly() ? base : base + SECURITY_FEED_PATH;
         SecurityFeed feed = readFeed(base, feedUrl, headers, errors);
@@ -76,7 +82,7 @@ public final class StoreClient {
         HttpResult result;
         try {
             result = fetcher.get(feedUrl, headers, MAX_FEED_BYTES);
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
             errors.add(new StoreError(base, StoreErrorKind.UNAVAILABLE, "Security feed: " + transportMessage(e)));
             logger.debug("Security feed of {} could not be read", base, e);
             return null;
@@ -92,7 +98,12 @@ public final class StoreClient {
             return null;
         }
         try {
-            return SecurityFeedParser.parse(result.getBody());
+            SecurityFeed feed = SecurityFeedParser.parse(result.getBody());
+            if (feed.getSkippedEntries() > 0) {
+                errors.add(new StoreError(base, StoreErrorKind.NOT_UNDERSTOOD, feed.getSkippedEntries()
+                        + " entries of the security feed could not be understood and were ignored"));
+            }
+            return feed;
         } catch (FeedFormatException e) {
             errors.add(new StoreError(base, StoreErrorKind.NOT_UNDERSTOOD, "Security feed not understood: " + e.getMessage()));
             return null;
@@ -107,7 +118,7 @@ public final class StoreClient {
                 return null;
             }
             return ModuleCatalogParser.parse(result.getBody());
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
             errors.add(new StoreError(base, StoreErrorKind.CATALOGUE_UNAVAILABLE, "Module list: " + transportMessage(e)));
             logger.debug("Module list of {} could not be read", base, e);
         } catch (FeedFormatException e) {
@@ -116,10 +127,10 @@ public final class StoreClient {
         return null;
     }
 
-    private static Map<String, String> headers(StoreTarget target) {
+    private static Map<String, String> headers(StoreTarget target, boolean secure) {
         Map<String, String> headers = new LinkedHashMap<>();
         headers.put("Accept", "application/json");
-        if (!target.isFeedOnly() && target.hasCredentials()) {
+        if (!target.isFeedOnly() && target.hasCredentials() && secure) {
             String password = target.getPassword() == null ? "" : target.getPassword();
             String token = Base64.getEncoder().encodeToString(
                     (target.getUser() + ":" + password).getBytes(StandardCharsets.UTF_8));
@@ -154,7 +165,7 @@ public final class StoreClient {
         return null;
     }
 
-    private static String transportMessage(IOException e) {
+    private static String transportMessage(Exception e) {
         if (e instanceof ResponseTooLargeException) {
             return "response too large";
         }

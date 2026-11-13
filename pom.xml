@@ -189,7 +189,7 @@
                         <_dsannotations>org.jahia.community.securityupdates.feed.*,org.jahia.community.securityupdates.service.*,org.jahia.community.securityupdates.graphql.*</_dsannotations>
                         <!-- org.json: bnd would pin the exact version of the build-time jar ([20231013,20231014)); accept any
                              later org.json the platform may export -->
-                        <Import-Package>org.json;version="[20180813,30000000)",*</Import-Package>
+                        <Import-Package>org.json;version="[20231013,30000000)",*</Import-Package>
                         <_metatypeannotations>*</_metatypeannotations>
                     </instructions>
                 </configuration>

@@ -33,6 +33,8 @@ class StoreClientTest {
     private static final String FEED_URL = BASE + StoreClient.SECURITY_FEED_PATH;
     private static final String LIST_URL = BASE + StoreClient.MODULE_LIST_PATH;
     private static final String SECRET = "s3cr3t-Pa55";
+    private static final String FULL_FEED = "{\"schemaVersion\":1,\"advisories\":[{\"id\":\"JSA-1\",\"fixes\":"
+            + "[{\"component\":\"m\",\"fixedVersions\":[\"1.0.0\"]}]}]}";
 
     @Mock
     private HttpFetcher fetcher;
@@ -55,7 +57,7 @@ class StoreClientTest {
     @Test
     @DisplayName("reads the feed and the catalogue of a store")
     void happyPath() throws IOException {
-        feedAnswers(new HttpResult(200, Fixtures.read("security-v1.json")));
+        feedAnswers(new HttpResult(200, FULL_FEED));
         listAnswers(new HttpResult(200, Fixtures.read("module-list.json")));
 
         StoreFetchResult result = client.fetch(StoreTarget.store(BASE + "/", null, null));
@@ -275,5 +277,54 @@ class StoreClientTest {
     @Test
     void targetToStringHidesPassword() {
         assertThat(StoreTarget.store(BASE, "u", SECRET).toString()).doesNotContain(SECRET).contains("authenticated");
+    }
+
+    @Test
+    @DisplayName("credentials are never sent over plain http, and that is reported")
+    @SuppressWarnings("unchecked")
+    void noCredentialsOverHttp() throws IOException {
+        String base = "http://store.example.org";
+        when(fetcher.get(eq(base + StoreClient.SECURITY_FEED_PATH), anyMap(), anyInt()))
+                .thenReturn(new HttpResult(200, Fixtures.read("empty-v1.json")));
+        when(fetcher.get(eq(base + StoreClient.MODULE_LIST_PATH), anyMap(), anyInt())).thenReturn(new HttpResult(200, "[]"));
+
+        StoreFetchResult result = client.fetch(StoreTarget.store(base, "jdoe", SECRET));
+
+        ArgumentCaptor<Map<String, String>> headers = ArgumentCaptor.forClass(Map.class);
+        verify(fetcher).get(eq(base + StoreClient.SECURITY_FEED_PATH), headers.capture(), anyInt());
+        assertThat(headers.getValue()).doesNotContainKey("Authorization");
+        assertThat(result.getFeed()).isNotNull();
+        assertThat(result.getErrors()).singleElement().satisfies(e -> {
+            assertThat(e.getKind()).isEqualTo(StoreErrorKind.INVALID_URL);
+            assertThat(e.getMessage()).contains("https").doesNotContain(SECRET);
+        });
+    }
+
+    @Test
+    @DisplayName("an unexpected runtime failure of one request becomes a store error")
+    void runtimeFailure() throws IOException {
+        when(fetcher.get(eq(FEED_URL), anyMap(), anyInt())).thenThrow(new IllegalArgumentException("bad " + SECRET));
+        when(fetcher.get(eq(LIST_URL), anyMap(), anyInt())).thenThrow(new IllegalStateException("x"));
+
+        StoreFetchResult result = client.fetch(StoreTarget.store(BASE, null, null));
+
+        assertThat(result.getErrors()).extracting(StoreError::getKind)
+                .containsExactly(StoreErrorKind.UNAVAILABLE, StoreErrorKind.CATALOGUE_UNAVAILABLE);
+        assertThat(result.getErrors()).allSatisfy(e -> assertThat(e.getMessage()).doesNotContain(SECRET));
+    }
+
+    @Test
+    @DisplayName("feed entries that could not be understood are reported, the rest of the feed is used")
+    void skippedEntriesReported() throws IOException {
+        feedAnswers(new HttpResult(200, Fixtures.read("security-v1.json")));
+        listAnswers(new HttpResult(200, "[]"));
+
+        StoreFetchResult result = client.fetch(StoreTarget.store(BASE, null, null));
+
+        assertThat(result.getFeed()).isNotNull();
+        assertThat(result.getErrors()).singleElement().satisfies(e -> {
+            assertThat(e.getKind()).isEqualTo(StoreErrorKind.NOT_UNDERSTOOD);
+            assertThat(e.getMessage()).contains("5");
+        });
     }
 }

@@ -331,6 +331,80 @@ class SecurityUpdateServiceTest {
     }
 
     @Nested
+    @DisplayName("completeness")
+    class Completeness {
+
+        @Test
+        @DisplayName("a component whose version cannot be compared makes the report PARTIAL, never OK")
+        void malformedInstalledVersion() {
+            when(installed.installedModules()).thenReturn(List.of(new InstalledComponent("odd", "g", "not-a-version")));
+            service.apply(Settings.defaults());
+            storeServes(DEFAULT_STORE, EMPTY_FEED);
+
+            SecurityReport report = service.refreshNow();
+
+            assertThat(report.getStatus()).isEqualTo(ReportStatus.PARTIAL);
+            assertThat(report.getErrors()).extracting(StoreError::getKind).containsExactly(StoreErrorKind.MALFORMED_VERSION);
+        }
+
+        @Test
+        @DisplayName("an unusable running Jahia version makes the report PARTIAL")
+        void malformedJahiaVersion() {
+            SecurityUpdateService odd = new SecurityUpdateService(clock, () -> "custom-build", () -> executor, warned::add);
+            odd.setHttpFetcher(fetcher);
+            odd.setForgeSettingsReader(forges);
+            odd.setInstalledComponentsProvider(installed);
+            odd.apply(Settings.defaults());
+            storeServes(DEFAULT_STORE, EMPTY_FEED);
+
+            assertThat(odd.refreshNow().getStatus()).isEqualTo(ReportStatus.PARTIAL);
+        }
+
+        @Test
+        @DisplayName("a fresh feed with ignored entries is used, PARTIAL, and not called stale")
+        void partlyUnderstoodFeed() {
+            service.apply(Settings.defaults());
+            String feed = FEED_WITH_FINDING.replace("\"advisories\":[", "\"advisories\":[\"not an object\",");
+            storeServes(DEFAULT_STORE, feed);
+
+            SecurityReport report = service.refreshNow();
+
+            assertThat(report.getStatus()).isEqualTo(ReportStatus.PARTIAL);
+            assertThat(report.getFindings()).hasSize(1);
+            assertThat(report.getErrors()).singleElement()
+                    .satisfies(e -> assertThat(e.getMessage()).doesNotContain("last successful check"));
+        }
+
+        @Test
+        @DisplayName("disabling the check while a check runs leaves the report DISABLED")
+        void disabledDuringCheck() {
+            service.apply(Settings.defaults());
+            storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
+            fetcher.onGet(() -> service.apply(settings(false, true, "", DEFAULT_STORE)));
+
+            SecurityReport report = service.refreshNow();
+
+            assertThat(report.getStatus()).isEqualTo(ReportStatus.DISABLED);
+            assertThat(service.getReport().getStatus()).isEqualTo(ReportStatus.DISABLED);
+        }
+
+        @Test
+        @DisplayName("an Error such as a stack overflow does not stop the schedule")
+        void scheduledTaskSurvivesStackOverflow() {
+            service.apply(Settings.defaults());
+            ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
+            verify(executor).scheduleWithFixedDelay(task.capture(), anyLong(), anyLong(), any(TimeUnit.class));
+            fetcher.onGet(() -> {
+                throw new StackOverflowError();
+            });
+
+            task.getValue().run();
+
+            assertThat(service.getReport().getStatus()).isEqualTo(ReportStatus.UNAVAILABLE);
+        }
+    }
+
+    @Nested
     @DisplayName("logging and refresh")
     class LoggingAndRefresh {
 
@@ -439,6 +513,11 @@ class SecurityUpdateServiceTest {
         final List<String> requested = new ArrayList<>();
         final Map<String, Map<String, String>> headers = new HashMap<>();
         private RuntimeException failure;
+        private Runnable onGet;
+
+        void onGet(Runnable hook) {
+            onGet = hook;
+        }
 
         void answer(String url, Object answer) {
             answers.put(url, answer);
@@ -452,6 +531,11 @@ class SecurityUpdateServiceTest {
         public HttpResult get(String url, Map<String, String> requestHeaders, int maxBytes) throws IOException {
             if (failure != null) {
                 throw failure;
+            }
+            if (onGet != null) {
+                Runnable hook = onGet;
+                onGet = null;
+                hook.run();
             }
             requested.add(url);
             headers.put(url, requestHeaders);
