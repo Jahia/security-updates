@@ -1,7 +1,8 @@
-import React from 'react';
-import {fireEvent, render, screen, waitFor, within} from '@testing-library/react';
+import {act, fireEvent, render, screen, waitFor, within} from '@testing-library/react';
+import {axe} from 'jest-axe';
 import {useMutation, useQuery} from '@apollo/client';
 import {SettingsForm} from '../SettingsForm';
+import {CHANGED_EVENT} from '../../common/constants';
 
 const settings = {
     enabled: true,
@@ -16,182 +17,361 @@ const settings = {
     bannerTextColor: '#FFFFFF',
     bannerDismissPolicy: 'SESSION',
     bannerDismissHours: 24,
-    contrastRatio: 17.22
+    contrastRatio: 17.22,
+    canEdit: true
 };
+
+const loaded = (values = settings) => ({data: {securityUpdates: {settings: values}}, loading: false, error: undefined, refetch: jest.fn()});
 
 describe('SettingsForm', () => {
     let update;
     let reset;
-    let refetch;
 
     beforeEach(() => {
-        refetch = jest.fn(() => Promise.resolve());
-        useQuery.mockReturnValue({data: {securityUpdates: {settings}}, loading: false, error: undefined, refetch});
+        useQuery.mockReturnValue(loaded());
         update = jest.fn(() => Promise.resolve({data: {securityUpdates: {updateSettings: {ok: true, errors: [], settings}}}}));
         reset = jest.fn(() => Promise.resolve({data: {securityUpdates: {resetSettings: {ok: true, errors: [], settings}}}}));
         useMutation.mockImplementation(doc => [String(doc).includes('resetSettings') ? reset : update, {loading: false}]);
     });
 
+    afterEach(() => {
+        jest.useRealTimers();
+    });
+
     const section = () => screen.getByRole('region', {name: 'settings.title'});
+    const field = name => within(section()).getByLabelText(`settings.fields.${name}.label`);
+    const status = () => screen.getByTestId('security-updates-settings-status');
+    const save = () => screen.getByRole('button', {name: 'settings.save'});
 
-    test('shows every setting in a labelled control with its current value', () => {
+    describe('loading', () => {
+        test('says the settings are loading', () => {
+            useQuery.mockReturnValue({data: undefined, loading: true, error: undefined});
+            render(<SettingsForm/>);
+            expect(within(section()).getByText('settings.loading')).toBeInTheDocument();
+            expect(within(section()).getByTestId('loader')).toBeInTheDocument();
+        });
+
+        test('says when the settings could not be loaded', () => {
+            useQuery.mockReturnValue({data: undefined, loading: false, error: new Error('boom')});
+            render(<SettingsForm/>);
+            expect(within(section()).getByRole('alert')).toHaveTextContent('settings.loadError');
+            expect(screen.queryByRole('button', {name: 'settings.save'})).toBeNull();
+        });
+
+        test('the error state has no axe violation', async () => {
+            useQuery.mockReturnValue({data: undefined, loading: false, error: new Error('boom')});
+            const {container} = render(<SettingsForm/>);
+            expect(await axe(container)).toHaveNoViolations();
+        });
+    });
+
+    test('shows every setting in a control named by its own label, with its current value', () => {
         render(<SettingsForm/>);
-        const form = within(section());
 
-        expect(form.getByLabelText('settings.fields.enabled.label')).toBeChecked();
-        expect(form.getByLabelText('settings.fields.refreshIntervalHours.label')).toHaveValue(24);
-        expect(form.getByLabelText('settings.fields.useForgeSettings.label')).toBeChecked();
-        expect(form.getByLabelText('settings.fields.defaultStoreUrl.label')).toHaveValue('https://store.jahia.com');
-        expect(form.getByLabelText('settings.fields.extraFeedUrls.label')).toHaveValue('');
-        expect(form.getByLabelText('settings.fields.bannerEnabled.label')).toBeChecked();
-        expect(form.getByLabelText('settings.fields.bannerMinimumSeverity.label')).toHaveValue('HIGH');
-        expect(form.getByLabelText('settings.fields.bannerIncludeOwnerReports.label')).toBeChecked();
-        expect(form.getByLabelText('settings.fields.bannerBackgroundColor.label')).toHaveValue('#1B1B1B');
-        expect(form.getByLabelText('settings.fields.bannerBackgroundColor.picker')).toHaveValue('#1b1b1b');
-        expect(form.getByLabelText('settings.fields.bannerTextColor.label')).toHaveValue('#FFFFFF');
-        expect(form.getByLabelText('settings.fields.bannerDismissPolicy.label')).toHaveValue('SESSION');
-        expect(form.getByLabelText('settings.fields.bannerDismissHours.label')).toHaveValue(24);
+        expect(field('enabled')).toBeChecked();
+        expect(field('refreshIntervalHours')).toHaveValue(24);
+        expect(field('useForgeSettings')).toBeChecked();
+        expect(field('defaultStoreUrl')).toHaveValue('https://store.jahia.com');
+        expect(field('extraFeedUrls')).toHaveValue('');
+        expect(field('bannerEnabled')).toBeChecked();
+        expect(field('bannerMinimumSeverity')).toHaveValue('HIGH');
+        expect(field('bannerIncludeOwnerReports')).toBeChecked();
+        expect(field('bannerBackgroundColor')).toHaveValue('#1B1B1B');
+        expect(within(section()).getByLabelText('settings.fields.bannerBackgroundColor.picker')).toHaveValue('#1b1b1b');
+        expect(field('bannerTextColor')).toHaveValue('#FFFFFF');
+        expect(field('bannerDismissPolicy')).toHaveValue('SESSION');
+        expect(field('bannerDismissHours')).toHaveValue(24);
+    });
+
+    test('labels are native labels: no control is named by aria-label only', () => {
+        const {container} = render(<SettingsForm/>);
+        container.querySelectorAll('input, select, textarea').forEach(control => {
+            expect(control).not.toHaveAttribute('aria-label');
+            expect(container.querySelector(`label[for="${control.id}"]`)).not.toBeNull();
+        });
     });
 
     test('every control has a help text', () => {
         render(<SettingsForm/>);
-        const control = within(section()).getByLabelText('settings.fields.refreshIntervalHours.label');
-        const help = document.getElementById(control.getAttribute('aria-describedby').split(' ')[0]);
+        const help = document.getElementById(field('refreshIntervalHours').getAttribute('aria-describedby').split(' ')[0]);
         expect(help).toHaveTextContent('settings.fields.refreshIntervalHours.help');
     });
 
-    test('the preview uses the chosen colours and shows the contrast ratio', () => {
-        render(<SettingsForm/>);
-        const background = within(section()).getByLabelText('settings.fields.bannerBackgroundColor.label');
+    describe('read only', () => {
+        test('a user who cannot change the settings sees them, disabled, with an explanation and no buttons', () => {
+            useQuery.mockReturnValue(loaded({...settings, canEdit: false}));
+            render(<SettingsForm/>);
 
-        fireEvent.change(background, {target: {value: '#0b3d91'}});
-
-        const preview = screen.getByTestId('security-updates-banner-preview');
-        expect(preview.style.backgroundColor).toBe('rgb(11, 61, 145)');
-        expect(preview.style.color).toBe('rgb(255, 255, 255)');
-        expect(screen.getByTestId('security-updates-contrast')).toHaveTextContent('10.04');
-        expect(screen.getByTestId('security-updates-contrast')).toHaveTextContent('settings.preview.pass');
+            expect(within(section()).getByText('settings.readOnly')).toBeInTheDocument();
+            expect(field('refreshIntervalHours')).toBeDisabled();
+            expect(field('enabled')).toBeDisabled();
+            expect(field('bannerMinimumSeverity')).toBeDisabled();
+            expect(screen.queryByRole('button', {name: 'settings.save'})).toBeNull();
+            expect(screen.queryByRole('button', {name: 'settings.reset'})).toBeNull();
+        });
     });
 
-    test('the colour picker and the hex field stay in sync', () => {
-        render(<SettingsForm/>);
-        const form = within(section());
+    describe('preview', () => {
+        test('uses the chosen colours and shows the contrast ratio', () => {
+            render(<SettingsForm/>);
 
-        fireEvent.change(form.getByLabelText('settings.fields.bannerTextColor.picker'), {target: {value: '#ffd400'}});
+            fireEvent.change(field('bannerBackgroundColor'), {target: {value: '#0b3d91'}});
 
-        expect(form.getByLabelText('settings.fields.bannerTextColor.label')).toHaveValue('#FFD400');
+            const preview = screen.getByTestId('security-updates-banner-preview');
+            expect(preview.style.backgroundColor).toBe('rgb(11, 61, 145)');
+            expect(preview.style.color).toBe('rgb(255, 255, 255)');
+            expect(preview).toHaveTextContent('banner.message.other {n=3, threshold=banner.threshold.HIGH}');
+            expect(screen.getByTestId('security-updates-contrast')).toHaveTextContent('10.04');
+            expect(screen.getByTestId('security-updates-contrast')).toHaveTextContent('settings.preview.pass');
+        });
+
+        test('a failing pair is still previewed, labelled as one that cannot be saved', () => {
+            render(<SettingsForm/>);
+            fireEvent.change(field('bannerBackgroundColor'), {target: {value: '#888888'}});
+            fireEvent.change(field('bannerTextColor'), {target: {value: '#777777'}});
+
+            const preview = screen.getByTestId('security-updates-banner-preview');
+            expect(preview.style.backgroundColor).toBe('rgb(136, 136, 136)');
+            expect(preview.style.color).toBe('rgb(119, 119, 119)');
+            expect(screen.getByText('settings.preview.failLabel')).toBeInTheDocument();
+            expect(screen.getByTestId('security-updates-contrast')).toHaveTextContent('1.26');
+            expect(screen.getByTestId('security-updates-contrast')).toHaveTextContent('settings.preview.fail');
+        });
+
+        test('an invalid colour keeps the picker on the default colour of its field, not black', () => {
+            render(<SettingsForm/>);
+            fireEvent.change(field('bannerTextColor'), {target: {value: '#FFF'}});
+
+            expect(within(section()).getByLabelText('settings.fields.bannerTextColor.picker')).toHaveValue('#ffffff');
+            expect(screen.getByTestId('security-updates-contrast')).toHaveTextContent('settings.preview.invalid');
+        });
+
+        test('the colour picker and the text field stay in sync', () => {
+            render(<SettingsForm/>);
+
+            fireEvent.change(within(section()).getByLabelText('settings.fields.bannerTextColor.picker'), {target: {value: '#ffd400'}});
+
+            expect(field('bannerTextColor')).toHaveValue('#FFD400');
+        });
+
+        test('the verdict is not live on every key; only a change between pass and fail is announced, after a pause', () => {
+            jest.useFakeTimers();
+            render(<SettingsForm/>);
+            const live = screen.getByTestId('security-updates-contrast-status');
+            expect(screen.getByTestId('security-updates-contrast')).not.toHaveAttribute('aria-live');
+
+            fireEvent.change(field('bannerTextColor'), {target: {value: '#33'}});
+            fireEvent.change(field('bannerTextColor'), {target: {value: '#333'}});
+            fireEvent.change(field('bannerTextColor'), {target: {value: '#333333'}});
+            expect(live).toBeEmptyDOMElement();
+            act(() => jest.advanceTimersByTime(1000));
+            expect(live).toHaveTextContent('settings.preview.announceFail');
+
+            fireEvent.change(field('bannerTextColor'), {target: {value: '#333334'}});
+            act(() => jest.advanceTimersByTime(1000));
+            expect(live).toHaveTextContent('settings.preview.announceFail');
+
+            fireEvent.change(field('bannerTextColor'), {target: {value: '#FFFFFF'}});
+            act(() => jest.advanceTimersByTime(1000));
+            expect(live).toHaveTextContent('settings.preview.announcePass');
+        });
     });
 
-    test('a low contrast is shown as failing in the preview', () => {
-        render(<SettingsForm/>);
-        const form = within(section());
-        fireEvent.change(form.getByLabelText('settings.fields.bannerBackgroundColor.label'), {target: {value: '#888888'}});
-        fireEvent.change(form.getByLabelText('settings.fields.bannerTextColor.label'), {target: {value: '#777777'}});
+    describe('save', () => {
+        test('sends every field, typed, shows the saved values without asking the server again, and tells the banner', async () => {
+            const changed = jest.fn();
+            window.addEventListener(CHANGED_EVENT, changed);
+            update.mockImplementation(() => Promise.resolve({data: {securityUpdates: {updateSettings: {
+                ok: true, errors: [], settings: {...settings, refreshIntervalHours: 6, defaultStoreUrl: 'https://saved.example'}
+            }}}}));
+            const query = loaded();
+            useQuery.mockReturnValue(query);
+            render(<SettingsForm/>);
+            fireEvent.change(field('refreshIntervalHours'), {target: {value: '6'}});
 
-        expect(screen.getByTestId('security-updates-contrast')).toHaveTextContent('1.26');
-        expect(screen.getByTestId('security-updates-contrast')).toHaveTextContent('settings.preview.fail');
+            fireEvent.click(save());
+
+            await waitFor(() => expect(status()).toHaveTextContent('settings.saved'));
+            const input = update.mock.calls[0][0].variables.input;
+            expect(input.refreshIntervalHours).toBe(6);
+            expect(input.enabled).toBe(true);
+            expect(Object.keys(input)).toHaveLength(12);
+            expect(field('defaultStoreUrl')).toHaveValue('https://saved.example');
+            expect(query.refetch).not.toHaveBeenCalled();
+            expect(changed).toHaveBeenCalledTimes(1);
+            window.removeEventListener(CHANGED_EVENT, changed);
+        });
+
+        test('Save is the submit button of the form: submitting with Enter saves once', async () => {
+            render(<SettingsForm/>);
+            expect(save()).toHaveAttribute('type', 'submit');
+
+            fireEvent.submit(field('refreshIntervalHours').closest('form'));
+            fireEvent.submit(field('refreshIntervalHours').closest('form'));
+
+            await waitFor(() => expect(status()).toHaveTextContent('settings.saved'));
+            expect(update).toHaveBeenCalledTimes(1);
+        });
+
+        test('a new answer of the settings query does not overwrite the edits in progress', () => {
+            const {rerender} = render(<SettingsForm/>);
+            fireEvent.change(field('refreshIntervalHours'), {target: {value: '7'}});
+
+            useQuery.mockReturnValue(loaded({...settings, refreshIntervalHours: 48}));
+            rerender(<SettingsForm/>);
+
+            expect(field('refreshIntervalHours')).toHaveValue(7);
+        });
+
+        test('field errors from the server are shown, linked and announced; the first invalid field gets the focus', async () => {
+            update.mockImplementation(() => Promise.resolve({data: {securityUpdates: {updateSettings: {ok: false, settings: null, errors: [
+                {field: 'refreshIntervalHours', code: 'OUT_OF_RANGE', message: 'Must be from 1 to 720 hours'},
+                {field: 'extraFeedUrls', code: 'NOT_HTTPS', message: 'https only'},
+                {field: 'bannerBackgroundColor', code: 'LOW_CONTRAST', message: 'The contrast ratio is 1.26:1'},
+                {field: 'bannerTextColor', code: 'LOW_CONTRAST', message: 'The contrast ratio is 1.26:1'}
+            ]}}}}));
+            render(<SettingsForm/>);
+
+            fireEvent.click(save());
+
+            const alert = await screen.findByRole('alert');
+            expect(alert).toHaveTextContent('settings.invalid');
+            const interval = field('refreshIntervalHours');
+            expect(interval).toHaveAttribute('aria-invalid', 'true');
+            const errorId = interval.getAttribute('aria-describedby').split(' ').find(id => id.endsWith('-error'));
+            expect(document.getElementById(errorId)).toHaveTextContent('settings.errors.OUT_OF_RANGE');
+            expect(screen.getByText('settings.errors.NOT_HTTPS')).toBeInTheDocument();
+            expect(field('bannerTextColor')).toHaveAttribute('aria-invalid', 'true');
+            expect(document.activeElement).toBe(interval);
+        });
+
+        test.each(['__proto__', 'constructor', 'toString', 'unknownField'])('an error on the unknown field "%s" pollutes nothing and is shown as a general error', async name => {
+            update.mockImplementation(() => Promise.resolve({data: {securityUpdates: {updateSettings: {ok: false, settings: null, errors: [
+                {field: name, code: 'INVALID_VALUE', message: 'x'}
+            ]}}}}));
+            render(<SettingsForm/>);
+
+            fireEvent.click(save());
+
+            expect(await screen.findByRole('alert')).toHaveTextContent('settings.errors.INVALID_VALUE');
+            expect({}.code).toBeUndefined();
+            expect(Object.prototype.code).toBeUndefined();
+            document.querySelectorAll('input, select, textarea').forEach(control => expect(control).not.toHaveAttribute('aria-invalid'));
+        });
+
+        test('a number field that is not a whole number is refused without calling the server', async () => {
+            render(<SettingsForm/>);
+            fireEvent.change(field('refreshIntervalHours'), {target: {value: ''}});
+
+            fireEvent.click(save());
+
+            expect(await screen.findByRole('alert')).toHaveTextContent('settings.invalid');
+            expect(update).not.toHaveBeenCalled();
+            expect(field('refreshIntervalHours')).toHaveAttribute('aria-invalid', 'true');
+        });
+
+        test('a write failure on the server is shown', async () => {
+            update.mockImplementation(() => Promise.resolve({data: {securityUpdates: {updateSettings: {ok: false, settings: null, errors: [
+                {field: null, code: 'WRITE_FAILED', message: 'The settings could not be saved'}
+            ]}}}}));
+            render(<SettingsForm/>);
+
+            fireEvent.click(save());
+
+            expect(await screen.findByRole('alert')).toHaveTextContent('settings.errors.WRITE_FAILED');
+        });
+
+        test('a request that does not reach the server is not called a write failure', async () => {
+            update.mockImplementation(() => Promise.reject(new Error('Failed to fetch')));
+            render(<SettingsForm/>);
+
+            fireEvent.click(save());
+
+            expect(await screen.findByRole('alert')).toHaveTextContent('settings.errors.REQUEST_FAILED');
+        });
+
+        test('a permission denied by the server says so', async () => {
+            update.mockImplementation(() => Promise.reject(Object.assign(new Error('Permission denied'), {graphQLErrors: [{message: 'Permission denied'}]})));
+            render(<SettingsForm/>);
+
+            fireEvent.click(save());
+
+            expect(await screen.findByRole('alert')).toHaveTextContent('settings.errors.DENIED');
+        });
     });
 
-    test('Save sends every field, typed, and announces the result', async () => {
-        render(<SettingsForm/>);
-        fireEvent.change(within(section()).getByLabelText('settings.fields.refreshIntervalHours.label'), {target: {value: '6'}});
+    describe('reset', () => {
+        test('asks for confirmation in a dialog; cancelling changes nothing', () => {
+            render(<SettingsForm/>);
 
-        fireEvent.click(screen.getByRole('button', {name: 'settings.save'}));
+            fireEvent.click(screen.getByRole('button', {name: 'settings.reset'}));
 
-        await waitFor(() => expect(screen.getByTestId('security-updates-settings-status')).toHaveTextContent('settings.saved'));
-        const input = update.mock.calls[0][0].variables.input;
-        expect(input.refreshIntervalHours).toBe(6);
-        expect(input.enabled).toBe(true);
-        expect(Object.keys(input)).toHaveLength(12);
-        expect(refetch).toHaveBeenCalled();
-    });
+            const dialog = screen.getByRole('dialog', {name: 'settings.resetConfirm.title'});
+            expect(dialog).toHaveAttribute('aria-modal', 'true');
+            expect(within(dialog).getByText('settings.resetConfirm.body')).toBeInTheDocument();
+            fireEvent.click(within(dialog).getByRole('button', {name: 'settings.resetConfirm.cancel'}));
+            expect(screen.queryByRole('dialog')).toBeNull();
+            expect(reset).not.toHaveBeenCalled();
+        });
 
-    test('field errors from the server are shown, linked and announced; the first invalid field gets the focus', async () => {
-        update.mockImplementation(() => Promise.resolve({data: {securityUpdates: {updateSettings: {ok: false, settings: null, errors: [
-            {field: 'refreshIntervalHours', code: 'OUT_OF_RANGE', message: 'Must be from 1 to 720 hours'},
-            {field: 'bannerBackgroundColor', code: 'LOW_CONTRAST', message: 'The contrast ratio is 1.26:1'},
-            {field: 'bannerTextColor', code: 'LOW_CONTRAST', message: 'The contrast ratio is 1.26:1'}
-        ]}}}}));
-        render(<SettingsForm/>);
+        test('Escape closes the dialog without resetting', () => {
+            render(<SettingsForm/>);
+            fireEvent.click(screen.getByRole('button', {name: 'settings.reset'}));
 
-        fireEvent.click(screen.getByRole('button', {name: 'settings.save'}));
+            fireEvent.keyDown(screen.getByRole('dialog'), {key: 'Escape'});
 
-        const alert = await screen.findByRole('alert');
-        expect(alert).toHaveTextContent('settings.invalid');
-        const interval = within(section()).getByLabelText('settings.fields.refreshIntervalHours.label');
-        expect(interval).toHaveAttribute('aria-invalid', 'true');
-        const errorId = interval.getAttribute('aria-describedby').split(' ').find(id => id.endsWith('-error'));
-        expect(document.getElementById(errorId)).toHaveTextContent('settings.errors.OUT_OF_RANGE');
-        expect(within(section()).getByLabelText('settings.fields.bannerTextColor.label')).toHaveAttribute('aria-invalid', 'true');
-        expect(document.activeElement).toBe(interval);
-    });
+            expect(screen.queryByRole('dialog')).toBeNull();
+            expect(reset).not.toHaveBeenCalled();
+        });
 
-    test('a number field that is not a whole number is refused without calling the server', async () => {
-        render(<SettingsForm/>);
-        fireEvent.change(within(section()).getByLabelText('settings.fields.refreshIntervalHours.label'), {target: {value: ''}});
+        test('confirming resets, shows the default values returned by the server, and announces it', async () => {
+            reset.mockImplementation(() => Promise.resolve({data: {securityUpdates: {resetSettings: {
+                ok: true, errors: [], settings: {...settings, refreshIntervalHours: 24, extraFeedUrls: ''}
+            }}}}));
+            render(<SettingsForm/>);
+            fireEvent.change(field('refreshIntervalHours'), {target: {value: '5'}});
+            fireEvent.click(screen.getByRole('button', {name: 'settings.reset'}));
 
-        fireEvent.click(screen.getByRole('button', {name: 'settings.save'}));
+            fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', {name: 'settings.resetConfirm.confirm'}));
 
-        expect(await screen.findByRole('alert')).toHaveTextContent('settings.invalid');
-        expect(update).not.toHaveBeenCalled();
-        expect(within(section()).getByLabelText('settings.fields.refreshIntervalHours.label')).toHaveAttribute('aria-invalid', 'true');
-    });
-
-    test('a write failure is shown', async () => {
-        update.mockImplementation(() => Promise.resolve({data: {securityUpdates: {updateSettings: {ok: false, settings: null, errors: [
-            {field: null, code: 'WRITE_FAILED', message: 'The settings could not be saved'}
-        ]}}}}));
-        render(<SettingsForm/>);
-
-        fireEvent.click(screen.getByRole('button', {name: 'settings.save'}));
-
-        expect(await screen.findByRole('alert')).toHaveTextContent('settings.errors.WRITE_FAILED');
-    });
-
-    test('Reset to defaults calls the reset mutation and announces it', async () => {
-        render(<SettingsForm/>);
-
-        fireEvent.click(screen.getByRole('button', {name: 'settings.reset'}));
-
-        await waitFor(() => expect(screen.getByTestId('security-updates-settings-status')).toHaveTextContent('settings.resetDone'));
-        expect(reset).toHaveBeenCalled();
+            await waitFor(() => expect(status()).toHaveTextContent('settings.resetDone'));
+            expect(reset).toHaveBeenCalledTimes(1);
+            expect(field('refreshIntervalHours')).toHaveValue(24);
+            expect(screen.queryByRole('dialog')).toBeNull();
+        });
     });
 
     test('the dismissal duration is only offered with the HOURS policy', () => {
         render(<SettingsForm/>);
-        const hours = within(section()).getByLabelText('settings.fields.bannerDismissHours.label');
-        expect(hours).toBeDisabled();
+        expect(field('bannerDismissHours')).toBeDisabled();
 
-        fireEvent.change(within(section()).getByLabelText('settings.fields.bannerDismissPolicy.label'), {target: {value: 'HOURS'}});
+        fireEvent.change(field('bannerDismissPolicy'), {target: {value: 'HOURS'}});
 
-        expect(hours).not.toBeDisabled();
+        expect(field('bannerDismissHours')).not.toBeDisabled();
     });
 
-    test('renders nothing until the settings are loaded', () => {
-        useQuery.mockReturnValue({data: undefined, loading: true, error: undefined, refetch});
-        const {container} = render(<SettingsForm/>);
-        expect(container).toBeEmptyDOMElement();
-    });
-
-    test('is built from Moonstone Field, Switch, Input, Textarea and Button; selects keep their own name', () => {
+    test('is built from Moonstone Switch, Input, Textarea and Button; selects are native', () => {
         const {container} = render(<SettingsForm/>);
         const used = name => container.querySelectorAll(`[data-moonstone="${name}"]`).length;
 
-        expect(used('Field')).toBe(12);
         expect(used('Switch')).toBe(4);
         expect(used('Input')).toBe(5);
         expect(used('Textarea')).toBe(1);
-        expect(screen.getByRole('button', {name: 'settings.save'})).toHaveAttribute('data-moonstone', 'Button');
+        expect(save()).toHaveAttribute('data-moonstone', 'Button');
         expect(screen.getByRole('heading', {level: 2, name: 'settings.title'})).toBeInTheDocument();
         expect(screen.getByRole('combobox', {name: 'settings.fields.bannerDismissPolicy.label'})).toHaveValue('SESSION');
+    });
+
+    test('has no axe violation', async () => {
+        const {container} = render(<SettingsForm/>);
+        expect(await axe(container)).toHaveNoViolations();
     });
 
     describe('contrast suggestions', () => {
         const fail = (background, text) => {
             render(<SettingsForm/>);
-            const form = within(section());
-            fireEvent.change(form.getByLabelText('settings.fields.bannerBackgroundColor.label'), {target: {value: background}});
-            fireEvent.change(form.getByLabelText('settings.fields.bannerTextColor.label'), {target: {value: text}});
+            fireEvent.change(field('bannerBackgroundColor'), {target: {value: background}});
+            fireEvent.change(field('bannerTextColor'), {target: {value: text}});
         };
 
         test('a passing pair shows no suggestion', () => {
@@ -204,8 +384,8 @@ describe('SettingsForm', () => {
 
             const forText = screen.getByTestId('security-updates-suggestion-text');
             expect(forText.querySelector('[aria-hidden="true"]').style.backgroundColor).toBe('rgb(166, 166, 166)');
-            expect(within(forText).getByText('settings.suggest.text')).toBeInTheDocument();
-            expect(within(forText).getByRole('button', {name: 'settings.suggest.use_text'})).toBeInTheDocument();
+            expect(within(forText).getByText('settings.suggest.text {value=#A6A6A6, ratio=7.07}')).toBeInTheDocument();
+            expect(within(forText).getByRole('button', {name: 'settings.suggest.use_text {value=#A6A6A6}'})).toBeInTheDocument();
             expect(screen.getByTestId('security-updates-suggestion-background')).toBeInTheDocument();
         });
 
@@ -214,9 +394,9 @@ describe('SettingsForm', () => {
 
             fireEvent.click(within(screen.getByTestId('security-updates-suggestion-text')).getByRole('button'));
 
-            expect(within(section()).getByLabelText('settings.fields.bannerTextColor.label')).toHaveValue('#A6A6A6');
+            expect(field('bannerTextColor')).toHaveValue('#A6A6A6');
             expect(screen.getByTestId('security-updates-contrast')).toHaveTextContent('settings.preview.pass');
-            expect(screen.getByTestId('security-updates-settings-status')).toHaveTextContent('settings.suggest.appliedText');
+            expect(status()).toHaveTextContent('settings.suggest.appliedText');
             expect(screen.queryByTestId('security-updates-suggestions')).toBeNull();
         });
 
@@ -225,19 +405,19 @@ describe('SettingsForm', () => {
 
             fireEvent.click(within(screen.getByTestId('security-updates-suggestion-background')).getByRole('button'));
 
-            expect(within(section()).getByLabelText('settings.fields.bannerBackgroundColor.label')).toHaveValue('#C1C1C1');
-            expect(screen.getByTestId('security-updates-settings-status')).toHaveTextContent('settings.suggest.appliedBackground');
+            expect(field('bannerBackgroundColor')).toHaveValue('#C1C1C1');
+            expect(status()).toHaveTextContent('settings.suggest.appliedBackground');
         });
 
         test('when no single change can reach 7:1, the default colours are offered', () => {
             fail('#777777', '#888888');
 
             expect(screen.getByText('settings.suggest.none')).toBeInTheDocument();
-            fireEvent.click(screen.getByRole('button', {name: 'settings.suggest.useDefaults'}));
+            fireEvent.click(screen.getByRole('button', {name: /^settings\.suggest\.useDefaults/}));
 
-            expect(within(section()).getByLabelText('settings.fields.bannerBackgroundColor.label')).toHaveValue('#1B1B1B');
-            expect(within(section()).getByLabelText('settings.fields.bannerTextColor.label')).toHaveValue('#FFFFFF');
-            expect(screen.getByTestId('security-updates-settings-status')).toHaveTextContent('settings.suggest.appliedDefaults');
+            expect(field('bannerBackgroundColor')).toHaveValue('#1B1B1B');
+            expect(field('bannerTextColor')).toHaveValue('#FFFFFF');
+            expect(status()).toHaveTextContent('settings.suggest.appliedDefaults');
         });
     });
 });

@@ -1,26 +1,66 @@
-// Layout only, from Moonstone's CSS variables (the fallbacks are for the unit tests, which run without the Moonstone
-// stylesheet). The exceptions are the native controls Moonstone does not provide (select, colour picker), which take
-// Moonstone's border, colour and focus variables so that they sit with the Moonstone inputs, and the banner preview,
-// whose colours are the setting being edited.
+// Layout from Moonstone's CSS variables (the fallbacks are for the unit tests, which run without the Moonstone
+// stylesheet, and for older hosts), plus the accessibility rules of WCAG 2.2 AAA: 3px focus ring of at least 3:1,
+// 44 by 44 pixel targets, text colours of at least 7:1. The native controls Moonstone does not provide (select,
+// colour picker) take Moonstone's border and colour variables; the banner preview's colours are the setting edited.
+
+$focus-color: var(--color-accent_dark_contrast, #004781);
+
+@mixin focus-ring {
+  outline: 3px solid $focus-color !important;
+  outline-offset: 2px !important;
+}
 
 .settings {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-small, 8px);
   margin-top: var(--spacing-large, 24px);
+
+  :focus-visible {
+    @include focus-ring;
+  }
+}
+
+.text,
+.help {
+  max-width: 80ch;
+}
+
+.target {
+  min-height: 2.75rem !important;
+  min-width: 2.75rem;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-small, 8px);
 }
 
 .form {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-medium, 16px);
-  max-width: 720px;
+  max-width: 45rem;
 }
 
 .group {
   border: 0;
   margin: 0;
   padding: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-medium, 16px);
@@ -30,27 +70,63 @@
   }
 }
 
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-nano, 4px);
+}
+
+// The label is part of the switch's target: label and switch side by side, at least 44 pixels high.
+.switchField {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--spacing-nano, 4px) var(--spacing-small, 8px);
+
+  > :first-child {
+    order: 2;
+    min-height: 2.75rem;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+  }
+
+  > :nth-child(2) {
+    order: 1;
+  }
+
+  > :nth-child(n + 3) {
+    order: 3;
+    grid-column: 1 / -1;
+  }
+}
+
+// Moonstone draws the switch around a hidden-looking input: the ring goes around the whole switch.
+.switch:has(input:focus-visible) {
+  @include focus-ring;
+}
+
+.label {
+  cursor: pointer;
+}
+
+// Error text in dark red: 10:1 against white.
 .error {
-  color: var(--color-danger, currentColor);
+  color: var(--color-danger_dark, #840d0f);
 }
 
 .select {
   font: inherit;
   font-family: var(--moon-font-family, inherit);
-  min-height: 32px;
+  min-height: 2.75rem;
   padding: 0 var(--spacing-small, 8px);
-  border: 1px solid var(--color-gray, #767676);
+  border: 1px solid var(--color-gray_dark, #293136);
   border-radius: 4px;
-  color: var(--color-dark, inherit);
+  color: var(--color-dark, #131c21);
   background: var(--color-white, #fff);
 
-  &:focus-visible {
-    outline: 3px solid var(--color-accent, #00457c);
-    outline-offset: 2px;
-  }
-
   &[aria-invalid='true'] {
-    border-color: var(--color-danger, currentColor);
+    border-color: var(--color-danger_dark, #840d0f);
   }
 }
 
@@ -65,16 +141,12 @@
 }
 
 .picker {
-  width: 44px;
-  height: 32px;
+  width: 2.75rem;
+  height: 2.75rem;
   padding: 0;
-  border: 1px solid var(--color-gray, #767676);
+  border: 1px solid var(--color-gray_dark, #293136);
   border-radius: 4px;
-
-  &:focus-visible {
-    outline: 3px solid var(--color-accent, #00457c);
-    outline-offset: 2px;
-  }
+  flex-shrink: 0;
 }
 
 .preview,
@@ -87,8 +159,9 @@
 .sample {
   border-radius: 4px;
   padding: var(--spacing-small, 8px) var(--spacing-medium, 16px);
-  max-width: 420px;
+  max-width: 30rem;
   font-family: var(--moon-font-family, inherit);
+  font-size: 0.875rem;
 
   p {
     margin: 0 0 var(--spacing-nano, 4px);
@@ -117,19 +190,34 @@
 }
 
 .swatch {
-  width: 24px;
-  height: 24px;
+  width: 1.5rem;
+  height: 1.5rem;
   border-radius: 4px;
-  border: 1px solid var(--color-gray, #767676);
+  border: 1px solid var(--color-gray_dark, #293136);
   flex-shrink: 0;
 }
 
 .status {
   min-height: 1.5em;
+  margin: 0;
+  font-family: var(--moon-font-family, inherit);
 }
 
 .actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-medium, 16px);
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+
+  :focus-visible {
+    @include focus-ring;
+  }
+}
+
+.dialogFooter {
+  gap: var(--spacing-small, 8px);
 }
