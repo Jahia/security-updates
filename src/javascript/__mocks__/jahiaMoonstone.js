@@ -2,8 +2,10 @@
 // render (checked against Moonstone 2.21.1): Input, Switch and Textarea put id and aria-* on the control; Button is
 // type="button" unless told otherwise and calls onClick unconditionally; Header renders an h1; Table cells take
 // `component`; Modal renders nothing when closed, an aria-modal dialog when open (closed by Escape through
-// onOpenChange), and ModalHeader its title as an h4. Each double carries data-moonstone="<Name>" so that tests can
-// check what is used.
+// onOpenChange) that focuses its first tabbable element when it opens (Floating UI's FloatingFocusManager with its
+// default initialFocus 0), and ModalHeader its title as an h4; ModalFooter is a flex row aligned to the end (class
+// flexRow_reverse: justify-content flex-end, not row-reverse), so the DOM order is the visual and the tab order. Each
+// double carries data-moonstone="<Name>" so that tests can check what is used.
 import React from 'react';
 
 const mark = name => ({'data-moonstone': name});
@@ -50,18 +52,29 @@ export const TableBodyCell = ({children, component: Component = 'td', verticalAl
     <Component {...mark('TableBodyCell')} {...rest}>{children}</Component>
 );
 
-export const Modal = ({isOpen, onOpenChange, size, children, ...rest}) => (isOpen ? (
-    <div
-        role="dialog"
-        aria-modal="true"
-        data-size={size}
-        onKeyDown={event => event.key === 'Escape' && onOpenChange && onOpenChange(false)}
-        {...mark('Modal')}
-        {...rest}
-    >
-        {children}
-    </div>
-) : null);
+const TABBABLE = 'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
+
+export const Modal = ({isOpen, onOpenChange, size, children, ...rest}) => {
+    const dialog = React.useRef(null);
+    React.useEffect(() => {
+        if (isOpen) {
+            dialog.current?.querySelector(TABBABLE)?.focus();
+        }
+    }, [isOpen]);
+    return isOpen ? (
+        <div
+            ref={dialog}
+            role="dialog"
+            aria-modal="true"
+            data-size={size}
+            onKeyDown={event => event.key === 'Escape' && onOpenChange && onOpenChange(false)}
+            {...mark('Modal')}
+            {...rest}
+        >
+            {children}
+        </div>
+    ) : null;
+};
 
 export const ModalHeader = ({title, children, ...rest}) => (
     <header {...mark('ModalHeader')} {...rest}><h4>{title}</h4>{children}</header>

@@ -410,6 +410,20 @@ describe('SettingsForm', () => {
             expect(reset).not.toHaveBeenCalled();
         });
 
+        test('Cancel comes first and has the focus when the dialog opens; Reset is the danger button; the body describes the dialog', () => {
+            render(<SettingsForm/>);
+
+            fireEvent.click(screen.getByRole('button', {name: 'settings.reset'}));
+
+            const dialog = screen.getByRole('dialog', {name: 'settings.resetConfirm.title'});
+            expect(dialog).toHaveAccessibleDescription('settings.resetConfirm.body');
+            const buttons = within(dialog).getAllByRole('button');
+            expect(buttons.map(button => button.textContent)).toEqual(['settings.resetConfirm.cancel', 'settings.resetConfirm.confirm']);
+            expect(document.activeElement).toBe(buttons[0]);
+            expect(buttons[1]).toHaveAttribute('data-color', 'danger');
+            expect(buttons[1]).toHaveClass('target');
+        });
+
         test('Escape closes the dialog without resetting', () => {
             render(<SettingsForm/>);
             fireEvent.click(screen.getByRole('button', {name: 'settings.reset'}));
