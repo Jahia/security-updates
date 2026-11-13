@@ -1,2 +1,2 @@
 #!/bin/bash
-source ./set-env.sh
+source ./set-env.sh || exit 1

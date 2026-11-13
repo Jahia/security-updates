@@ -1,5 +1,5 @@
 #!/bin/bash
-source ./set-env.sh
+source ./set-env.sh || exit 1
 
 mkdir -p ./artifacts
 if [[ -e ../target ]]; then
