@@ -488,7 +488,7 @@ describe('SettingsForm', () => {
         expect(screen.getByRole('combobox', {name: 'settings.fields.bannerDismissPolicy.label'})).toHaveValue('SESSION');
     });
 
-    // jest-axe runs against the Jest double of Moonstone, not its real markup and CSS: the e2e axe runs (cypress-axe) are the authority.
+    // The jest-axe check runs against the Jest double of Moonstone, not its real markup and CSS: the e2e axe runs (cypress-axe) are the authority.
     test('jest-axe on the Moonstone double: no violation (the e2e axe runs are the authority)', async () => {
         const {container} = render(<SettingsForm/>);
         expect(await axe(container)).toHaveNoViolations();

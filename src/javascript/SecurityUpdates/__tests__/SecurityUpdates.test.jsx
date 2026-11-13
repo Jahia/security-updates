@@ -741,7 +741,7 @@ describe('SecurityUpdates page', () => {
         expect(within(message).getByTestId('icon-warning')).toHaveAttribute('aria-hidden', 'true');
     });
 
-    // jest-axe runs against the Jest double of Moonstone, not its real markup and CSS: the e2e axe runs (cypress-axe) are the authority.
+    // The jest-axe check runs against the Jest double of Moonstone, not its real markup and CSS: the e2e axe runs (cypress-axe) are the authority.
     test('jest-axe on the Moonstone double: no violation with findings and store problems (the e2e axe runs are the authority)', async () => {
         mockReport(report({
             status: 'PARTIAL',
