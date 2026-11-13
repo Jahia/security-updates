@@ -3,6 +3,8 @@
 // 44 by 44 pixel targets, text colours of at least 7:1. The native controls Moonstone does not provide (select,
 // colour picker) take Moonstone's border and colour variables; the banner preview's colours are the setting edited.
 
+@use '../common/accessibleButtons' as buttons;
+
 $focus-color: var(--color-accent_dark_contrast, #004781);
 
 @mixin focus-ring {
@@ -29,6 +31,8 @@ $focus-color: var(--color-accent_dark_contrast, #004781);
 .target {
   min-height: 2.75rem !important;
   min-width: 2.75rem;
+
+  @include buttons.accessible-buttons;
 }
 
 .srOnly {

@@ -1,0 +1,99 @@
+// Colours of the Moonstone buttons this module renders, for WCAG 2.2 AAA (1.4.6, 7:1 for text). Moonstone's accent and
+// danger buttons put white text on #00a0e3 / #f44053 (below 3:1 and 4:1), and the hover and active states of its
+// outlined and ghost buttons use #00a0e3 text or background too. Only the module's own buttons change: the rules are
+// scoped to the module's .target class (doubled to win over Moonstone's selectors, which have the same shape).
+// Disabled buttons keep Moonstone's look (inactive controls are exempt).
+
+$white: #fff;
+$text: #293136; // 13.2:1 on white
+$accent: #00457c; // white on it: 9.8:1
+$accent-hover: #003561; // 12.5:1
+$accent-active: #002647; // 15.4:1
+$danger: #840d0f; // 10.3:1
+$danger-hover: #5f0a0b; // 13.7:1
+$hover-background: #e6eef5; // $accent on it: 8.4:1
+$focus: #004781; // 9.5:1 on white, 3px ring with a white gap
+
+@mixin filled($background) {
+  color: $white;
+  border-color: $background;
+  background-color: $background;
+}
+
+@mixin accessible-buttons {
+  &#{&} {
+    &:focus-visible {
+      outline: 3px solid $focus !important;
+      outline-offset: 2px !important;
+      // A white gap between the button and the ring, whatever is behind the button.
+      box-shadow: 0 0 0 2px $white;
+    }
+
+    // The text of a Moonstone button is a Typography span: it takes the button's colour.
+    > * {
+      color: inherit;
+    }
+
+    &[data-variant=default][data-color=accent] {
+      @include filled($accent);
+    }
+
+    &[data-variant=default][data-color=accent]:focus-visible:not(:disabled) {
+      @include filled($accent);
+    }
+
+    &[data-variant=default][data-color=accent]:hover:not(:disabled) {
+      @include filled($accent-hover);
+    }
+
+    &[data-variant=default][data-color=accent]:active:not(:disabled) {
+      @include filled($accent-active);
+    }
+
+    &[data-variant=default][data-color=danger] {
+      @include filled($danger);
+    }
+
+    &[data-variant=default][data-color=danger]:focus-visible:not(:disabled) {
+      @include filled($danger);
+    }
+
+    &[data-variant=default][data-color=danger]:hover:not(:disabled) {
+      @include filled($danger-hover);
+    }
+
+    &[data-variant=default][data-color=danger]:active:not(:disabled) {
+      @include filled($danger-hover);
+    }
+
+    &[data-variant=outlined]:not(:disabled) {
+      color: $text;
+      border-color: $text;
+      background-color: transparent;
+    }
+
+    &[data-variant=outlined]:hover:not(:disabled) {
+      color: $accent;
+      border-color: $accent;
+      background-color: $hover-background;
+    }
+
+    &[data-variant=outlined]:active:not(:disabled) {
+      @include filled($accent);
+    }
+
+    &[data-variant=ghost]:not(:disabled) {
+      color: $text;
+      background-color: transparent;
+    }
+
+    &[data-variant=ghost]:hover:not(:disabled) {
+      color: $accent;
+      background-color: $hover-background;
+    }
+
+    &[data-variant=ghost]:active:not(:disabled) {
+      @include filled($accent);
+    }
+  }
+}

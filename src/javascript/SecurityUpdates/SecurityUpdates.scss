@@ -2,6 +2,8 @@
 // colours come from Moonstone's CSS variables (the fallbacks are for the unit tests, which run without the Moonstone
 // stylesheet, and for older hosts).
 
+@use '../common/accessibleButtons' as buttons;
+
 // Focus ring of 3px, at least 3:1 against the page (#004781 on white: 9.5:1), on every control of the page, over
 // Moonstone's own 2px ring (hence !important: Moonstone's selectors are more specific).
 $focus-color: var(--color-accent_dark_contrast, #004781);
@@ -37,6 +39,8 @@ $focus-color: var(--color-accent_dark_contrast, #004781);
 .target {
   min-height: 2.75rem !important;
   min-width: 2.75rem;
+
+  @include buttons.accessible-buttons;
 }
 
 .srOnly {
