@@ -15,6 +15,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - GraphQL API: `Query.securityUpdates.report` and `Mutation.securityUpdates.refresh`
   (permission `adminTemplates`).
 - Admin page **Server settings > System components > Security updates** (English, French).
-- Notice for `adminTemplates` users when high or critical Jahia advisories apply.
+- Notice for `adminTemplates` users in the Jahia UI, decided server-side
+  (`Query.securityUpdates.banner`): counts the findings at or above a configurable severity, from Jahia
+  advisories and, optionally, owner reports; dismissible per browser session.
 - OSGi configuration `org.jahia.community.securityupdates` (`enabled`, `refreshIntervalHours`,
-  `useForgeSettings`, `extraFeedUrls`, `defaultStoreUrl`).
+  `useForgeSettings`, `extraFeedUrls`, `defaultStoreUrl`, `bannerEnabled`, `bannerMinimumSeverity`,
+  `bannerIncludeOwnerReports`).

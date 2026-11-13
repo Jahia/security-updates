@@ -34,9 +34,26 @@ once every 30 seconds).
   unknown format, the page says "Security feed unavailable" (or that the list may be incomplete),
   never that the platform is up to date.
 
-Users with `adminTemplates` also get a small dismissible notice, anywhere in the Jahia UI, when Jahia
-advisories of high or critical severity apply. It is dismissed for the browser session (it comes back
-if the count changes) and is silently skipped on any error.
+## Banner
+
+Users with `adminTemplates` also get a small dismissible notice, on every page of the Jahia UI (the
+`/jahia/...` app shell), for example "Security updates of high severity or above concern this Jahia: 3.",
+with a link to the Security updates page.
+
+The server decides whether it is shown, from the current report and three settings (see
+[Configuration](#configuration)), and exposes the decision as `Query.securityUpdates.banner`:
+
+- `count` is the number of finding rows whose severity is at least `bannerMinimumSeverity` and whose
+  source is a Jahia advisory, or an owner report when `bannerIncludeOwnerReports=true`. A finding of
+  unknown severity is never counted.
+- `components` lists the component of each counted row, sorted (one entry per row).
+- `visible` is `bannerEnabled && count > 0`.
+
+A configuration change applies on the next query, without waiting for a check. The browser only renders
+the decision: it never filters findings itself. Dismissing the notice (button or Escape) hides it for
+the browser session; it comes back when the set of counted components changes. Any error (network,
+permission, unexpected answer) leaves the UI unchanged. Users without `adminTemplates` never get it:
+the banner query is not even sent for them.
 
 ## Data sources
 
@@ -119,6 +136,9 @@ or in the OSGi configuration UI (labels in English and French). The shipped file
 | `useForgeSettings` | `true` | Read the stores of the module manager (`/settings/forgesSettings`). |
 | `extraFeedUrls` | (empty) | Comma-separated full URLs of additional security feeds. |
 | `defaultStoreUrl` | `https://store.jahia.com` | Store used when no store is configured in the module manager. |
+| `bannerEnabled` | `true` | Show the notice in the Jahia UI (see [Banner](#banner)). The page is not affected. |
+| `bannerMinimumSeverity` | `HIGH` | Lowest severity the notice counts: `LOW`, `MEDIUM`, `HIGH` or `CRITICAL`. Any other value means `HIGH`, with one WARN in the log. |
+| `bannerIncludeOwnerReports` | `true` | Count owner-reported findings in the notice, not only Jahia advisories. |
 
 ## GraphQL API
 
@@ -142,6 +162,12 @@ query {
         advisories { id title url cves severity }
       }
     }
+  }
+}
+
+query {
+  securityUpdates {
+    banner { visible count minimumSeverity components }
   }
 }
 

@@ -28,7 +28,8 @@ fix security issues, from the Jahia Store security feed. Admin UI at
 | `feed.StoreUrls` | Absolute http(s), host, no user info / query / fragment |
 | `service.SecurityUpdateService` (DS, OCD) | Daemon-thread schedule, on-demand refresh (30 s rate limit), last-good data per store, status, WARN once per new finding |
 | `service.JahiaInstalledComponentsProvider` (DS) | Started modules from `JahiaTemplateManagerService.getTemplatePackageRegistry().getRegisteredModules()` |
-| `graphql.*` | One namespace: `Query.securityUpdates { report }`, `Mutation.securityUpdates { refresh }` |
+| `service.BannerPolicy` / `service.BannerSettings` | Pure banner decision from the current report and the `banner*` settings (invalid severity -> HIGH + one WARN) |
+| `graphql.*` | One namespace: `Query.securityUpdates { report banner }`, `Mutation.securityUpdates { refresh }` |
 
 DS packages are listed one by one in `_dsannotations` (class patterns, `<package>.*`): add a new
 package there if it gets a `@Component`, or no `OSGI-INF/*.xml` is generated for it.
@@ -43,7 +44,12 @@ update" only for `OK` with no finding.
 ## Frontend
 
 - `src/javascript/init.js`: `jahiaApp-init:60` callback loads the `security-updates` i18n namespace,
-  registers the admin route and shows the banner (`Banner/securityBanner.js`, plain DOM).
+  registers the admin route and shows the banner (`Banner/securityBanner.js`, plain DOM). The banner
+  checks `adminTemplates` (`jcr.nodeByPath("/").hasPermission`), then renders `securityUpdates.banner`
+  as decided by the server; it never filters findings itself. Selectors: `#security-updates-banner`
+  (`data-count`), `[data-sel-role="security-updates-banner-link"]`,
+  `[data-sel-role="security-updates-banner-dismiss"]`. Dismissal key: `components.join('|')` in
+  sessionStorage.
 - `src/javascript/SecurityUpdates/`: page (`SecurityUpdates.jsx`), GraphQL documents, pure helpers
   (`securityUpdatesUtils.js`).
 - Locales: `src/main/resources/javascript/locales/{en,fr}.json` (same keys, checked by a test).
@@ -65,8 +71,11 @@ use a global Yarn Berry: it rewrites the v1 `yarn.lock`.
 - Java unit tests: `src/test/java` (JUnit 5, AssertJ, Mockito 4); JaCoCo report in `target/site/jacoco`.
 - Jest: `src/javascript/**/__tests__`.
 - Cypress (Docker): `tests/` copied from `what-is-my-public-server-ip`; specs
-  `01-securityUpdates.cy.ts` (API, honest status, page) and `02-securityUpdates-Permissions.cy.ts`
-  (`adminTemplates` gate). `tests/.env.example` must be provided before running.
+  `01-securityUpdates.cy.ts` (API, honest status, page), `02-securityUpdates-Permissions.cy.ts`
+  (`adminTemplates` gate), `03-securityUpdates-Findings.cy.ts` and `04-securityUpdates-Banner.cy.ts`
+  (against the `storefixture` nginx service, files in `tests/storefixture/contents/`; settings switched
+  by the provisioning fixtures in `tests/cypress/fixtures/security-updates/`, each of which also points
+  the module at the fixture store). `tests/.env.example` must be provided before running.
 
 ## Gotchas
 
@@ -75,3 +84,5 @@ use a global Yarn Berry: it rewrites the v1 `yarn.lock`.
 - Store passwords come from JCR and must never be logged; transport errors are reported by exception
   type only.
 - `org.json` is imported with a wide range on purpose (bnd would pin the build-time version).
+- Metatype labels (`OSGI-INF/l10n/**.properties`) are read as ISO-8859-1: write accents as `\uXXXX`
+  (a test checks it).
