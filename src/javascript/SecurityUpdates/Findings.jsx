@@ -2,12 +2,14 @@ import {useState} from 'react';
 import PropTypes from 'prop-types';
 import {useTranslation} from 'react-i18next';
 import {RadioGroup, RadioItem, Typography} from '@jahia/moonstone';
+import {Trans} from 'react-i18next';
 import styles from './SecurityUpdates.scss';
-import {NS, THRESHOLD_SEVERITIES} from '../common/constants';
+import {JAHIA_UPGRADE_URL, NS, THRESHOLD_SEVERITIES} from '../common/constants';
 import {pluralKey, values} from '../common/i18n';
-import {filterFindings} from './securityUpdatesUtils';
+import {adminUrl, filterFindings} from './securityUpdatesUtils';
 import {countBySource, defaultFilter, severitySummary} from './reportView';
 import {FindingsTable} from './FindingsTable';
+import {ExternalLink} from './AdvisoryList';
 import {StatusMessage} from './StatusMessage';
 import {bannerShape, findingShape} from './propTypes';
 
@@ -64,7 +66,10 @@ export const Findings = ({findings, banner}) => {
     const onFilter = value => {
         setFilter(value);
         const {total} = severitySummary(filterFindings(findings, value));
-        setFilterStatus(t(`page.filter.showing.${pluralKey(total, i18n?.language)}`, values({n: total})));
+        // An empty view says why it is empty and what to do, as the page does, not only "0 components".
+        setFilterStatus(total === 0 ?
+            t('page.filteredEmpty') :
+            t(`page.filter.showing.${pluralKey(total, i18n?.language)}`, values({n: total})));
     };
 
     const shown = filterFindings(findings, filter);
@@ -96,7 +101,17 @@ export const Findings = ({findings, banner}) => {
             {shown.length > 0 ?
                 <FindingsTable findings={shown} labelledBy={TITLE_ID}/> :
                 <StatusMessage tone="info">{t('page.filteredEmpty')}</StatusMessage>}
-            <Typography className={styles.text}>{t('page.afterTable')}</Typography>
+            {/* The places it names are links, to the same targets as the rows' actions. */}
+            <Typography className={styles.text} data-testid="security-updates-after-table">
+                <Trans
+                    t={t}
+                    i18nKey="page.afterTable"
+                    components={{
+                        manage: <a className={styles.inlineLink} href={adminUrl('manageModules')}/>,
+                        upgrade: <ExternalLink href={JAHIA_UPGRADE_URL} className={styles.inlineLink}/>
+                    }}
+                />
+            </Typography>
         </div>
     );
 };

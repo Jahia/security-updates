@@ -135,3 +135,4 @@ export const RadioItem = ({id, label, value, ...rest}) => {
 
 export const Information = props => <svg data-testid="icon-information" {...mark('Information')} {...props}/>;
 export const Warning = props => <svg data-testid="icon-warning" {...mark('Warning')} {...props}/>;
+export const OpenInNew = ({size, ...props}) => <svg data-size={size} {...mark('OpenInNew')} {...props}/>;

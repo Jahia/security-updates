@@ -172,6 +172,47 @@ $focus-color: var(--color-accent_dark_contrast, #004781);
   display: block;
 }
 
+// A link inside a sentence: the sentence sets its size (WCAG 2.5.5 inline exception).
+.inlineLink {
+  text-decoration: underline;
+}
+
+// The visible "opens in a new tab" mark, after the link text.
+.newTabIcon {
+  flex-shrink: 0;
+  margin-left: 0.25em;
+  vertical-align: middle;
+}
+
+.glossary {
+  max-width: 80ch;
+}
+
+// The summary is a 44 by 44 pixel target, with the native disclosure marker.
+.glossarySummary {
+  display: list-item;
+  min-height: 2.75rem;
+  line-height: 2.75rem;
+  cursor: pointer;
+}
+
+.glossaryList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-small, 8px);
+  margin: 0 0 0 var(--spacing-medium, 16px);
+
+  dd {
+    margin: 0;
+  }
+}
+
+.glossaryEntry {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-nano, 4px);
+}
+
 .advisories {
   margin: 0;
   padding-left: var(--spacing-medium, 16px);

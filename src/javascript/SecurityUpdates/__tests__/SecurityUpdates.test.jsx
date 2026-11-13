@@ -8,7 +8,7 @@ import {CHANGED_EVENT, JAHIA_UPGRADE_URL, PAGE_EVENT} from '../../common/constan
 const mockSettingsForm = jest.fn(() => <section aria-label="settings"/>);
 jest.mock('../../Settings/SettingsForm', () => ({SettingsForm: props => mockSettingsForm(props)}));
 
-const advisory = (id, url, extra = {}) => ({id, title: `Title ${id}`, url, cves: ['CVE-2026-1234'], severity: 'HIGH', ...extra});
+const advisory = (id, url, extra = {}) => ({id, title: `Title ${id}`, url, cves: ['CVE-2026-1234'], severity: 'HIGH', storeHost: 'store.jahia.com', ...extra});
 
 const finding = (component, severity, source = 'ADVISORY', extra = {}) => ({
     component,
@@ -338,7 +338,29 @@ describe('SecurityUpdates page', () => {
             const docs = screen.getByRole('link', {name: /page\.action\.core/});
             expect(docs).toHaveAttribute('href', JAHIA_UPGRADE_URL);
             expect(docs).toHaveAttribute('target', '_blank');
-            expect(screen.getByText('page.afterTable')).toBeInTheDocument();
+        });
+
+        test('the closing sentence links the places it names, to the same targets as the rows', () => {
+            mockReport(report({findings: [finding('jcontent', 'HIGH')]}));
+            render(<SecurityUpdates/>);
+            const sentence = screen.getByTestId('security-updates-after-table');
+
+            expect(sentence).toHaveTextContent('page.afterTable');
+            expect(within(sentence).getByRole('link', {name: 'manage'})).toHaveAttribute('href', '/jahia/administration/manageModules');
+            const upgrade = within(sentence).getByRole('link', {name: /upgrade/});
+            expect(upgrade).toHaveAttribute('href', JAHIA_UPGRADE_URL);
+            expect(upgrade).toHaveAttribute('target', '_blank');
+            expect(upgrade).toHaveTextContent('page.newTab');
+        });
+
+        test('a link opening a new tab shows a visible, decorative icon, and says it in words to screen readers', () => {
+            mockReport(report({findings: [finding('m', 'HIGH')]}));
+            render(<SecurityUpdates/>);
+            const link = screen.getByRole('link', {name: /JSA-m-ADVISORY/});
+
+            const icon = link.querySelector('[data-moonstone="OpenInNew"]');
+            expect(icon).toHaveAttribute('aria-hidden', 'true');
+            expect(within(link).getByText('page.newTab')).toHaveClass('srOnly');
         });
 
         test('advisory links open in a new tab without opener; non-https links are plain text', () => {
@@ -367,6 +389,23 @@ describe('SecurityUpdates page', () => {
             render(<SecurityUpdates/>);
             expect(screen.getByRole('link', {name: /page\.cveLink \{id=CVE-2026-1234\}/}))
                 .toHaveAttribute('href', 'https://www.cve.org/CVERecord?id=CVE-2026-1234');
+        });
+
+        test('an advisory from another store than the Jahia Store says where it comes from, and where its link goes', () => {
+            mockReport(report({findings: [finding('m', 'HIGH', 'ADVISORY', {advisories: [
+                advisory('JSA-SAME', 'https://feed.example.com/jsa', {storeHost: 'feed.example.com'}),
+                advisory('JSA-OTHER', 'https://docs.example.org/jsa', {storeHost: 'feed.example.com', title: null}),
+                advisory('JSA-NOLINK', null, {storeHost: 'feed.example.com'}),
+                advisory('JSA-JAHIA', 'https://academy.jahia.com/jsa', {storeHost: 'STORE.jahia.com'}),
+                advisory('JSA-UNKNOWN', 'https://academy.jahia.com/jsa', {storeHost: null})
+            ]})]}));
+            render(<SecurityUpdates/>);
+
+            expect(screen.getByRole('link', {name: /JSA-SAME: Title JSA-SAME page\.advisoryFrom \{store=feed\.example\.com\}/})).toBeInTheDocument();
+            expect(screen.getByRole('link', {name: /page\.advisoryFallback \{id=JSA-OTHER\} page\.advisoryFromLink \{store=feed\.example\.com, host=docs\.example\.org\}/}))
+                .toHaveAttribute('href', 'https://docs.example.org/jsa');
+            expect(screen.getByText(/^JSA-NOLINK/)).toHaveTextContent('page.advisoryFrom {store=feed.example.com}');
+            expect(screen.getAllByTestId('security-updates-advisory-source')).toHaveLength(3);
         });
 
         test('an owner report reads as text, and its link names the host', () => {
@@ -432,6 +471,17 @@ describe('SecurityUpdates page', () => {
             expect(filterStatus).toHaveTextContent('page.filter.showing.other {n=2}');
         });
 
+        test('a filter that leaves nothing announces why, not only "0 components"', () => {
+            mockReport(report({findings: [finding('owner-module', 'CRITICAL', 'OWNER_REPORTED')]}));
+            render(<SecurityUpdates/>);
+            const filterStatus = screen.getByTestId('security-updates-filter-status');
+
+            fireEvent.click(screen.getByLabelText('page.filter.advisories {n=0}'));
+
+            expect(filterStatus).toHaveTextContent('page.filteredEmpty');
+            expect(filterStatus).not.toHaveTextContent('page.filter.showing');
+        });
+
         test('shows Jahia advisories only when there is no owner report', () => {
             mockReport(report({findings: [finding('advised', 'HIGH')]}));
             render(<SecurityUpdates/>);
@@ -443,6 +493,20 @@ describe('SecurityUpdates page', () => {
             mockReport(report({findings: [finding('owner-module', 'CRITICAL', 'OWNER_REPORTED')]}));
             render(<SecurityUpdates/>);
             expect(screen.getByText('page.filteredEmpty')).toBeInTheDocument();
+        });
+    });
+
+    test('explains its terms in plain language, in a closed native disclosure', () => {
+        mockReport(report());
+        render(<SecurityUpdates/>);
+        const glossary = screen.getByTestId('security-updates-glossary');
+
+        expect(glossary.tagName).toBe('DETAILS');
+        expect(glossary).not.toHaveAttribute('open');
+        expect(glossary.querySelector('summary')).toHaveTextContent('page.glossary.title');
+        ['advisory', 'cve', 'store', 'catalogue'].forEach(term => {
+            expect(within(glossary).getByText(`page.glossary.${term}.term`).tagName).toBe('DT');
+            expect(within(glossary).getByText(`page.glossary.${term}.definition`).tagName).toBe('DD');
         });
     });
 

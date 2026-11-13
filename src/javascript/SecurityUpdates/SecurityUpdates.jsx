@@ -11,6 +11,7 @@ import {values} from '../common/i18n';
 import {StatusMessage} from './StatusMessage';
 import {StoreErrors} from './StoreErrors';
 import {Findings} from './Findings';
+import {Glossary} from './Glossary';
 import {ReportDates, ReportStatus} from './ReportOverview';
 import {adminUrl, sortFindings} from './securityUpdatesUtils';
 import {chipColor, viewStatus} from './reportView';
@@ -123,6 +124,7 @@ export const SecurityUpdates = () => {
     const content = (
         <div className={styles.page}>
             <Typography className={styles.text}>{t('page.intro')}</Typography>
+            <Glossary/>
 
             {/* Always in the page, so that screen readers follow it from the start; empty until the page is mounted. */}
             <div role="status" aria-live="polite" aria-atomic="true" className={styles.announcement} data-testid="security-updates-status">

@@ -4,7 +4,8 @@ export const advisoryShape = PropTypes.shape({
     id: PropTypes.string.isRequired,
     title: PropTypes.string,
     url: PropTypes.string,
-    cves: PropTypes.arrayOf(PropTypes.string)
+    cves: PropTypes.arrayOf(PropTypes.string),
+    storeHost: PropTypes.string
 });
 
 export const findingShape = PropTypes.shape({

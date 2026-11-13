@@ -3,6 +3,25 @@
   "page": {
     "documentTitle": "{{title}} – Jahia administration",
     "intro": "This page lists the installed components (Jahia and its modules) that have an update fixing a security problem, from the security data that the stores publish.",
+    "glossary": {
+      "title": "What these terms mean",
+      "advisory": {
+        "term": "Advisory",
+        "definition": "A message published about a security problem in Jahia or in a module. It says which versions have the problem and which version fixes it."
+      },
+      "cve": {
+        "term": "CVE",
+        "definition": "A public number given to a known security problem, such as CVE-2026-1234. Its link opens the record of the problem on cve.org."
+      },
+      "store": {
+        "term": "Store",
+        "definition": "A server that offers Jahia modules and publishes their security data, such as the Jahia Store (store.jahia.com). The stores checked come from Manage modules and from the settings below."
+      },
+      "catalogue": {
+        "term": "Module list (catalogue)",
+        "definition": "The list of the modules and versions that a store offers. This page uses it to tell whether an update works with your Jahia version."
+      }
+    },
     "loading": "Loading the security report…",
     "error": "The security report could not be loaded. Reload the page to try again.",
     "updateError": "The security report could not be updated: the last report loaded is shown. Reload the page to try again.",
@@ -39,10 +58,12 @@
     "newTab": "(opens in a new tab)",
     "requires": "Minimum Jahia: {{version}}",
     "advisoryFallback": "Advisory {{id}}",
+    "advisoryFrom": "(from {{store}})",
+    "advisoryFromLink": "(from {{store}}, link to {{host}})",
     "ownerReport": "Report by the module owner",
     "ownerLink": "Owner report on {{host}}",
     "cveLink": "{{id}} on cve.org",
-    "afterTable": "To update a module, open Manage modules and install the recommended version. To update Jahia itself, follow the Jahia upgrade documentation.",
+    "afterTable": "To update a module, open <manage>Manage modules</manage> and install the recommended version. To update Jahia itself, follow the <upgrade>Jahia upgrade documentation</upgrade>.",
     "action": {
       "module": "Update {{component}} in Manage modules",
       "core": "Jahia upgrade documentation"

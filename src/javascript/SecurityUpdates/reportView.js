@@ -8,8 +8,11 @@ export const isNotPublishedOnly = errors => (errors || []).length > 0 && errors.
 
 const JAHIA_STORE_HOST = 'store.jahia.com';
 
+/** Whether a host name is the Jahia Store's (an advisory's storeHost). */
+export const isJahiaStoreHost = host => (host || '').toLowerCase() === JAHIA_STORE_HOST;
+
 // Same rule as StoreUrls.isJahiaStore: the host of the address is the Jahia Store's.
-const isJahiaStore = url => (hostOf(url) || '').toLowerCase() === JAHIA_STORE_HOST;
+const isJahiaStore = url => isJahiaStoreHost(hostOf(url));
 
 /**
  * What the report means, as a statusLabel key: DISABLED, NOT_CHECKED, UPDATES_NEEDED (findings, even from a partial
@@ -121,8 +124,9 @@ export const countBySource = findings => ({
 const FILTERS = ['advisories', 'all'];
 
 /**
- * The first filter: from the address (?filter=all, used by the banner link), else "all" when module owners report
- * something (the banner counts those reports by default), else Jahia advisories only.
+ * The first filter: from the address (?filter=all or ?filter=advisories, for a link to a given view; the banner link
+ * has no query), else "all" when module owners report something (the banner counts those reports by default), else
+ * Jahia advisories only.
  */
 export const defaultFilter = (findings, search) => {
     let requested = null;

@@ -30,6 +30,7 @@ const REPORT_FIELDS = gql`
                 url
                 cves
                 severity
+                storeHost
             }
         }
     }

@@ -45,6 +45,21 @@ describe('locales', () => {
         prefixes.forEach(prefix => expect([prefix, typeof get(en, prefix)]).toEqual([prefix, 'object']));
     });
 
+    test('en and fr use the same component tags (react-i18next Trans) in every text', () => {
+        const tags = text => [...String(text).matchAll(/<\/?(\w+)>/g)].map(match => match[0]).sort();
+        keys(en).forEach(key => {
+            expect([key, tags(get(fr, key))]).toEqual([key, tags(get(en, key))]);
+        });
+        expect(tags(en.page.afterTable)).toEqual(['</manage>', '</upgrade>', '<manage>', '<upgrade>']);
+    });
+
+    test('the glossary explains each term of the page in both languages', () => {
+        ['advisory', 'cve', 'store', 'catalogue'].forEach(term => [en, fr].forEach(locale => {
+            expect(locale.page.glossary[term].term).toBeTruthy();
+            expect(locale.page.glossary[term].definition).toBeTruthy();
+        }));
+    });
+
     test('texts use the typographic apostrophe in French', () => {
         keys(fr).forEach(key => expect([key, get(fr, key).includes('\'')]).toEqual([key, false]));
     });
