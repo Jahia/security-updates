@@ -12,19 +12,31 @@ import org.jahia.community.securityupdates.service.SettingsKeys;
 import java.util.Map;
 
 /**
- * GraphQL view of the module settings: one field per configuration key, from validated values.
+ * GraphQL view of the module settings: one field per configuration key, as stored, and whether the current user may
+ * change them.
  */
 @GraphQLName("SecurityUpdatesSettings")
 @GraphQLDescription("Settings of the security updates module (configuration org.jahia.community.securityupdates)")
 public class GqlSettings {
 
     private final Map<String, String> values;
+    private final boolean canEdit;
 
     /**
-     * @param values every key of {@link SettingsKeys#ALL}, validated
+     * @param values  every key of {@link SettingsKeys#ALL}, in their normalised stored form
+     * @param canEdit whether the current user may change the settings
      */
-    public GqlSettings(Map<String, String> values) {
+    public GqlSettings(Map<String, String> values, boolean canEdit) {
         this.values = Map.copyOf(values);
+        this.canEdit = canEdit;
+    }
+
+    @GraphQLField
+    @GraphQLName("canEdit")
+    @GraphQLNonNull
+    @GraphQLDescription("True when the current user may change the settings (permission admin, held by server administrators)")
+    public boolean isCanEdit() {
+        return canEdit;
     }
 
     private boolean bool(String key) {
@@ -63,7 +75,7 @@ public class GqlSettings {
     @GraphQLField
     @GraphQLName("extraFeedUrls")
     @GraphQLNonNull
-    @GraphQLDescription("Comma-separated URLs of additional security feeds")
+    @GraphQLDescription("URLs of additional security feeds, separated by commas")
     public String getExtraFeedUrls() {
         return values.get(SettingsKeys.EXTRA_FEED_URLS);
     }

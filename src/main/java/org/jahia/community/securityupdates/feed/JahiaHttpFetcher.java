@@ -20,7 +20,11 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * {@link HttpFetcher} over Jahia's {@link HttpClientService}, so that Jahia's proxy settings and its outbound
- * request screening ({@code SsrfProtectionDnsResolver}, Jahia 8.2.3.7 and later) apply. The status code is kept
+ * request screening ({@code SsrfProtectionDnsResolver}, Jahia 8.2.3.7 and later) apply. Every request goes through
+ * the screened client of {@link HttpClientService#getHttpClient(String)}: its DNS resolver refuses internal
+ * addresses when the connection is opened, which also covers DNS rebinding. This class never uses an unscreened
+ * client ({@code getHttpClientForConfiguredTarget}): the URLs come from settings an {@code adminTemplates} user
+ * can change. The status code is kept
  * for every response, which {@code HttpClientService.executeGet} does not do. Redirects are not followed and
  * every request is bounded in time and size.
  *

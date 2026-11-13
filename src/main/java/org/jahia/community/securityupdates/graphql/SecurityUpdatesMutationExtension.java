@@ -19,7 +19,7 @@ public final class SecurityUpdatesMutationExtension {
 
     @GraphQLField
     @GraphQLName("securityUpdates")
-    @GraphQLDescription("Security updates mutations (requires adminTemplates)")
+    @GraphQLDescription("Security updates mutations (requires adminTemplates; changing the settings requires admin)")
     @GraphQLRequiresPermission(Permissions.ADMIN_TEMPLATES)
     public static SecurityUpdatesMutation securityUpdates() {
         return new SecurityUpdatesMutation();

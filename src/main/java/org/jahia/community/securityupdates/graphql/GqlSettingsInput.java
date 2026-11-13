@@ -36,8 +36,8 @@ public class GqlSettingsInput {
             @GraphQLName("enabled") @GraphQLNonNull @GraphQLDescription("Whether the stores are checked") Boolean enabled,
             @GraphQLName("refreshIntervalHours") @GraphQLNonNull @GraphQLDescription("Hours between two scheduled checks, 1 to 720") Integer refreshIntervalHours,
             @GraphQLName("useForgeSettings") @GraphQLNonNull @GraphQLDescription("Whether the stores of the module manager are checked") Boolean useForgeSettings,
-            @GraphQLName("defaultStoreUrl") @GraphQLNonNull @GraphQLDescription("Absolute http(s) URL of the default store, or empty") String defaultStoreUrl,
-            @GraphQLName("extraFeedUrls") @GraphQLNonNull @GraphQLDescription("Comma-separated absolute http(s) URLs of additional security feeds") String extraFeedUrls,
+            @GraphQLName("defaultStoreUrl") @GraphQLNonNull @GraphQLDescription("Absolute https URL of the default store, or empty") String defaultStoreUrl,
+            @GraphQLName("extraFeedUrls") @GraphQLNonNull @GraphQLDescription("Up to 10 absolute https URLs of additional security feeds, separated by commas or spaces") String extraFeedUrls,
             @GraphQLName("bannerEnabled") @GraphQLNonNull @GraphQLDescription("Whether the notice is shown in the Jahia UI") Boolean bannerEnabled,
             @GraphQLName("bannerMinimumSeverity") @GraphQLNonNull @GraphQLDescription("LOW, MEDIUM, HIGH or CRITICAL") String bannerMinimumSeverity,
             @GraphQLName("bannerIncludeOwnerReports") @GraphQLNonNull @GraphQLDescription("Whether owner-reported findings count in the notice") Boolean bannerIncludeOwnerReports,
@@ -110,7 +110,7 @@ public class GqlSettingsInput {
     @GraphQLField
     @GraphQLName("defaultStoreUrl")
     @GraphQLNonNull
-    @GraphQLDescription("Absolute http(s) URL of the default store, or empty")
+    @GraphQLDescription("Absolute https URL of the default store, or empty")
     public String getDefaultStoreUrl() {
         return defaultStoreUrl;
     }
@@ -118,7 +118,7 @@ public class GqlSettingsInput {
     @GraphQLField
     @GraphQLName("extraFeedUrls")
     @GraphQLNonNull
-    @GraphQLDescription("Comma-separated absolute http(s) URLs of additional security feeds")
+    @GraphQLDescription("Up to 10 absolute https URLs of additional security feeds, separated by commas or spaces")
     public String getExtraFeedUrls() {
         return extraFeedUrls;
     }

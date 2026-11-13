@@ -116,6 +116,17 @@ class JahiaHttpFetcherTest {
     }
 
     @Test
+    @DisplayName("always takes the screened client of the URL (SSRF screening at connect time), never an unscreened one")
+    void usesTheScreenedClientOnly() throws IOException {
+        fetcher.get(base + "/ok", Map.of(), 1000);
+        fetcher.get(base + "/unavailable", Map.of(), 1000);
+
+        verify(httpClientService).getHttpClient(base + "/ok");
+        verify(httpClientService).getHttpClient(base + "/unavailable");
+        verify(httpClientService, org.mockito.Mockito.never()).getHttpClientForConfiguredTarget(anyString());
+    }
+
+    @Test
     @DisplayName("refuses a body declared larger than the limit")
     void declaredTooLarge() {
         assertThatThrownBy(() -> fetcher.get(base + "/big", Map.of(), 1000)).isInstanceOf(ResponseTooLargeException.class);

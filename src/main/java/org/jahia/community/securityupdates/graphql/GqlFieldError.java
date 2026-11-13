@@ -32,8 +32,8 @@ public class GqlFieldError {
     @GraphQLField
     @GraphQLName("code")
     @GraphQLNonNull
-    @GraphQLDescription("MISSING, INVALID_BOOLEAN, INVALID_NUMBER, OUT_OF_RANGE, INVALID_URL, INVALID_VALUE, INVALID_COLOR, "
-            + "LOW_CONTRAST or WRITE_FAILED")
+    @GraphQLDescription("MISSING, INVALID_BOOLEAN, INVALID_NUMBER, OUT_OF_RANGE, INVALID_URL, NOT_HTTPS, TOO_MANY, "
+            + "INVALID_VALUE, INVALID_COLOR, LOW_CONTRAST or WRITE_FAILED")
     public String getCode() {
         return error.getCode();
     }

@@ -50,8 +50,8 @@ public class GqlSettingsResult {
 
     @GraphQLField
     @GraphQLName("settings")
-    @GraphQLDescription("The saved settings, normalised; null when nothing was saved")
+    @GraphQLDescription("The saved settings, normalised (use them as the new form values); null when nothing was saved")
     public GqlSettings getSettings() {
-        return saved == null ? null : new GqlSettings(saved);
+        return saved == null ? null : new GqlSettings(saved, true);
     }
 }

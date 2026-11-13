@@ -11,7 +11,9 @@ import org.jahia.community.securityupdates.model.ReportStatus;
 import org.jahia.community.securityupdates.model.SecurityReport;
 import org.jahia.community.securityupdates.model.Severity;
 import org.jahia.community.securityupdates.model.StoreError;
+import org.jahia.community.securityupdates.model.StoreErrorDetail;
 import org.jahia.community.securityupdates.model.StoreErrorKind;
+import org.jahia.community.securityupdates.model.ReportView;
 import org.jahia.community.securityupdates.service.SecurityUpdateService;
 import org.jahia.modules.graphql.provider.dxm.DXGraphQLProvider;
 import org.jahia.modules.graphql.provider.dxm.security.GraphQLRequiresPermission;
@@ -139,6 +141,29 @@ class SecurityUpdatesGraphQLTest {
 
         verify(service).refresh();
         assertThat(gql.getFindings()).hasSize(1);
+        assertThat(gql.isInProgress()).isTrue();
+    }
+
+    @Test
+    @DisplayName("the report exposes inProgress, nextCheckAt, stale and the error details")
+    void reportState() {
+        SecurityUpdateService service = mock(SecurityUpdateService.class);
+        SecurityReport base = new SecurityReport(ReportStatus.PARTIAL, CHECKED, SUCCESS, "8.2.2.1", List.of(
+                new StoreError("https://store.example.org", StoreErrorKind.INVALID_URL, StoreErrorDetail.NOT_HTTPS, "Plain http"),
+                new StoreError(null, StoreErrorKind.STALE, "old")), List.of());
+        when(service.getReportView()).thenReturn(new ReportView(base, false, CHECKED.plusSeconds(3600), true));
+        ServiceLocator.override(() -> service);
+
+        GqlSecurityReport gql = new SecurityUpdatesQuery().getReport();
+
+        assertThat(gql.isInProgress()).isFalse();
+        assertThat(gql.getNextCheckAt()).isEqualTo("2026-11-13T11:00:00Z");
+        assertThat(gql.isStale()).isTrue();
+        assertThat(gql.getErrors()).extracting(GqlSecurityReport.GqlStoreError::getKind, GqlSecurityReport.GqlStoreError::getDetail)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(StoreErrorKind.INVALID_URL, StoreErrorDetail.NOT_HTTPS),
+                        org.assertj.core.groups.Tuple.tuple(StoreErrorKind.STALE, null));
+        assertThat(GqlSecurityReport.serviceUnavailable().getNextCheckAt()).isNull();
+        assertThat(GqlSecurityReport.serviceUnavailable().isInProgress()).isFalse();
     }
 
     @Test

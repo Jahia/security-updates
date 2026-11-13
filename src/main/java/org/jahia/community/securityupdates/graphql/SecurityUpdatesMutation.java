@@ -5,7 +5,6 @@ import graphql.annotations.annotationTypes.GraphQLField;
 import graphql.annotations.annotationTypes.GraphQLName;
 import graphql.annotations.annotationTypes.GraphQLNonNull;
 import org.jahia.community.securityupdates.service.FieldError;
-import org.jahia.community.securityupdates.service.SecurityUpdateService;
 import org.jahia.community.securityupdates.service.Settings;
 import org.jahia.community.securityupdates.service.SettingsStore;
 import org.jahia.community.securityupdates.service.SettingsValidator;
@@ -19,7 +18,8 @@ import java.util.Collections;
 import java.util.Map;
 
 /**
- * Mutation namespace of the module.
+ * Mutation namespace of the module. Running a check needs {@code adminTemplates}; changing the settings needs
+ * {@code admin} (server administrators).
  */
 @GraphQLName("SecurityUpdatesMutation")
 @GraphQLDescription("Security updates mutations")
@@ -35,16 +35,16 @@ public class SecurityUpdatesMutation {
             + "until inProgress is false")
     @GraphQLRequiresPermission(Permissions.ADMIN_TEMPLATES)
     public GqlSecurityReport refresh() {
-        SecurityUpdateService service = ServiceLocator.service();
-        return service == null ? GqlSecurityReport.serviceUnavailable() : new GqlSecurityReport(service.refresh());
+        return ServiceLocator.withService(service -> new GqlSecurityReport(service.refresh()),
+                GqlSecurityReport::serviceUnavailable);
     }
 
     @GraphQLField
     @GraphQLName("updateSettings")
     @GraphQLNonNull
-    @GraphQLDescription("Validates and saves every setting at once; an invalid input is refused with per-field errors and "
-            + "nothing is saved")
-    @GraphQLRequiresPermission(Permissions.ADMIN_TEMPLATES)
+    @GraphQLDescription("Validates and saves every setting at once (requires admin); an invalid input is refused with "
+            + "per-field errors and nothing is saved")
+    @GraphQLRequiresPermission(Permissions.ADMIN)
     public GqlSettingsResult updateSettings(@GraphQLName("input") @GraphQLNonNull GqlSettingsInput input) {
         ValidationResult result = SettingsValidator.validate(input.toValues());
         if (!result.isValid()) {
@@ -56,8 +56,8 @@ public class SecurityUpdatesMutation {
     @GraphQLField
     @GraphQLName("resetSettings")
     @GraphQLNonNull
-    @GraphQLDescription("Saves the default value of every setting")
-    @GraphQLRequiresPermission(Permissions.ADMIN_TEMPLATES)
+    @GraphQLDescription("Saves the default value of every setting (requires admin)")
+    @GraphQLRequiresPermission(Permissions.ADMIN)
     public GqlSettingsResult resetSettings() {
         return save(Settings.defaults().toValues());
     }

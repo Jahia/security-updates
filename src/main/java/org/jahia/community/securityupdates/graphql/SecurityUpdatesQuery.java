@@ -6,9 +6,14 @@ import graphql.annotations.annotationTypes.GraphQLName;
 import graphql.annotations.annotationTypes.GraphQLNonNull;
 import org.jahia.community.securityupdates.model.BannerDecision;
 import org.jahia.community.securityupdates.service.SecurityUpdateService;
-import org.jahia.community.securityupdates.service.Settings;
+import org.jahia.community.securityupdates.service.SettingsStore;
+import org.jahia.modules.graphql.provider.dxm.DataFetchingException;
 import org.jahia.modules.graphql.provider.dxm.security.GraphQLRequiresPermission;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.util.Map;
 
 /**
  * Query namespace of the module.
@@ -17,36 +22,45 @@ import org.jahia.modules.graphql.provider.dxm.security.GraphQLRequiresPermission
 @GraphQLDescription("Security updates queries")
 public class SecurityUpdatesQuery {
 
+    private static final Logger logger = LoggerFactory.getLogger(SecurityUpdatesQuery.class);
+
     @GraphQLField
     @GraphQLName("report")
     @GraphQLNonNull
-    @GraphQLDescription("The latest security report (built by the scheduled check; see the refresh mutation)")
+    @GraphQLDescription("The latest security report of this Jahia node (built by the scheduled check; see the refresh mutation)")
     @GraphQLRequiresPermission(Permissions.ADMIN_TEMPLATES)
     public GqlSecurityReport getReport() {
-        SecurityUpdateService service = ServiceLocator.service();
-        return service == null ? GqlSecurityReport.serviceUnavailable() : new GqlSecurityReport(service.getReportView());
+        return ServiceLocator.withService(service -> new GqlSecurityReport(service.getReportView()),
+                GqlSecurityReport::serviceUnavailable);
     }
 
     @GraphQLField
     @GraphQLName("banner")
     @GraphQLNonNull
-    @GraphQLDescription("Whether the notice is shown in the Jahia UI, decided from the current report and settings")
+    @GraphQLDescription("Whether the banner is shown in the Jahia UI, decided from the current report and settings")
     @GraphQLRequiresPermission(Permissions.ADMIN_TEMPLATES)
     public GqlBanner getBanner() {
-        SecurityUpdateService service = ServiceLocator.service();
-        return new GqlBanner(service == null
-                ? BannerDecision.hidden()
-                : service.getBanner(), ServiceLocator.username());
+        return new GqlBanner(ServiceLocator.withService(SecurityUpdateService::getBanner, BannerDecision::hidden),
+                ServiceLocator.username());
     }
 
     @GraphQLField
     @GraphQLName("settings")
     @GraphQLNonNull
-    @GraphQLDescription("The settings in effect")
+    @GraphQLDescription("The stored settings (a change just saved included), and whether the current user may change them")
     @GraphQLRequiresPermission(Permissions.ADMIN_TEMPLATES)
     public GqlSettings getSettings() {
-        SecurityUpdateService service = ServiceLocator.service();
-        Settings settings = service == null ? Settings.defaults() : service.getSettings();
-        return new GqlSettings(settings.toValues());
+        SettingsStore store = ServiceLocator.store();
+        if (store == null) {
+            throw new DataFetchingException("The security updates settings are not available");
+        }
+        Map<String, String> values;
+        try {
+            values = store.load();
+        } catch (IOException e) {
+            logger.error("Could not read the security updates settings", e);
+            throw new DataFetchingException("The security updates settings could not be read; see the Jahia log");
+        }
+        return new GqlSettings(values, ServiceLocator.canEditSettings());
     }
 }
