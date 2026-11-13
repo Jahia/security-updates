@@ -208,6 +208,38 @@ class SecurityUpdatesGraphQLTest {
         assertPermission(extension.getMethod("securityUpdates"));
     }
 
+    @Test
+    @DisplayName("every field of the module's Query and Mutation types requires a permission")
+    void everyFieldRequiresAPermission() {
+        for (Class<?> type : List.of(SecurityUpdatesQuery.class, SecurityUpdatesMutation.class,
+                SecurityUpdatesQueryExtension.class, SecurityUpdatesMutationExtension.class)) {
+            List<Method> fields = java.util.Arrays.stream(type.getDeclaredMethods())
+                    .filter(m -> m.isAnnotationPresent(graphql.annotations.annotationTypes.GraphQLField.class))
+                    .collect(java.util.stream.Collectors.toList());
+            assertThat(fields).as(type.getSimpleName()).isNotEmpty();
+            assertThat(fields).as(type.getSimpleName())
+                    .allSatisfy(m -> assertThat(m.getAnnotation(GraphQLRequiresPermission.class)).as(m.getName()).isNotNull());
+        }
+    }
+
+    @Test
+    @DisplayName("canEdit is false, never an error, when the session or the permission check fails")
+    void canEditFailsClosed() throws Exception {
+        org.jahia.services.content.JCRNodeWrapper failing = mock(org.jahia.services.content.JCRNodeWrapper.class);
+        when(failing.hasPermission(Permissions.ADMIN)).thenThrow(new IllegalStateException("no session"));
+        org.jahia.services.content.JCRNodeWrapper admin = mock(org.jahia.services.content.JCRNodeWrapper.class);
+        when(admin.hasPermission(Permissions.ADMIN)).thenReturn(true);
+
+        assertThat(ServiceLocator.holdsAdmin(() -> {
+            throw new javax.jcr.RepositoryException("no session");
+        })).isFalse();
+        assertThat(ServiceLocator.holdsAdmin(() -> {
+            throw new IllegalStateException("no request");
+        })).isFalse();
+        assertThat(ServiceLocator.holdsAdmin(() -> failing)).isFalse();
+        assertThat(ServiceLocator.holdsAdmin(() -> admin)).isTrue();
+    }
+
     private static void assertPermission(Method method) {
         assertThat(method.getAnnotation(GraphQLRequiresPermission.class)).isNotNull();
         assertThat(method.getAnnotation(GraphQLRequiresPermission.class).value()).isEqualTo("adminTemplates");

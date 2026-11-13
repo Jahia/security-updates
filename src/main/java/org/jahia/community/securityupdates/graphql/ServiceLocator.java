@@ -3,6 +3,7 @@ package org.jahia.community.securityupdates.graphql;
 import org.jahia.community.securityupdates.service.SecurityUpdateService;
 import org.jahia.community.securityupdates.service.SettingsStore;
 import org.jahia.osgi.BundleUtils;
+import org.jahia.services.content.JCRNodeWrapper;
 import org.jahia.services.content.JCRSessionFactory;
 import org.jahia.services.usermanager.JahiaUser;
 import org.slf4j.Logger;
@@ -31,14 +32,8 @@ final class ServiceLocator {
         return user == null ? null : user.getUsername();
     };
     /** Whether the user of the current request holds the permission that changes the settings, on the root node. */
-    private static final BooleanSupplier JAHIA_CAN_EDIT = () -> {
-        try {
-            return JCRSessionFactory.getInstance().getCurrentUserSession().getNode("/").hasPermission(Permissions.ADMIN);
-        } catch (RepositoryException | RuntimeException e) {
-            logger.debug("Could not check the settings permission", e);
-            return false;
-        }
-    };
+    private static final BooleanSupplier JAHIA_CAN_EDIT =
+            () -> holdsAdmin(() -> JCRSessionFactory.getInstance().getCurrentUserSession().getNode("/"));
 
     private static final AtomicReference<Supplier<SecurityUpdateService>> SERVICE = new AtomicReference<>(OSGI);
     private static final AtomicReference<Supplier<SettingsStore>> STORE = new AtomicReference<>(OSGI_STORE);
@@ -95,6 +90,25 @@ final class ServiceLocator {
     /** Test seam. */
     static void overrideCanEdit(BooleanSupplier testSupplier) {
         CAN_EDIT.set(testSupplier);
+    }
+
+    /** The root node of the current user's session. */
+    @FunctionalInterface
+    interface RootNode {
+        JCRNodeWrapper get() throws RepositoryException;
+    }
+
+    /**
+     * @return true when the user holds {@code admin} on the root node; false when that cannot be checked (no
+     * session, a repository failure): the settings then show read-only, and the mutations check again
+     */
+    static boolean holdsAdmin(RootNode root) {
+        try {
+            return root.get().hasPermission(Permissions.ADMIN);
+        } catch (RepositoryException | RuntimeException e) {
+            logger.debug("Could not check the settings permission", e);
+            return false;
+        }
     }
 
     static void reset() {
