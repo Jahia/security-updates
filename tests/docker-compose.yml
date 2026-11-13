@@ -9,11 +9,23 @@ services:
             - SUPER_USER_PASSWORD=${SUPER_USER_PASSWORD}
             - JAHIA_LICENSE=${JAHIA_LICENSE}
             - JPDA=true
+            # Jahia's HTTP client refuses internal addresses (SSRF guard). Allow the fixture store of spec 03,
+            # which a customer does the same way for a private store: jahia.httpClient.allowedInternalHosts.
+            - jahia_cfg_jahia_httpClient_allowedInternalHosts=storefixture
         extra_hosts:
             - jahia:127.0.0.1
         networks:
             - stack
     # Cypress container
+    # A store that serves fixed moduleList.json and securityUpdates.json (spec 03), so that the findings
+    # do not depend on what store.jahia.com publishes, nor on internet access from the test network.
+    storefixture:
+        image: 'nginx:1.27.5-alpine'
+        container_name: storefixture
+        volumes:
+            - ./storefixture:/usr/share/nginx/html:ro
+        networks:
+            - stack
     cypress:
         image: '${TESTS_IMAGE}'
         # https://github.com/cypress-io/cypress/issues/350
@@ -21,6 +33,7 @@ services:
         container_name: cypress
         depends_on:
             - jahia
+            - storefixture
         environment:
             - MANIFEST=${MANIFEST}
             - SUPER_USER_PASSWORD=${SUPER_USER_PASSWORD}

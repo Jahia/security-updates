@@ -83,10 +83,15 @@ describe('Security updates', () => {
         })
     })
 
-    it('the Check now button runs a check and announces it', () => {
+    it('the Check now button runs a check and announces it, then announces the rate limit', () => {
+        // before() ran a check: on-demand checks are limited to one per 30 seconds.
+        // eslint-disable-next-line cypress/no-unnecessary-waiting
+        cy.wait(31000)
         cy.login()
         cy.visit(ADMIN_PATH)
         cy.contains('button', 'Check now').click()
         cy.get('[role="status"]').should('contain', 'Check completed')
+        cy.contains('button', 'Check now').should('not.be.disabled').click()
+        cy.get('[role="status"]').should('contain', 'the report is unchanged')
     })
 })

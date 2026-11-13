@@ -178,8 +178,10 @@ only when they start with `https://`.
 - Owner-flagged versions are declared by module developers and not reviewed by Jahia.
 - **Check now** (the `refresh` mutation) runs the check in the GraphQL request: with several slow or
   unreachable stores it can take minutes (each request is bounded by the timeouts above).
-- On Jahia versions whose `HttpClientService` screens outbound requests against internal addresses,
-  a store on a private network is subject to that screening.
+- Jahia's HTTP client refuses hosts that resolve to an internal address (loopback, private networks),
+  and the report then shows the store as unavailable (`SsrfBlockedException`). For a store on a private
+  network, add its host name to `jahia.httpClient.allowedInternalHosts` in `jahia.properties` (or the
+  `jahia_cfg_jahia_httpClient_allowedInternalHosts` environment variable in Docker).
 
 ## Build
 
