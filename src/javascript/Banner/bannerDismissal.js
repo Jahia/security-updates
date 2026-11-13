@@ -1,68 +1,119 @@
-// How long a dismissed notice stays hidden (setting bannerDismissPolicy). Pure: the storages and the clock are
-// passed in. Any storage problem fails open: the notice is shown.
+// How long a hidden banner stays hidden (setting bannerDismissPolicy). Pure: the storages, the clock and the user key
+// are passed in. Any storage problem fails open: the banner is shown.
 //
-// - SESSION:      sessionStorage[SESSION_KEY] = components key
-// - HOURS:        localStorage[localKey(user)] = {"key": components key, "at": epoch ms}; hidden for `hours` hours
-// - UNTIL_CHANGE: localStorage[localKey(user)] = {"key": components key, "at": epoch ms}
+// The identity of what was hidden is the set of dismissal keys sent by the server (one "<component>|<advisory>" per
+// counted finding): the banner comes back as soon as a key is not in the stored set (a new advisory, even for a
+// component already listed, or a new component), and stays hidden when keys only disappear (a fix).
+//
+// - SESSION:      sessionStorage[SESSION_KEY] = JSON array of keys (sessionStorage is per browser tab)
+// - HOURS:        localStorage[localKey(userKey)] = {"keys": [...], "at": epoch ms}; hidden for `hours` hours
+// - UNTIL_CHANGE: localStorage[localKey(userKey)] = {"keys": [...], "at": epoch ms}
 // - NEVER:        never hidden, nothing stored
-// Except with NEVER, the notice comes back as soon as the components key changes.
+// The user key is a hash of the user name, so that the browser storage does not keep user names in clear.
 
 export const SESSION_KEY = 'security-updates-banner-dismissed';
 
 const HOUR_MS = 3600 * 1000;
 
-export const localKey = username => `${SESSION_KEY}:${username || ''}`;
+export const localKey = userKey => `${SESSION_KEY}:${userKey || ''}`;
 
-const readLocal = (local, username) => {
-    const raw = local.getItem(localKey(username));
-    if (!raw) {
-        return null;
+const isKeyList = value => Array.isArray(value) && value.every(key => typeof key === 'string');
+
+const readSession = session => {
+    const keys = JSON.parse(session.getItem(SESSION_KEY));
+    return isKeyList(keys) ? {keys} : null;
+};
+
+const readLocal = (local, userKey) => {
+    const record = JSON.parse(local.getItem(localKey(userKey)));
+    const isValid = record && typeof record === 'object' && isKeyList(record.keys) && typeof record.at === 'number';
+    return isValid ? record : null;
+};
+
+const read = ({policy, userKey, session, local}) => {
+    if (policy === 'SESSION') {
+        return session ? readSession(session) : null;
     }
 
-    const record = JSON.parse(raw);
-    const valid = record && typeof record === 'object' && typeof record.key === 'string' && typeof record.at === 'number';
-    return valid ? record : null;
+    if (policy === 'HOURS' || policy === 'UNTIL_CHANGE') {
+        return local ? readLocal(local, userKey) : null;
+    }
+
+    return null;
 };
 
 /**
- * @param {{policy: string, hours: number, key: string, username: string, now: number, session: Storage, local: Storage}} ctx
- * @returns {boolean} true when the notice was dismissed for these components and the dismissal still holds
+ * @param {{policy: string, hours: number, keys: string[], userKey: string, now: number, session: Storage, local: Storage}} ctx
+ * @returns {boolean} true when every current key was hidden and the dismissal still holds
  */
-export const isDismissed = ({policy, hours, key, username, now, session, local}) => {
+export const isDismissed = ctx => {
     try {
-        if (policy === 'SESSION') {
-            return Boolean(session) && session.getItem(SESSION_KEY) === key;
-        }
-
-        if (policy !== 'HOURS' && policy !== 'UNTIL_CHANGE') {
+        const record = read(ctx);
+        if (!record || !isKeyList(ctx.keys) || ctx.keys.length === 0) {
             return false;
         }
 
-        const record = local ? readLocal(local, username) : null;
-        if (!record || record.key !== key) {
+        const stored = new Set(record.keys);
+        if (!ctx.keys.every(key => stored.has(key))) {
             return false;
         }
 
-        if (policy === 'UNTIL_CHANGE') {
+        if (ctx.policy !== 'HOURS') {
             return true;
         }
 
-        const elapsed = now - record.at;
-        return elapsed >= 0 && elapsed < hours * HOUR_MS;
+        const elapsed = ctx.now - record.at;
+        return elapsed >= 0 && elapsed < ctx.hours * HOUR_MS;
     } catch {
         return false;
     }
 };
 
-/** Records a dismissal for the policy; a storage failure is ignored (the notice will simply come back). */
-export const recordDismissal = ({policy, key, username, now, session, local}) => {
+/** Records a dismissal for the policy; a storage failure is ignored (the banner will simply come back). */
+export const recordDismissal = ({policy, keys, userKey, now, session, local}) => {
     try {
         if (policy === 'SESSION') {
-            session.setItem(SESSION_KEY, key);
+            session.setItem(SESSION_KEY, JSON.stringify(keys));
         } else if (policy === 'HOURS' || policy === 'UNTIL_CHANGE') {
-            local.setItem(localKey(username), JSON.stringify({key, at: now}));
+            local.setItem(localKey(userKey), JSON.stringify({keys, at: now}));
         }
     } catch {
         // Fail open: nothing is remembered.
     }
+};
+
+// 32-bit FNV-1a, used only where SubtleCrypto is missing (it needs a secure context): it still keeps the user name
+// out of the storage key.
+const FNV_OFFSET = 0x811C9DC5;
+const FNV_PRIME = 0x01000193;
+
+const fnv1a = text => {
+    let hash = FNV_OFFSET;
+    for (const char of text) {
+        hash ^= char.codePointAt(0);
+        hash = Math.imul(hash, FNV_PRIME);
+    }
+
+    return (hash >>> 0).toString(16).padStart(8, '0');
+};
+
+/**
+ * The user key of a user name: its SHA-256 in hexadecimal, or a shorter non-cryptographic hash without SubtleCrypto.
+ *
+ * @param {string} username the Jahia user name
+ * @param {SubtleCrypto} [subtle] the SubtleCrypto to use (window.crypto.subtle by default)
+ * @returns {Promise<string>} the user key
+ */
+export const hashUser = async (username, subtle = window.crypto?.subtle) => {
+    const text = String(username || '');
+    if (subtle) {
+        try {
+            const digest = await subtle.digest('SHA-256', new TextEncoder().encode(text));
+            return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+        } catch {
+            // Falls back below.
+        }
+    }
+
+    return fnv1a(text);
 };
