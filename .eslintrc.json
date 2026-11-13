@@ -3,12 +3,15 @@
   "parserOptions": {
     "requireConfigFile": false,
     "babelOptions": {
-      "presets": ["@babel/preset-react"]
+      "presets": [["@babel/preset-react", {"runtime": "automatic"}]]
     }
   },
   "env": {
     "browser": true,
     "es2021": true,
     "jest": true
+  },
+  "rules": {
+    "react-hooks/exhaustive-deps": "error"
   }
 }

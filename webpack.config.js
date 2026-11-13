@@ -16,7 +16,10 @@ const cycloneDxWebpackPluginOptions = {
 };
 
 module.exports = (env, argv) => {
-    let config = {
+    // Production unless asked otherwise (`yarn watch` asks for development).
+    const mode = argv.mode || 'production';
+    const production = mode === 'production';
+    const config = {
         entry: {
             main: path.resolve(__dirname, 'src/javascript/index')
         },
@@ -48,10 +51,8 @@ module.exports = (env, argv) => {
                                     modules: false,
                                     targets: {chrome: '60', edge: '44', firefox: '54', safari: '12'}
                                 }],
-                                '@babel/preset-react'
-                            ],
-                            plugins: [
-                                '@babel/plugin-syntax-dynamic-import'
+                                // Same JSX runtime as the Jest transform (jest.config.js)
+                                ['@babel/preset-react', {runtime: 'automatic'}]
                             ]
                         }
                     }
@@ -90,17 +91,24 @@ module.exports = (env, argv) => {
             ]
         },
         plugins: [
+            // Shared singletons (react, i18next 21, react-i18next 11, @apollo/client, @jahia/moonstone...) come from the
+            // Jahia UI at runtime: their versions in package.json follow the ones the Jahia 8.2 UI provides.
             new ModuleFederationPlugin(getModuleFederationConfig(packageJson, {
                 library: {type: 'assign', name: 'appShell.remotes.securityUpdates'}
             })),
             new CleanWebpackPlugin({verbose: false}),
-            new CopyWebpackPlugin({patterns: [{from: './package.json', to: ''}]}),
-            new CycloneDxWebpackPlugin(cycloneDxWebpackPluginOptions)
+            new CopyWebpackPlugin({patterns: [{from: './package.json', to: ''}]})
         ],
-        mode: 'development'
+        mode
     };
 
-    config.devtool = (argv.mode === 'production') ? 'source-map' : 'eval-source-map';
+    if (production) {
+        // The SBOM describes what is shipped: only the production build writes it.
+        config.plugins.push(new CycloneDxWebpackPlugin(cycloneDxWebpackPluginOptions));
+    }
+
+    // Production source maps are written for debugging but not referenced by the bundle (not served to browsers).
+    config.devtool = production ? 'hidden-source-map' : 'eval-source-map';
 
     if (argv.analyze) {
         config.devtool = 'source-map';
