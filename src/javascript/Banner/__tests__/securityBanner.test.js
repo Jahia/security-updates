@@ -3,7 +3,11 @@ import {
     BANNER_ID,
     DISMISS_KEY,
     FEEDBACK_ID,
+    FLIP_HOLD_MS,
+    READY_ATTRIBUTE,
     REFRESH_INTERVAL_MS,
+    REQUEST_TIMEOUT_MS,
+    RETRY_INTERVAL_MS,
     removeBanner,
     showSecurityBanner,
     startSecurityBanner,
@@ -44,7 +48,8 @@ const fetchAnswering = (...bodies) => {
     return fetchImpl;
 };
 
-const hash = username => Promise.resolve(`hash(${username})`);
+const hash = text => Promise.resolve(`hash(${text})`);
+const hashed = keys => keys.map(key => `hash(${key})`);
 const show = (fetchImpl, options = {}) => showSecurityBanner({t, language: 'fr', fetchImpl, hash, ...options});
 const banner = () => document.getElementById(BANNER_ID);
 const dismissButton = () => document.querySelector('[data-sel-role="security-updates-banner-dismiss"]');
@@ -102,10 +107,11 @@ describe('showSecurityBanner', () => {
         expect(banner().querySelector('p').textContent).toBe('banner.message.one {n=1, threshold=banner.threshold.HIGH}');
     });
 
-    test('comes first in the page, so that keyboard users reach it early', async () => {
+    test('comes last in the page, where it is drawn, so that the tab order follows the reading order', async () => {
         await show(fetchAnswering(answer()));
 
-        expect(document.body.firstElementChild).toBe(banner());
+        expect(document.body.lastElementChild).toBe(banner());
+        expect(document.body.firstElementChild).toBe(document.getElementById('content'));
     });
 
     test('announces itself politely once, a moment after it appears', async () => {
@@ -133,7 +139,8 @@ describe('showSecurityBanner', () => {
         await show(fetchAnswering(answer({count: 3, dismissalKeys: [...KEYS, 'jcontent|JSA-3']})));
         jest.advanceTimersByTime(1500);
         expect(live().textContent).toBe('banner.message.other {n=3, threshold=banner.threshold.HIGH}');
-        expect(window.sessionStorage.getItem(ANNOUNCED_KEY)).toBe(`3|${[...KEYS, 'jcontent|JSA-3'].sort().join(',')}`);
+        // The hashed keys: the session storage does not name the components either.
+        expect(window.sessionStorage.getItem(ANNOUNCED_KEY)).toBe(`3|${hashed([...KEYS, 'jcontent|JSA-3']).sort().join(',')}`);
     });
 
     test('without a usable session storage, the page remembers what it announced', async () => {
@@ -233,7 +240,7 @@ describe('showSecurityBanner', () => {
             expect(banner()).toBeNull();
             expect(document.activeElement).toBe(pageButton);
             expect(document.getElementById('content')).not.toHaveAttribute('tabindex');
-            expect(JSON.parse(window.sessionStorage.getItem(DISMISS_KEY))).toEqual(KEYS);
+            expect(JSON.parse(window.sessionStorage.getItem(DISMISS_KEY))).toEqual(hashed(KEYS));
             expect(await show(fetchAnswering(answer()))).toBe(false);
         });
 
@@ -321,7 +328,7 @@ describe('showSecurityBanner', () => {
             dismissButton().click();
 
             expect(window.localStorage.getItem(localKey('jdoe'))).toBeNull();
-            expect(JSON.parse(window.localStorage.getItem(localKey('hash(jdoe)')))).toEqual({keys: KEYS, at: 1_000_000});
+            expect(JSON.parse(window.localStorage.getItem(localKey('hash(jdoe)')))).toEqual({keys: hashed(KEYS), at: 1_000_000});
             now += 3600 * 1000;
             expect(await show(fetchAnswering(hours()), {now: () => now})).toBe(false);
             now += 3600 * 1000;
@@ -445,11 +452,15 @@ describe('showSecurityBanner', () => {
             window.dispatchEvent(new Event('resize'));
             expect(frames).toHaveBeenCalledTimes(1);
             jest.advanceTimersByTime(20);
+            // The same element moved under the banner right after a move: it waits for the end of the hold, then moves.
+            expect(banner().getAttribute('data-position')).toBe('top');
+            jest.advanceTimersByTime(FLIP_HOLD_MS);
             expect(banner().getAttribute('data-position')).toBe('bottom');
+            frames.mockClear();
 
             removeBanner();
             document.querySelector('main').dispatchEvent(new Event('scroll'));
-            expect(frames).toHaveBeenCalledTimes(1);
+            expect(frames).not.toHaveBeenCalled();
             frames.mockRestore();
         });
 
@@ -580,5 +591,287 @@ describe('startSecurityBanner', () => {
 
         expect(banner().getAttribute('data-count')).toBe('5');
         stop();
+    });
+});
+
+describe('banner robustness', () => {
+    const ready = () => document.documentElement.getAttribute(READY_ATTRIBUTE);
+    let debug;
+
+    beforeEach(() => {
+        removeBanner();
+        document.documentElement.style.cssText = '';
+        document.documentElement.removeAttribute(READY_ATTRIBUTE);
+        document.body.innerHTML = '<main id="content"><button type="button">Page button</button><button type="button">Other</button></main>';
+        window.sessionStorage.clear();
+        window.localStorage.clear();
+        window.history.replaceState(null, '', '/ctx/jahia/jcontent');
+        debug = jest.spyOn(console, 'debug').mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+        debug.mockRestore();
+        jest.useRealTimers();
+    });
+
+    const flush = () => new Promise(resolve => {
+        setTimeout(resolve, 0);
+    });
+
+    describe('test hook on <html>', () => {
+        test('is pending while the request runs, and ready once the banner is shown', async () => {
+            let release;
+            const fetchImpl = jest.fn(() => new Promise(resolve => {
+                release = () => resolve({ok: true, json: () => Promise.resolve(answer())});
+            }));
+            const shown = show(fetchImpl);
+            expect(ready()).toBe('pending');
+            expect(READY_ATTRIBUTE).toBe('data-security-updates-banner');
+
+            release();
+            await shown;
+            expect(ready()).toBe('ready');
+            expect(banner()).not.toBeNull();
+        });
+
+        test.each([
+            ['hidden by the settings', () => show(fetchAnswering(answer({visible: false})))],
+            ['not authorised', () => show(fetchAnswering({data: {jcr: {nodeByPath: {hasPermission: false}}, securityUpdates: null}}))],
+            ['the page open', () => show(fetchAnswering(answer()), {isPageOpen: true})],
+            ['a failed request', () => show(jest.fn(() => Promise.reject(new Error('offline'))))]
+        ])('is ready once decided: %s', async (name, decide) => {
+            await decide();
+
+            expect(ready()).toBe('ready');
+            expect(banner()).toBeNull();
+        });
+
+        test('is ready after Hide, and goes when the banner is stopped', async () => {
+            const stop = startSecurityBanner({t, fetchImpl: jest.fn(() => response(answer())), hash});
+            await flush();
+            await flush();
+            expect(ready()).toBe('ready');
+
+            dismissButton().click();
+            expect(ready()).toBe('ready');
+            stop();
+            expect(document.documentElement.hasAttribute(READY_ATTRIBUTE)).toBe(false);
+        });
+
+        test('is ready when the Security updates page opens', async () => {
+            const stop = startSecurityBanner({t, fetchImpl: jest.fn(() => new Promise(() => undefined)), hash});
+            expect(ready()).toBe('pending');
+
+            window.dispatchEvent(new CustomEvent(PAGE_EVENT, {detail: {isOpen: true}}));
+            expect(ready()).toBe('ready');
+            stop();
+        });
+    });
+
+    describe('failed requests', () => {
+        test('a failed request keeps the banner shown, as it was', async () => {
+            await show(fetchAnswering(answer()));
+            const element = banner();
+
+            expect(await show(jest.fn(() => Promise.reject(new Error('offline'))))).toBe(false);
+            expect(await show(fetchAnswering({errors: [{message: 'Boom'}]}))).toBe(false);
+
+            expect(banner()).toBe(element);
+            expect(banner().getAttribute('data-count')).toBe('2');
+        });
+
+        test('a request without answer is abandoned after the timeout', async () => {
+            jest.useFakeTimers();
+            const fetchImpl = jest.fn((url, init) => new Promise((resolve, reject) => {
+                init.signal.addEventListener('abort', () => reject(new Error('aborted')));
+            }));
+            const onFailed = jest.fn();
+            const shown = show(fetchImpl, {onFailed});
+
+            jest.advanceTimersByTime(REQUEST_TIMEOUT_MS - 1);
+            await Promise.resolve();
+            expect(onFailed).not.toHaveBeenCalled();
+            jest.advanceTimersByTime(1);
+
+            expect(await shown).toBe(false);
+            expect(onFailed).toHaveBeenCalledTimes(1);
+            expect(REQUEST_TIMEOUT_MS).toBe(20 * 1000);
+        });
+
+        test('a failed refresh keeps the banner of the previous answer', async () => {
+            jest.useFakeTimers({doNotFake: ['setTimeout']});
+            const fetchImpl = jest.fn()
+                .mockImplementationOnce(() => response(answer()))
+                .mockImplementationOnce(() => Promise.reject(new Error('restarting')))
+                .mockImplementation(() => response(answer({count: 4})));
+            const stop = startSecurityBanner({t, fetchImpl, hash});
+            await flush();
+            window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
+            await flush();
+            expect(fetchImpl).toHaveBeenCalledTimes(2);
+            expect(banner().getAttribute('data-count')).toBe('2');
+            stop();
+            expect(RETRY_INTERVAL_MS).toBe(60 * 1000);
+        });
+
+        test('the retry runs once the delay has passed, and is cancelled by an answer', async () => {
+            jest.useFakeTimers();
+            const fetchImpl = jest.fn()
+                .mockImplementationOnce(() => Promise.reject(new Error('restarting')))
+                .mockImplementation(() => response(answer({count: 4})));
+            const stop = startSecurityBanner({t, fetchImpl, hash});
+            await jest.advanceTimersByTimeAsync(0);
+            expect(fetchImpl).toHaveBeenCalledTimes(1);
+
+            await jest.advanceTimersByTimeAsync(RETRY_INTERVAL_MS);
+            expect(fetchImpl).toHaveBeenCalledTimes(2);
+            expect(banner().getAttribute('data-count')).toBe('4');
+
+            await jest.advanceTimersByTimeAsync(RETRY_INTERVAL_MS);
+            expect(fetchImpl).toHaveBeenCalledTimes(2);
+            stop();
+        });
+
+        test('stopping cancels a planned retry', async () => {
+            jest.useFakeTimers();
+            const fetchImpl = jest.fn(() => Promise.reject(new Error('offline')));
+            const stop = startSecurityBanner({t, fetchImpl, hash});
+            await jest.advanceTimersByTimeAsync(0);
+            stop();
+
+            await jest.advanceTimersByTimeAsync(RETRY_INTERVAL_MS);
+            expect(fetchImpl).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('timers', () => {
+        test('a banner removed before its announcement leaves no pending timer', async () => {
+            jest.useFakeTimers();
+            await show(fetchAnswering(answer()));
+            expect(jest.getTimerCount()).toBeGreaterThan(0);
+
+            removeBanner();
+            expect(jest.getTimerCount()).toBe(0);
+        });
+
+        test('stopping right after Hide cancels the pending feedback', async () => {
+            jest.useFakeTimers();
+            const stop = startSecurityBanner({t, fetchImpl: jest.fn(() => response(answer())), hash});
+            await jest.advanceTimersByTimeAsync(0);
+            dismissButton().click();
+            stop();
+
+            jest.advanceTimersByTime(1000);
+            expect(feedback().textContent).toBe('');
+        });
+
+        test('a new banner cancels the feedback of the previous one', async () => {
+            jest.useFakeTimers();
+            await show(fetchAnswering(answer()));
+            dismissButton().click();
+            await show(fetchAnswering(answer({dismissalKeys: [...KEYS, 'jcontent|JSA-3']})));
+
+            jest.advanceTimersByTime(1000);
+            expect(feedback().textContent).toBe('');
+        });
+    });
+
+    describe('focus after Hide', () => {
+        test('goes back to the element focused when the banner appeared, when the focus came from outside the page', async () => {
+            const other = document.querySelectorAll('main button')[1];
+            other.focus();
+            await show(fetchAnswering(answer()));
+            // Shift+Tab from the browser's address bar: no focusin from the page before the banner.
+            other.blur();
+            dismissButton().focus();
+
+            dismissButton().click();
+
+            expect(document.activeElement).toBe(other);
+        });
+    });
+
+    describe('dismissal keys', () => {
+        test('are stored hashed, with the default hash, and still hide the banner', async () => {
+            await show(fetchAnswering(answer({dismissPolicy: 'UNTIL_CHANGE'})), {hash: undefined});
+            dismissButton().click();
+
+            const stored = Object.keys(window.localStorage).map(key => window.localStorage.getItem(key)).join('');
+            expect(stored).not.toContain('jahia-core');
+            expect(stored).not.toContain('JSA-2026');
+            expect(await show(fetchAnswering(answer({dismissPolicy: 'UNTIL_CHANGE'})), {hash: undefined})).toBe(false);
+        });
+
+        test('keys stored in clear by an older version show the banner again', async () => {
+            window.sessionStorage.setItem(DISMISS_KEY, JSON.stringify(KEYS));
+
+            expect(await show(fetchAnswering(answer()))).toBe(true);
+        });
+
+        test('keys that cannot be hashed fail open', async () => {
+            const failing = text => (text.includes('|') ? Promise.reject(new Error('no crypto')) : hash(text));
+            await show(fetchAnswering(answer({dismissPolicy: 'UNTIL_CHANGE'})), {hash: failing});
+            dismissButton().click();
+
+            expect(await show(fetchAnswering(answer({dismissPolicy: 'UNTIL_CHANGE'})), {hash: failing})).toBe(true);
+        });
+    });
+
+    describe('position', () => {
+        const place = (element, rect) => {
+            element.getBoundingClientRect = () => ({height: rect.bottom - rect.top, ...rect});
+        };
+
+        test('stays when the focused element would be under it at the other edge too (a tall region)', async () => {
+            await show(fetchAnswering(answer()));
+            place(banner(), {top: 600, bottom: 700, left: 800, right: 1200});
+            const button = document.querySelector('main button');
+            place(button, {top: 0, bottom: 768, left: 0, right: 1024});
+
+            button.focus();
+
+            expect(banner().getAttribute('data-position')).toBe('bottom');
+        });
+
+        test('a newly focused element moves it at once, even during the hold', async () => {
+            await show(fetchAnswering(answer()));
+            place(banner(), {top: 600, bottom: 700, left: 800, right: 1200});
+            const [first, second] = document.querySelectorAll('main button');
+            place(first, {top: 650, bottom: 680, left: 900, right: 1000});
+            first.focus();
+            expect(banner().getAttribute('data-position')).toBe('top');
+
+            place(banner(), {top: 68, bottom: 168, left: 800, right: 1200});
+            place(second, {top: 100, bottom: 130, left: 900, right: 1000});
+            second.focus();
+            expect(banner().getAttribute('data-position')).toBe('bottom');
+        });
+
+        test('the document style is written only when the scroll padding changes', async () => {
+            jest.useFakeTimers();
+            await show(fetchAnswering(answer()));
+            place(banner(), {top: 600, bottom: 700, left: 800, right: 1200});
+            const write = jest.spyOn(document.documentElement.style, 'setProperty');
+
+            window.dispatchEvent(new Event('resize'));
+            jest.advanceTimersByTime(20);
+            expect(write).toHaveBeenCalledTimes(1);
+            window.dispatchEvent(new Event('resize'));
+            jest.advanceTimersByTime(20);
+            document.dispatchEvent(new Event('scroll'));
+            jest.advanceTimersByTime(20);
+
+            expect(write).toHaveBeenCalledTimes(1);
+            write.mockRestore();
+        });
+
+        test('becomes a compact strip on a small viewport (400% zoom), never a box over most of the screen', async () => {
+            await show(fetchAnswering(answer()));
+
+            const css = document.getElementById('security-updates-banner-style').textContent;
+            const compact = css.slice(css.indexOf('@media (max-width: 40rem), (max-height: 40rem)'));
+            expect(compact).toMatch(/left: 0; right: 0; bottom: 0; max-width: none; max-height: 40vh; overflow-y: auto/);
+            expect(compact).toMatch(/\[data-position="top"\] \{ top: 0; bottom: auto; \}/);
+        });
     });
 });

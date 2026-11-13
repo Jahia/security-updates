@@ -2,7 +2,7 @@ import {adminUrl, graphqlUrl} from '../SecurityUpdates/securityUpdatesUtils';
 import {normalizeHex} from '../Settings/colorUtils';
 import {CHANGED_EVENT, DEFAULT_BANNER_BACKGROUND, DEFAULT_BANNER_TEXT, PAGE_EVENT, ROUTE_KEY, THRESHOLD_SEVERITIES} from '../common/constants';
 import {pluralKey, values} from '../common/i18n';
-import {hashUser, isDismissed, recordDismissal, SESSION_KEY} from './bannerDismissal';
+import {hashKeys, hashUser, isDismissed, recordDismissal, SESSION_KEY} from './bannerDismissal';
 
 export const BANNER_ID = 'security-updates-banner';
 export const DISMISS_KEY = SESSION_KEY;
@@ -14,6 +14,18 @@ export const VISIBILITY_MIN_INTERVAL_MS = 30 * 1000;
 export const FEEDBACK_ID = 'security-updates-banner-feedback';
 /** What the banner last announced in this browser tab (count and dismissal keys), so it is not announced again. */
 export const ANNOUNCED_KEY = 'security-updates-banner-announced';
+/** A failed request is tried again after this delay; the banner shown, if any, stays meanwhile. */
+export const RETRY_INTERVAL_MS = 60 * 1000;
+/** A request that has not answered after this delay is abandoned (and counts as failed). */
+export const REQUEST_TIMEOUT_MS = 20 * 1000;
+/** After the banner moved to the other edge, it does not move again for the same focused element before this delay. */
+export const FLIP_HOLD_MS = 2000;
+/**
+ * Stable test hook, read by the end-to-end tests: the attribute data-security-updates-banner on <html> is "pending"
+ * while a banner request runs, and "ready" once the banner decision is applied (shown, hidden by the settings or a
+ * dismissal, not authorised, page open, or request failed). It has no other use.
+ */
+export const READY_ATTRIBUTE = 'data-security-updates-banner';
 const STYLE_ID = 'security-updates-banner-style';
 const DISMISS_SELECTOR = '[data-sel-role="security-updates-banner-dismiss"]';
 const ANNOUNCE_DELAY_MS = 1000;
@@ -29,6 +41,10 @@ const BANNER_QUERY = 'query SecurityUpdatesBanner { jcr { nodeByPath(path: "/") 
 // link, the button border and the focus ring all use the text colour, so each of them keeps that contrast against
 // the background (the focus ring needs 3:1). The banner never relies on colour alone: the message says what it is.
 // Sizes are in rem (they follow the user's text size); the link and the button are 44 by 44 pixel targets.
+// On a small viewport (a phone, or a 400% zoom: 40rem wide or high at most), the box becomes a compact strip across
+// the edge, at most 40% of the height (scrolling inside beyond that), so that it never covers most of the screen, even
+// when it cannot be hidden. It stays fixed rather than in the flow: the Jahia interface fills the viewport and scrolls
+// inside its own containers, so an element after it in the body would be out of view.
 const CSS = `
 #${BANNER_ID} { position: fixed; right: 1rem; bottom: 1rem; z-index: 9999;
   max-width: min(30rem, calc(100vw - 2rem)); display: flex; flex-wrap: wrap; gap: 0.5rem 1rem;
@@ -49,6 +65,11 @@ const CSS = `
   outline: 3px solid var(--security-updates-banner-fg, ${DEFAULT_BANNER_TEXT}); outline-offset: 2px; }
 #${BANNER_ID} .security-updates-banner-sr, #${FEEDBACK_ID} { position: absolute; width: 1px; height: 1px; margin: -1px;
   padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (max-width: 40rem), (max-height: 40rem) {
+  #${BANNER_ID} { left: 0; right: 0; bottom: 0; max-width: none; max-height: 40vh; overflow-y: auto; border-radius: 0;
+    gap: 0.25rem 0.75rem; padding: 0.25rem 0.75rem; box-shadow: 0 -2px 8px rgba(0, 0, 0, .35); }
+  #${BANNER_ID}[data-position="top"] { top: 0; bottom: auto; }
+}
 `;
 
 const debug = (message, error) => {
@@ -56,18 +77,34 @@ const debug = (message, error) => {
     console.debug(`[security-updates] ${message}`, error);
 };
 
-const fetchBanner = async fetchImpl => {
-    const response = await fetchImpl(graphqlUrl(), {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: {'Content-Type': 'application/json', Accept: 'application/json'},
-        body: JSON.stringify({query: BANNER_QUERY})
-    });
-    if (!response.ok) {
-        throw new Error(`GraphQL request failed (HTTP ${response.status})`);
-    }
+const setReady = state => {
+    document.documentElement.setAttribute(READY_ATTRIBUTE, state);
+};
 
-    const payload = await response.json();
+// The request is abandoned after REQUEST_TIMEOUT_MS: a server that never answers does not leave it pending for ever.
+const post = async fetchImpl => {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timeout = controller ? setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS) : null;
+    try {
+        const response = await fetchImpl(graphqlUrl(), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {'Content-Type': 'application/json', Accept: 'application/json'},
+            body: JSON.stringify({query: BANNER_QUERY}),
+            signal: controller?.signal
+        });
+        if (!response.ok) {
+            throw new Error(`GraphQL request failed (HTTP ${response.status})`);
+        }
+
+        return await response.json();
+    } finally {
+        clearTimeout(timeout);
+    }
+};
+
+const fetchBanner = async fetchImpl => {
+    const payload = await post(fetchImpl);
     // A user without adminTemplates gets an error on the banner field: the permission says it is not an error here.
     if (payload?.data?.jcr?.nodeByPath?.hasPermission !== true) {
         if (!payload?.data) {
@@ -120,9 +157,19 @@ const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bot
 const dismissals = new WeakMap();
 // The element that had the focus before it went into the banner: it gets the focus back when the banner is hidden.
 let lastFocusOutside = null;
-// The page's own scroll-padding values, restored when the banner goes.
+// The element that had the focus when the banner appeared: the fallback when the focus went to the banner from
+// outside the page (Shift+Tab from the browser's address bar, a click).
+let focusAtInsert = null;
+// The page's own scroll-padding values, restored when the banner goes, and the last values written (not written again).
 let savedScrollPadding = null;
+let writtenScrollPadding = null;
 let frame = null;
+// The last move to the other edge (time and focused element), and the check planned for the end of its hold.
+let lastFlip = null;
+let holdTimer = null;
+// The pending texts of the live regions: the announcement of the banner, the feedback after Hide.
+let announceTimer = null;
+let feedbackTimer = null;
 
 const restoreScrollPadding = (style, side) => {
     const value = savedScrollPadding[side];
@@ -142,8 +189,15 @@ const updateScrollPadding = element => {
     }
 
     const side = element.getAttribute('data-position') === 'top' ? 'top' : 'bottom';
-    style.setProperty(`scroll-padding-${side}`, `calc(${Math.ceil(element.getBoundingClientRect().height)}px + 1rem)`);
+    const value = `calc(${Math.ceil(element.getBoundingClientRect().height)}px + 1rem)`;
+    // Called on every scroll and resize frame: the document's style is only written when the value changes.
+    if (writtenScrollPadding?.side === side && writtenScrollPadding.value === value) {
+        return;
+    }
+
+    style.setProperty(`scroll-padding-${side}`, value);
     restoreScrollPadding(style, side === 'top' ? 'bottom' : 'top');
+    writtenScrollPadding = {side, value};
 };
 
 const clearScrollPadding = () => {
@@ -153,20 +207,51 @@ const clearScrollPadding = () => {
         restoreScrollPadding(style, 'bottom');
         savedScrollPadding = null;
     }
+
+    writtenScrollPadding = null;
 };
 
-// The banner is fixed over the page: when the focused element would be under it, it moves to the other edge, so that
-// it never hides the focus (WCAG 2.4.12).
-const keepFocusVisible = target => {
+// Where the banner would be at the other edge: the same box, mirrored across the middle of the viewport (it keeps the
+// same distance to its edge).
+const mirrored = rect => {
+    const height = window.innerHeight || document.documentElement.clientHeight;
+    return {left: rect.left, right: rect.right, top: height - rect.bottom, bottom: height - rect.top};
+};
+
+const scheduleCheckAfterHold = delay => {
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(scheduleCheck, delay);
+};
+
+/**
+ * The banner is fixed over the page: when the focused element would be under it, it moves to the other edge, so that
+ * it never hides the focus (WCAG 2.4.11 and 2.4.12). It moves only when the element is clear of the banner at the
+ * other edge (a focused element taller than the space left, such as a scrolling region or a frame, would make it
+ * move on every frame), and, for the same focused element, not again during FLIP_HOLD_MS (checked again at the end).
+ * A newly focused element may always make it move.
+ */
+const keepFocusVisible = (target, isNewFocus) => {
     const element = document.getElementById(BANNER_ID);
     if (!element || !target || target === document.body || element.contains(target) || typeof target.getBoundingClientRect !== 'function') {
         return;
     }
 
-    if (overlaps(target.getBoundingClientRect(), element.getBoundingClientRect())) {
-        element.setAttribute('data-position', element.getAttribute('data-position') === 'top' ? 'bottom' : 'top');
-        updateScrollPadding(element);
+    const targetRect = target.getBoundingClientRect();
+    const bannerRect = element.getBoundingClientRect();
+    if (!overlaps(targetRect, bannerRect) || overlaps(targetRect, mirrored(bannerRect))) {
+        return;
     }
+
+    const now = Date.now();
+    const held = lastFlip && lastFlip.target === target && !isNewFocus ? FLIP_HOLD_MS - (now - lastFlip.at) : 0;
+    if (held > 0) {
+        scheduleCheckAfterHold(held);
+        return;
+    }
+
+    element.setAttribute('data-position', element.getAttribute('data-position') === 'top' ? 'bottom' : 'top');
+    lastFlip = {target, at: now};
+    updateScrollPadding(element);
 };
 
 // Once per animation frame at most: after the browser has scrolled the focused element into view, and on scroll and
@@ -181,7 +266,7 @@ const scheduleCheck = () => {
         const element = document.getElementById(BANNER_ID);
         if (element) {
             updateScrollPadding(element);
-            keepFocusVisible(document.activeElement);
+            keepFocusVisible(document.activeElement, false);
         }
     });
 };
@@ -192,7 +277,7 @@ const onFocusIn = event => {
         lastFocusOutside = event.target;
     }
 
-    keepFocusVisible(event.target);
+    keepFocusVisible(event.target, true);
     scheduleCheck();
 };
 
@@ -207,13 +292,24 @@ const listen = isOn => {
 export const removeBanner = () => {
     document.getElementById(BANNER_ID)?.remove();
     lastFocusOutside = null;
+    focusAtInsert = null;
+    lastFlip = null;
     listen(false);
     if (frame !== null) {
         window.cancelAnimationFrame(frame);
         frame = null;
     }
 
+    clearTimeout(holdTimer);
+    clearTimeout(announceTimer);
+    holdTimer = null;
+    announceTimer = null;
     clearScrollPadding();
+};
+
+const clearFeedbackTimer = () => {
+    clearTimeout(feedbackTimer);
+    feedbackTimer = null;
 };
 
 const message = (t, banner, language) => {
@@ -258,9 +354,13 @@ const createElement = t => {
     link.setAttribute('data-sel-role', 'security-updates-banner-link');
     element.append(text, link, live);
 
-    // First in the page, so that keyboard users reach it without going through the whole interface.
-    document.body.prepend(element);
+    // Last in the page, where it is drawn (at an edge, after the content): the tab order follows the reading order
+    // (WCAG 2.4.3). Its status line announces it, so users of screen readers learn of it wherever they are.
+    const active = document.activeElement;
+    focusAtInsert = active && active !== document.body ? active : null;
+    clearFeedbackTimer();
     feedbackElement().textContent = '';
+    document.body.append(element);
     listen(true);
     return element;
 };
@@ -269,23 +369,28 @@ const hiddenText = (t, {policy, hours}, language) => (policy === 'HOURS' ?
     t(`banner.hidden.HOURS.${pluralKey(hours, language)}`, values({n: hours})) :
     t(`banner.hidden.${policy}`));
 
+const canFocus = element => Boolean(element?.isConnected) && typeof element.focus === 'function';
+
 /**
  * Hides the banner for the policy, says so politely, and gives the focus back to where it was before it went into the
- * banner. When there is no such element (the banner is the first stop of the page), the focus stays on the document:
- * the next Tab goes to what followed the banner. Jahia's own elements are not made focusable for this.
+ * banner, else to the element that had it when the banner appeared. When there is neither (the focus came from outside
+ * the page), it stays on the document: the banner was the last stop, so the next Tab starts the page again. Jahia's
+ * own elements are not made focusable for this, and the feedback line is not focused (it is visually hidden: the focus
+ * would be invisible).
  */
 const hide = element => {
     const {t, language, dismissal} = dismissals.get(element);
     recordDismissal({...dismissal, now: dismissal.clock()});
-    const returnTo = lastFocusOutside;
+    const returnTo = [lastFocusOutside, focusAtInsert].find(canFocus);
     removeBanner();
-    if (returnTo?.isConnected && typeof returnTo.focus === 'function') {
-        returnTo.focus();
-    }
+    returnTo?.focus();
+    setReady('ready');
 
     const feedback = feedbackElement();
     feedback.textContent = '';
-    setTimeout(() => {
+    clearFeedbackTimer();
+    feedbackTimer = setTimeout(() => {
+        feedbackTimer = null;
         feedback.textContent = hiddenText(t, dismissal, language);
     }, FEEDBACK_DELAY_MS);
 };
@@ -348,7 +453,9 @@ const announce = (element, text, banner, dismissal) => {
     writeAnnounced(dismissal.session, signature);
     const live = element.querySelector('[role="status"]');
     live.textContent = '';
-    setTimeout(() => {
+    clearTimeout(announceTimer);
+    announceTimer = setTimeout(() => {
+        announceTimer = null;
         live.textContent = text;
     }, ANNOUNCE_DELAY_MS);
 };
@@ -382,16 +489,27 @@ const userKeyOf = async (hash, username) => {
     }
 };
 
+// Keys that cannot be hashed are not stored nor compared: the banner cannot be hidden then (fail open).
+const storedKeysOf = async (hash, keys) => {
+    try {
+        return await hashKeys(keys || [], hash);
+    } catch (error) {
+        debug('dismissal keys not hashed', error);
+        return [];
+    }
+};
+
 let generation = 0;
 
 /**
  * Shows, updates or removes the banner shown to users with adminTemplates, as decided by the server
- * (Query.securityUpdates.banner), with the configured colours and dismissal policy. Never throws: on any error it
- * shows nothing.
+ * (Query.securityUpdates.banner), with the configured colours and dismissal policy. Never throws: a failed request
+ * (network, timeout, HTTP or GraphQL error, malformed answer) keeps the banner as it was and calls onFailed.
  *
- * @param {object} options translation function, UI language (or a function giving it), whether the Security updates page is open, and (for
- *        tests) the fetch implementation, clock, storages and user name hash
- * @returns {Promise<boolean>} whether the banner is shown
+ * @param {object} options translation function, UI language (or a function giving it), whether the Security updates
+ *        page is open, onFetched and onFailed callbacks, and (for tests) the fetch implementation, clock, storages and
+ *        the hash of the user name and of the dismissal keys
+ * @returns {Promise<boolean>} whether a new banner decision shows the banner
  */
 export const showSecurityBanner = async ({
     t,
@@ -402,23 +520,26 @@ export const showSecurityBanner = async ({
     session = storage('sessionStorage'),
     local = storage('localStorage'),
     hash = hashUser,
-    onFetched = () => undefined
+    onFetched = () => undefined,
+    onFailed = () => undefined
 }) => {
     generation += 1;
     const current = generation;
     try {
         if (!fetchImpl || isPageOpen || isOnPage()) {
             removeBanner();
+            setReady('ready');
             return false;
         }
 
+        setReady('pending');
         const banner = await fetchBanner(fetchImpl);
         onFetched();
         const keys = Array.isArray(banner?.dismissalKeys) && banner.dismissalKeys.length > 0 ? banner.dismissalKeys : banner?.components;
         const dismissal = banner && {
             policy: banner.dismissPolicy || 'SESSION',
             hours: banner.dismissHours || 24,
-            keys: keys || [],
+            keys: await storedKeysOf(hash, keys),
             userKey: await userKeyOf(hash, banner.username),
             session,
             local,
@@ -431,15 +552,19 @@ export const showSecurityBanner = async ({
 
         if (!banner || !banner.visible || isDismissed({...dismissal, now: now()})) {
             removeBanner();
+            setReady('ready');
             return false;
         }
 
         render(t, typeof language === 'function' ? language() : language, banner, dismissal);
+        setReady('ready');
         return true;
     } catch (error) {
-        debug('banner not shown', error);
+        // Most failures are transient (a restart, the network): the banner shown stays, and the request is tried again.
+        debug('banner not updated', error);
         if (current === generation) {
-            removeBanner();
+            setReady('ready');
+            onFailed(error);
         }
 
         return false;
@@ -448,8 +573,9 @@ export const showSecurityBanner = async ({
 
 /**
  * Shows the banner and keeps it current: asks the server again after a check or a settings change (CHANGED_EVENT),
- * every REFRESH_INTERVAL_MS and when the browser tab is shown again (unless its last answer is less than
- * VISIBILITY_MIN_INTERVAL_MS old); hides it while the Security updates page is open (PAGE_EVENT).
+ * every REFRESH_INTERVAL_MS, RETRY_INTERVAL_MS after a failed request, and when the browser tab is shown again
+ * (unless its last answer is less than VISIBILITY_MIN_INTERVAL_MS old); hides it while the Security updates page is
+ * open (PAGE_EVENT).
  *
  * @param {object} options as for showSecurityBanner
  * @returns {function} stops the updates and removes the banner
@@ -458,16 +584,31 @@ export const startSecurityBanner = options => {
     const clock = options.now || Date.now;
     let isPageOpen = false;
     let fetchedAt = null;
-    const onFetched = () => {
-        fetchedAt = clock();
+    let retry = null;
+    const cancelRetry = () => {
+        clearTimeout(retry);
+        retry = null;
     };
 
-    const refresh = () => showSecurityBanner({...options, isPageOpen, onFetched});
+    const onFetched = () => {
+        fetchedAt = clock();
+        cancelRetry();
+    };
+
+    let refresh = null;
+    const onFailed = () => {
+        cancelRetry();
+        retry = setTimeout(refresh, RETRY_INTERVAL_MS);
+    };
+
+    refresh = () => showSecurityBanner({...options, isPageOpen, onFetched, onFailed});
     const onPage = event => {
         isPageOpen = Boolean(event?.detail?.isOpen);
         if (isPageOpen) {
             generation += 1;
+            cancelRetry();
             removeBanner();
+            setReady('ready');
         } else {
             refresh();
         }
@@ -491,7 +632,10 @@ export const startSecurityBanner = options => {
         window.removeEventListener(PAGE_EVENT, onPage);
         document.removeEventListener('visibilitychange', onVisibility);
         clearInterval(timer);
+        cancelRetry();
         generation += 1;
         removeBanner();
+        clearFeedbackTimer();
+        document.documentElement.removeAttribute(READY_ATTRIBUTE);
     };
 };
