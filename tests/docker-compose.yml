@@ -6,7 +6,8 @@ services:
             storefixture-tls:
                 condition: service_completed_successfully
         ports:
-            - '8080:8080'
+            # Local access only (Cypress reaches Jahia over the compose network, as http://jahia:8080).
+            - '127.0.0.1:8080:8080'
             # JDWP (JPDA=true): local debugging only, never on the other interfaces of the host.
             - '127.0.0.1:8000:8000'
         environment:
