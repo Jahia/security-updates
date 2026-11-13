@@ -68,6 +68,13 @@
     "source": {
       "ADVISORY": "Bulletin Jahia",
       "OWNER_REPORTED": "Signalé par le propriétaire du module"
+    },
+    "statusLabel": {
+      "NOT_CHECKED": "Pas encore vérifié",
+      "DISABLED": "Désactivé",
+      "OK": "Tous les stores vérifiés",
+      "PARTIAL": "Vérifié en partie",
+      "UNAVAILABLE": "Flux indisponible"
     }
   },
   "banner": {
@@ -170,6 +177,18 @@
       "INVALID_COLOR": "Saisissez une couleur au format #RRGGBB, par exemple #0B3D91.",
       "LOW_CONTRAST": "Le rapport de contraste des deux couleurs est de {{ratio}}:1 ; au moins 7:1 est requis.",
       "WRITE_FAILED": "Les paramètres n'ont pas pu être enregistrés. Voir le journal de Jahia."
+    },
+    "suggest": {
+      "intro": "Couleurs qui atteignent 7:1 :",
+      "text": "Couleur du texte {{value}}, contraste {{ratio}}:1",
+      "background": "Couleur de fond {{value}}, contraste {{ratio}}:1",
+      "use_text": "Utiliser cette couleur de texte {{value}}",
+      "use_background": "Utiliser cette couleur de fond {{value}}",
+      "none": "Aucune modification d’une seule couleur n’atteint 7:1 avec ces couleurs. Les couleurs par défaut, si.",
+      "useDefaults": "Utiliser les couleurs par défaut {{background}} / {{text}}",
+      "appliedText": "Couleur du texte {{value}} appliquée. Enregistrez les paramètres pour la conserver.",
+      "appliedBackground": "Couleur de fond {{value}} appliquée. Enregistrez les paramètres pour la conserver.",
+      "appliedDefaults": "Couleurs par défaut appliquées. Enregistrez les paramètres pour les conserver."
     }
   }
 }

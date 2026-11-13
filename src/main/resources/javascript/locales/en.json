@@ -68,6 +68,13 @@
     "source": {
       "ADVISORY": "Jahia advisory",
       "OWNER_REPORTED": "Reported by the module owner"
+    },
+    "statusLabel": {
+      "NOT_CHECKED": "Not checked yet",
+      "DISABLED": "Disabled",
+      "OK": "All stores checked",
+      "PARTIAL": "Partly checked",
+      "UNAVAILABLE": "Feed unavailable"
     }
   },
   "banner": {
@@ -170,6 +177,18 @@
       "INVALID_COLOR": "Enter a colour as #RRGGBB, for example #0B3D91.",
       "LOW_CONTRAST": "The contrast ratio of the two colours is {{ratio}}:1; at least 7:1 is required.",
       "WRITE_FAILED": "The settings could not be saved. See the Jahia log."
+    },
+    "suggest": {
+      "intro": "Colours that reach 7:1:",
+      "text": "Text colour {{value}}, contrast {{ratio}}:1",
+      "background": "Background colour {{value}}, contrast {{ratio}}:1",
+      "use_text": "Use this text colour {{value}}",
+      "use_background": "Use this background colour {{value}}",
+      "none": "No single colour change reaches 7:1 with these colours. The default colours do.",
+      "useDefaults": "Use the default colours {{background}} / {{text}}",
+      "appliedText": "Text colour {{value}} applied. Save the settings to keep it.",
+      "appliedBackground": "Background colour {{value}} applied. Save the settings to keep it.",
+      "appliedDefaults": "Default colours applied. Save the settings to keep them."
     }
   }
 }

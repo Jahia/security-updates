@@ -181,4 +181,38 @@ describe('SecurityUpdates page', () => {
 
         expect(await screen.findByRole('alert')).toHaveTextContent('page.refreshError');
     });
+
+    test('is built from Moonstone components: LayoutContent, Header (h1 title, Check now), Table, Chip, RadioGroup', () => {
+        mockReport(report({findings: [finding('m', 'CRITICAL'), finding('o', 'HIGH', 'OWNER_REPORTED')]}));
+        const {container} = render(<SecurityUpdates/>);
+        const used = name => container.querySelectorAll(`[data-moonstone="${name}"]`);
+
+        expect(used('LayoutContent')).toHaveLength(1);
+        const header = used('Header')[0];
+        expect(within(header).getByRole('heading', {level: 1})).toHaveTextContent('label');
+        expect(within(header).getByRole('button', {name: 'page.refresh'})).toHaveAttribute('data-moonstone', 'Button');
+        expect(within(header).getByText('page.statusLabel.OK')).toBeInTheDocument();
+        expect(used('Table')).toHaveLength(1);
+        expect(used('TableHeadCell')).toHaveLength(7);
+        expect(used('RadioGroup')).toHaveLength(1);
+        expect(used('RadioItem')).toHaveLength(2);
+        expect(container.querySelector('table')).not.toBeNull();
+    });
+
+    test('severity and source are Moonstone chips with a text label, and rows are not tab stops', () => {
+        mockReport(report({findings: [finding('m', 'CRITICAL')]}));
+        const {container} = render(<SecurityUpdates/>);
+        const chips = [...container.querySelectorAll('[data-moonstone="Chip"]')].map(chip => chip.textContent);
+
+        expect(chips).toEqual(expect.arrayContaining(['page.severity.CRITICAL', 'page.source.ADVISORY']));
+        container.querySelectorAll('tbody tr').forEach(row => expect(row).toHaveAttribute('tabindex', '-1'));
+    });
+
+    test('status messages carry a decorative Moonstone icon next to their text', () => {
+        mockReport(report({status: 'UNAVAILABLE'}));
+        render(<SecurityUpdates/>);
+
+        const message = screen.getByText('page.status.UNAVAILABLE').closest('div');
+        expect(within(message).getByTestId('icon-warning')).toHaveAttribute('aria-hidden', 'true');
+    });
 });

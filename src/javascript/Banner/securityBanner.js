@@ -17,16 +17,19 @@ const SEVERITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 // The colours come from the settings, validated server-side to a contrast of at least 7:1 (WCAG AAA). The text, the
 // link, the button border and the focus ring all use the text colour, so each of them keeps that contrast against
 // the background (the focus ring needs 3:1). The banner never relies on colour alone: the message says what it is.
+// Font and spacing are Moonstone's (CSS variables of the Jahia UI, with fallbacks for pages that lack them).
 const CSS = `
-#${BANNER_ID} { position: fixed; right: 16px; bottom: 16px; z-index: 9999; max-width: 420px; display: flex;
-  flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 12px 16px; border-radius: 4px;
+#${BANNER_ID} { position: fixed; right: var(--spacing-medium, 16px); bottom: var(--spacing-medium, 16px); z-index: 9999;
+  max-width: 420px; display: flex; flex-wrap: wrap; gap: var(--spacing-small, 8px) var(--spacing-medium, 16px);
+  align-items: center; padding: var(--spacing-small, 8px) var(--spacing-medium, 16px); border-radius: 4px;
   background: var(--security-updates-banner-bg, ${DEFAULT_BACKGROUND}); color: var(--security-updates-banner-fg, ${DEFAULT_TEXT});
-  font: 14px/1.5 'Nunito Sans', sans-serif; box-shadow: 0 4px 16px rgba(0, 0, 0, .35); }
+  font-family: var(--moon-font-family, 'Nunito Sans', sans-serif); font-size: 14px; line-height: 1.5;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .35); }
 #${BANNER_ID} p { margin: 0; flex: 1 1 100%; }
 #${BANNER_ID} a { color: var(--security-updates-banner-fg, ${DEFAULT_TEXT}); font-weight: 700; text-decoration: underline; }
 #${BANNER_ID} button { background: transparent; color: var(--security-updates-banner-fg, ${DEFAULT_TEXT});
   border: 1px solid var(--security-updates-banner-fg, ${DEFAULT_TEXT}); border-radius: 4px;
-  padding: 4px 12px; font: inherit; cursor: pointer; min-height: 32px; }
+  padding: var(--spacing-nano, 4px) var(--spacing-small, 8px); font: inherit; cursor: pointer; min-height: 32px; }
 #${BANNER_ID} a:focus-visible, #${BANNER_ID} button:focus-visible {
   outline: 3px solid var(--security-updates-banner-fg, ${DEFAULT_TEXT}); outline-offset: 2px; }
 `;

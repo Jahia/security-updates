@@ -2,26 +2,50 @@ import React, {useEffect, useRef, useState} from 'react';
 import PropTypes from 'prop-types';
 import {useMutation, useQuery} from '@apollo/client';
 import {useTranslation} from 'react-i18next';
-import {Button, Loader} from '@jahia/moonstone';
+import {
+    Button,
+    Chip,
+    Header,
+    LayoutContent,
+    Loader,
+    RadioGroup,
+    RadioItem,
+    Table,
+    TableBody,
+    TableBodyCell,
+    TableHead,
+    TableHeadCell,
+    TableRow,
+    Typography,
+    Warning
+} from '@jahia/moonstone';
 import styles from './SecurityUpdates.scss';
 import {GET_SECURITY_REPORT, REFRESH_SECURITY_REPORT} from './SecurityUpdates.gql';
 import {SettingsForm} from '../Settings/SettingsForm';
+import {StatusMessage} from './StatusMessage';
 import {adminUrl, filterFindings, formatDateTime, safeHttpsUrl, sortFindings} from './securityUpdatesUtils';
 
 const NS = 'security-updates';
 
-// Feed text is untrusted: everything below is rendered as React text (escaped); links only for https URLs.
+// Built from Moonstone (LayoutContent, Header, Table, Chip, RadioGroup, Typography, Button) like the other Jahia
+// administration pages. Feed text is untrusted: it is only rendered as React text, and links only for https URLs.
 
-const SeverityLabel = ({severity}) => {
+const SEVERITY_COLORS = {CRITICAL: 'danger', HIGH: 'warning', MEDIUM: 'accent', LOW: 'default', UNKNOWN: 'default'};
+
+const SeverityChip = ({severity}) => {
     const {t} = useTranslation(NS);
+    // The severity is written out; the colour only reinforces it.
+    const urgent = severity === 'CRITICAL' || severity === 'HIGH';
     return (
-        <span className={`${styles.severity} ${styles[`severity_${severity}`] || ''}`}>
-            {t(`page.severity.${severity}`)}
-        </span>
+        <Chip
+            color={SEVERITY_COLORS[severity] || 'default'}
+            label={t(`page.severity.${severity}`)}
+            icon={urgent ? <Warning aria-hidden="true"/> : undefined}
+        />
     );
 };
 
-SeverityLabel.propTypes = {severity: PropTypes.string.isRequired};
+SeverityChip.propTypes = {severity: PropTypes.string.isRequired};
 
 const AdvisoryList = ({advisories}) => {
     const {t} = useTranslation(NS);
@@ -33,13 +57,13 @@ const AdvisoryList = ({advisories}) => {
                 return (
                     <li key={advisory.id}>
                         {url ? (
-                            <a href={url} target="_blank" rel="noopener noreferrer">
+                            <Typography component="a" className={styles.link} href={url} target="_blank" rel="noopener noreferrer">
                                 {label}
                                 <span className={styles.srOnly}> {t('page.newTab')}</span>
-                            </a>
-                        ) : <span>{label}</span>}
+                            </Typography>
+                        ) : <Typography component="span">{label}</Typography>}
                         {advisory.cves && advisory.cves.length > 0 && (
-                            <span className={styles.cves}> ({advisory.cves.join(', ')})</span>
+                            <Typography component="span" variant="caption"> ({advisory.cves.join(', ')})</Typography>
                         )}
                     </li>
                 );
@@ -57,47 +81,51 @@ AdvisoryList.propTypes = {
     })).isRequired
 };
 
+const COLUMNS = ['component', 'installed', 'recommended', 'compatibility', 'severity', 'source', 'advisories'];
+
 const FindingsTable = ({findings}) => {
     const {t} = useTranslation(NS);
     return (
         <div className={styles.tableWrapper}>
-            <table className={styles.table}>
-                <caption className={styles.caption}>{t('page.table.caption')}</caption>
-                <thead>
-                    <tr>
-                        <th scope="col">{t('page.table.component')}</th>
-                        <th scope="col">{t('page.table.installed')}</th>
-                        <th scope="col">{t('page.table.recommended')}</th>
-                        <th scope="col">{t('page.table.compatibility')}</th>
-                        <th scope="col">{t('page.table.severity')}</th>
-                        <th scope="col">{t('page.table.source')}</th>
-                        <th scope="col">{t('page.table.advisories')}</th>
-                    </tr>
-                </thead>
-                <tbody>
+            <Table>
+                <caption className={styles.caption}>
+                    <Typography component="span" variant="heading">{t('page.table.caption')}</Typography>
+                </caption>
+                <TableHead>
+                    {/* Moonstone makes every row a tab stop; these rows have no action, so they are taken out of the tab order. */}
+                    <TableRow tabIndex={-1}>
+                        {COLUMNS.map(column => <TableHeadCell key={column} scope="col">{t(`page.table.${column}`)}</TableHeadCell>)}
+                    </TableRow>
+                </TableHead>
+                <TableBody>
                     {findings.map(finding => (
-                        <tr key={`${finding.groupId}:${finding.component}:${finding.source}`}>
-                            <th scope="row">
-                                <span className={styles.component}>{finding.component}</span>
-                                {finding.groupId && <span className={styles.groupId}>{finding.groupId}</span>}
-                            </th>
-                            <td>{finding.installedVersion}</td>
-                            <td>{finding.recommendedVersion}</td>
-                            <td>
-                                {t(`page.compatibility.${finding.compatibility}`)}
+                        <TableRow key={`${finding.groupId}:${finding.component}:${finding.source}`} tabIndex={-1}>
+                            <TableBodyCell component="th" scope="row" verticalAlign="top">
+                                <Typography component="span" weight="bold">{finding.component}</Typography>
+                                {finding.groupId && <Typography component="span" variant="caption" className={styles.block}>{finding.groupId}</Typography>}
+                            </TableBodyCell>
+                            <TableBodyCell verticalAlign="top">{finding.installedVersion}</TableBodyCell>
+                            <TableBodyCell verticalAlign="top">{finding.recommendedVersion}</TableBodyCell>
+                            <TableBodyCell verticalAlign="top">
+                                <Typography component="span">{t(`page.compatibility.${finding.compatibility}`)}</Typography>
                                 {finding.requiredJahiaVersion && finding.compatibility !== 'JAHIA_UPGRADE' && (
-                                    <span className={styles.secondary}>
+                                    <Typography component="span" variant="caption" className={styles.block}>
                                         {t('page.requires', {version: finding.requiredJahiaVersion})}
-                                    </span>
+                                    </Typography>
                                 )}
-                            </td>
-                            <td><SeverityLabel severity={finding.severity}/></td>
-                            <td>{t(`page.source.${finding.source}`)}</td>
-                            <td><AdvisoryList advisories={finding.advisories}/></td>
-                        </tr>
+                            </TableBodyCell>
+                            <TableBodyCell verticalAlign="top"><SeverityChip severity={finding.severity}/></TableBodyCell>
+                            <TableBodyCell verticalAlign="top">
+                                <Chip
+                                    color={finding.source === 'ADVISORY' ? 'accent' : 'default'}
+                                    label={t(`page.source.${finding.source}`)}
+                                />
+                            </TableBodyCell>
+                            <TableBodyCell verticalAlign="top"><AdvisoryList advisories={finding.advisories}/></TableBodyCell>
+                        </TableRow>
                     ))}
-                </tbody>
-            </table>
+                </TableBody>
+            </Table>
         </div>
     );
 };
@@ -111,14 +139,16 @@ const StoreErrors = ({errors}) => {
     }
 
     return (
-        <section className={styles.errors} aria-labelledby="security-updates-errors-title">
-            <h3 id="security-updates-errors-title" className={styles.subtitle}>{t('page.errors.title')}</h3>
-            <ul aria-labelledby="security-updates-errors-title">
+        <section className={styles.section} aria-labelledby="security-updates-errors-title">
+            <Typography component="h2" variant="heading" id="security-updates-errors-title">{t('page.errors.title')}</Typography>
+            <ul className={styles.list} aria-labelledby="security-updates-errors-title">
                 {errors.map(error => (
                     <li key={`${error.storeUrl}:${error.kind}:${error.message}`}>
-                        <strong>{t(`page.errorKind.${error.kind}`)}</strong>
-                        {error.storeUrl && <span> {error.storeUrl}</span>}
-                        {error.message && <span> ({error.message})</span>}
+                        <StatusMessage tone="warning">
+                            <strong>{t(`page.errorKind.${error.kind}`)}</strong>
+                            {error.storeUrl && <span> {error.storeUrl}</span>}
+                            {error.message && <span> ({error.message})</span>}
+                        </StatusMessage>
                     </li>
                 ))}
             </ul>
@@ -131,17 +161,19 @@ StoreErrors.propTypes = {errors: PropTypes.arrayOf(PropTypes.object)};
 const StatusNotice = ({report, hasFindings}) => {
     const {t} = useTranslation(NS);
     if (report.status === 'OK' && !hasFindings) {
-        return <p className={`${styles.notice} ${styles.notice_ok}`}>{t('page.empty')}</p>;
+        return <StatusMessage tone="info">{t('page.empty')}</StatusMessage>;
     }
 
     if (report.status === 'OK') {
         return null;
     }
 
-    return <p className={`${styles.notice} ${styles.notice_warning}`}>{t(`page.status.${report.status}`)}</p>;
+    return <StatusMessage tone="warning">{t(`page.status.${report.status}`)}</StatusMessage>;
 };
 
 StatusNotice.propTypes = {report: PropTypes.object.isRequired, hasFindings: PropTypes.bool.isRequired};
+
+const STATUS_CHIP_COLORS = {OK: 'success', PARTIAL: 'warning', UNAVAILABLE: 'danger', DISABLED: 'default', NOT_CHECKED: 'default'};
 
 export const SecurityUpdates = () => {
     const {t, i18n} = useTranslation(NS);
@@ -194,80 +226,70 @@ export const SecurityUpdates = () => {
             });
     };
 
-    let statusText = announcement;
-    if (loading) {
-        statusText = t('page.loading');
-    }
+    const statusText = loading ? t('page.loading') : announcement;
 
-    return (
-        <section className={styles.container} aria-labelledby="security-updates-title">
-            <h2 id="security-updates-title" className={styles.title}>{t('label')}</h2>
-            <p className={styles.intro}>{t('page.intro')}</p>
+    const header = (
+        <Header
+            title={t('label')}
+            mainActions={<Button size="big" color="accent" label={t('page.refresh')} onClick={onRefresh}/>}
+            status={report ? (
+                <Chip
+                    color={STATUS_CHIP_COLORS[report.status] || 'default'}
+                    label={t(`page.statusLabel.${report.status}`)}
+                />
+            ) : null}
+        />
+    );
 
-            <p role="status" aria-live="polite" aria-atomic="true" className={styles.announcement}>{statusText}</p>
+    const content = (
+        <div className={styles.page}>
+            <Typography>{t('page.intro')}</Typography>
+
+            <Typography role="status" aria-live="polite" aria-atomic="true" className={styles.announcement}>{statusText}</Typography>
 
             {loading && <div className={styles.loader} aria-hidden="true"><Loader size="big"/></div>}
 
-            {error && <p role="alert" className={`${styles.notice} ${styles.notice_error}`}>{t('page.error')}</p>}
+            {error && <StatusMessage tone="warning" role="alert">{t('page.error')}</StatusMessage>}
 
             {!loading && !error && report && (
                 <>
                     <dl className={styles.meta}>
-                        <dt>{t('page.jahiaVersion')}</dt>
-                        <dd>{report.jahiaVersion || t('page.unknown')}</dd>
-                        <dt>{t('page.checkedAt')}</dt>
-                        <dd>{formatDateTime(report.checkedAt, language) || t('page.never')}</dd>
-                        <dt>{t('page.lastSuccess')}</dt>
-                        <dd>{formatDateTime(report.lastSuccess, language) || t('page.never')}</dd>
+                        <Typography component="dt" weight="bold">{t('page.jahiaVersion')}</Typography>
+                        <Typography component="dd">{report.jahiaVersion || t('page.unknown')}</Typography>
+                        <Typography component="dt" weight="bold">{t('page.checkedAt')}</Typography>
+                        <Typography component="dd">{formatDateTime(report.checkedAt, language) || t('page.never')}</Typography>
+                        <Typography component="dt" weight="bold">{t('page.lastSuccess')}</Typography>
+                        <Typography component="dd">{formatDateTime(report.lastSuccess, language) || t('page.never')}</Typography>
                     </dl>
 
-                    <div className={styles.actions}>
-                        <Button
-                            label={t('page.refresh')}
-                            variant="primary"
-                            onClick={onRefresh}
-                        />
-                        <a className={styles.link} href={adminUrl('manageModules')}>{t('page.manageModules')}</a>
-                    </div>
+                    <Typography component="a" className={styles.link} href={adminUrl('manageModules')}>{t('page.manageModules')}</Typography>
 
-                    {refreshError && <p role="alert" className={`${styles.notice} ${styles.notice_error}`}>{t('page.refreshError')}</p>}
+                    {refreshError && <StatusMessage tone="warning" role="alert">{t('page.refreshError')}</StatusMessage>}
                     <StatusNotice report={report} hasFindings={allFindings.length > 0}/>
                     <StoreErrors errors={report.errors}/>
 
                     {allFindings.length > 0 && (
                         <>
                             <fieldset className={styles.filter}>
-                                <legend>{t('page.filter.legend')}</legend>
-                                <label>
-                                    <input
-                                        type="radio"
-                                        name="security-updates-filter"
-                                        value="advisories"
-                                        checked={filter === 'advisories'}
-                                        onChange={() => setFilter('advisories')}
-                                    />
-                                    {t('page.filter.advisories')}
-                                </label>
-                                <label>
-                                    <input
-                                        type="radio"
-                                        name="security-updates-filter"
-                                        value="all"
-                                        checked={filter === 'all'}
-                                        onChange={() => setFilter('all')}
-                                    />
-                                    {t('page.filter.all')}
-                                </label>
+                                <Typography component="legend" weight="bold">{t('page.filter.legend')}</Typography>
+                                <RadioGroup name="security-updates-filter" value={filter} onChange={(event, value) => setFilter(value)}>
+                                    <RadioItem id="security-updates-filter-advisories" value="advisories" label={t('page.filter.advisories')}/>
+                                    <RadioItem id="security-updates-filter-all" value="all" label={t('page.filter.all')}/>
+                                </RadioGroup>
                             </fieldset>
-                            {shown.length > 0 ? <FindingsTable findings={shown}/> : <p className={styles.notice}>{t('page.filteredEmpty')}</p>}
+                            {shown.length > 0 ? <FindingsTable findings={shown}/> : <StatusMessage tone="info">{t('page.filteredEmpty')}</StatusMessage>}
                         </>
                     )}
                 </>
             )}
 
             <SettingsForm/>
-        </section>
+        </div>
     );
+
+    // The loader is rendered in the content rather than through LayoutContent's isLoading, which would also hide the
+    // status region that announces the loading.
+    return <LayoutContent hasPadding header={header} content={content}/>;
 };
 
 export default SecurityUpdates;

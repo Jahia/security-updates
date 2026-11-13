@@ -172,4 +172,72 @@ describe('SettingsForm', () => {
         const {container} = render(<SettingsForm/>);
         expect(container).toBeEmptyDOMElement();
     });
+
+    test('is built from Moonstone Field, Switch, Input, Textarea and Button; selects keep their own name', () => {
+        const {container} = render(<SettingsForm/>);
+        const used = name => container.querySelectorAll(`[data-moonstone="${name}"]`).length;
+
+        expect(used('Field')).toBe(12);
+        expect(used('Switch')).toBe(4);
+        expect(used('Input')).toBe(5);
+        expect(used('Textarea')).toBe(1);
+        expect(screen.getByRole('button', {name: 'settings.save'})).toHaveAttribute('data-moonstone', 'Button');
+        expect(screen.getByRole('heading', {level: 2, name: 'settings.title'})).toBeInTheDocument();
+        expect(screen.getByRole('combobox', {name: 'settings.fields.bannerDismissPolicy.label'})).toHaveValue('SESSION');
+    });
+
+    describe('contrast suggestions', () => {
+        const fail = (background, text) => {
+            render(<SettingsForm/>);
+            const form = within(section());
+            fireEvent.change(form.getByLabelText('settings.fields.bannerBackgroundColor.label'), {target: {value: background}});
+            fireEvent.change(form.getByLabelText('settings.fields.bannerTextColor.label'), {target: {value: text}});
+        };
+
+        test('a passing pair shows no suggestion', () => {
+            render(<SettingsForm/>);
+            expect(screen.queryByTestId('security-updates-suggestions')).toBeNull();
+        });
+
+        test('a failing pair shows both suggestions, with a decorative swatch, the value and ratio as text, and named buttons', () => {
+            fail('#1B1B1B', '#333333');
+
+            const forText = screen.getByTestId('security-updates-suggestion-text');
+            expect(forText.querySelector('[aria-hidden="true"]').style.backgroundColor).toBe('rgb(166, 166, 166)');
+            expect(within(forText).getByText('settings.suggest.text')).toBeInTheDocument();
+            expect(within(forText).getByRole('button', {name: 'settings.suggest.use_text'})).toBeInTheDocument();
+            expect(screen.getByTestId('security-updates-suggestion-background')).toBeInTheDocument();
+        });
+
+        test('using a suggestion fills the field, passes the preview and is announced', () => {
+            fail('#1B1B1B', '#333333');
+
+            fireEvent.click(within(screen.getByTestId('security-updates-suggestion-text')).getByRole('button'));
+
+            expect(within(section()).getByLabelText('settings.fields.bannerTextColor.label')).toHaveValue('#A6A6A6');
+            expect(screen.getByTestId('security-updates-contrast')).toHaveTextContent('settings.preview.pass');
+            expect(screen.getByTestId('security-updates-settings-status')).toHaveTextContent('settings.suggest.appliedText');
+            expect(screen.queryByTestId('security-updates-suggestions')).toBeNull();
+        });
+
+        test('using the background suggestion fills the background field', () => {
+            fail('#1B1B1B', '#333333');
+
+            fireEvent.click(within(screen.getByTestId('security-updates-suggestion-background')).getByRole('button'));
+
+            expect(within(section()).getByLabelText('settings.fields.bannerBackgroundColor.label')).toHaveValue('#C1C1C1');
+            expect(screen.getByTestId('security-updates-settings-status')).toHaveTextContent('settings.suggest.appliedBackground');
+        });
+
+        test('when no single change can reach 7:1, the default colours are offered', () => {
+            fail('#777777', '#888888');
+
+            expect(screen.getByText('settings.suggest.none')).toBeInTheDocument();
+            fireEvent.click(screen.getByRole('button', {name: 'settings.suggest.useDefaults'}));
+
+            expect(within(section()).getByLabelText('settings.fields.bannerBackgroundColor.label')).toHaveValue('#1B1B1B');
+            expect(within(section()).getByLabelText('settings.fields.bannerTextColor.label')).toHaveValue('#FFFFFF');
+            expect(screen.getByTestId('security-updates-settings-status')).toHaveTextContent('settings.suggest.appliedDefaults');
+        });
+    });
 });

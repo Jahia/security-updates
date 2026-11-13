@@ -156,6 +156,8 @@ describe('showSecurityBanner', () => {
         expect(element.style.getPropertyValue('--security-updates-banner-fg')).toBe('#FFFFFF');
         const css = document.getElementById('security-updates-banner-style').textContent;
         expect(css).toContain('background: var(--security-updates-banner-bg');
+        expect(css).toContain('font-family: var(--moon-font-family');
+        expect(css).toContain('padding: var(--spacing-small');
         expect(css).toMatch(/a \{[^}]*color: var\(--security-updates-banner-fg/);
         expect(css).toMatch(/button \{[^}]*color: var\(--security-updates-banner-fg/);
         expect(css).toMatch(/focus-visible[^{]*\{[^}]*outline: 3px solid var\(--security-updates-banner-fg/);

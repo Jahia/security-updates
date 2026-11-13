@@ -1,14 +1,108 @@
-// Lightweight test doubles for the @jahia/moonstone components used by the module.
+// Test doubles for the @jahia/moonstone components used by the module. They mirror the markup the real components
+// render (checked by rendering Moonstone 2.21.1 in jsdom): Field puts its id on the wrapper and renders an
+// unassociated <label>; Input, Switch and Textarea put id and aria-* on the control; Header renders an h1; Table
+// cells take `component`. Each double carries data-moonstone="<Name>" so that tests can check what is used.
 import React from 'react';
 
-export const Button = ({label, onClick, isDisabled, type = 'button', ...rest}) => (
-    <button type={type} disabled={isDisabled} aria-describedby={rest['aria-describedby']} onClick={onClick}>
-        {label}
+const mark = name => ({'data-moonstone': name});
+
+export const Button = ({label, onClick, isDisabled, variant, size, icon, ...rest}) => (
+    <button type="button" disabled={isDisabled} data-variant={variant} data-size={size} onClick={onClick} {...mark('Button')} {...rest}>
+        {icon}{label}
     </button>
 );
 
-export const Loader = () => <span data-testid="loader"/>;
+export const Loader = () => <span data-testid="loader" {...mark('Loader')}/>;
 
-export const Typography = ({children, component: Component = 'span', id, className}) => (
-    <Component id={id} className={className}>{children}</Component>
+export const Typography = ({children, component: Component = 'p', variant, weight, isNowrap, ...rest}) => (
+    <Component data-variant={variant} {...mark('Typography')} {...rest}>{children}</Component>
 );
+
+export const LayoutContent = ({header, content, isLoading, hasPadding, ...rest}) => (
+    <div {...mark('LayoutContent')} {...rest}>
+        {header}
+        <div>{isLoading ? <span data-testid="loader"/> : content}</div>
+    </div>
+);
+
+export const Header = ({title, mainActions, status, toolbarLeft, toolbarRight, ...rest}) => (
+    <header {...mark('Header')} {...rest}>
+        <h1>{title}</h1>
+        <div>{mainActions}</div>
+        <div>{status}{toolbarLeft}{toolbarRight}</div>
+    </header>
+);
+
+export const Separator = () => <hr {...mark('Separator')}/>;
+
+export const Chip = ({label, color, variant, icon, ...rest}) => (
+    <span data-color={color} {...mark('Chip')} {...rest}>{icon}<span>{label}</span></span>
+);
+
+export const Table = ({children, ...rest}) => <table {...mark('Table')} {...rest}>{children}</table>;
+export const TableHead = ({children, ...rest}) => <thead {...mark('TableHead')} {...rest}>{children}</thead>;
+export const TableBody = ({children, ...rest}) => <tbody {...mark('TableBody')} {...rest}>{children}</tbody>;
+export const TableRow = ({children, ...rest}) => <tr {...mark('TableRow')} {...rest}>{children}</tr>;
+export const TableHeadCell = ({children, ...rest}) => <th {...mark('TableHeadCell')} {...rest}>{children}</th>;
+export const TableBodyCell = ({children, component: Component = 'td', verticalAlign, ...rest}) => (
+    <Component {...mark('TableBodyCell')} {...rest}>{children}</Component>
+);
+
+export const Field = ({id, label, children, hasError, helper, ...rest}) => (
+    <div id={id} data-has-error={hasError ? 'true' : undefined} {...mark('Field')} {...rest}>
+        <label>{label}</label>
+        {children}
+    </div>
+);
+
+export const Input = ({isDisabled, onChange, value, ...rest}) => (
+    <div><input disabled={isDisabled} value={value} onChange={onChange} {...mark('Input')} {...rest}/></div>
+);
+
+export const Textarea = ({isDisabled, onChange, value, ...rest}) => (
+    <textarea disabled={isDisabled} value={value} onChange={onChange} {...mark('Textarea')} {...rest}/>
+);
+
+export const Switch = ({isDisabled, onChange, checked, value = '', ...rest}) => (
+    <div>
+        <input
+            type="checkbox"
+            role="checkbox"
+            checked={checked}
+            disabled={isDisabled}
+            onChange={event => onChange && onChange(event, value, event.target.checked)}
+            {...mark('Switch')}
+            {...rest}
+        />
+    </div>
+);
+
+const RadioContext = React.createContext({});
+
+export const RadioGroup = ({name, value, onChange, children, ...rest}) => (
+    <RadioContext.Provider value={{name, value, onChange}}>
+        <div {...mark('RadioGroup')} {...rest}>{children}</div>
+    </RadioContext.Provider>
+);
+
+export const RadioItem = ({id, label, value, ...rest}) => {
+    const group = React.useContext(RadioContext);
+    return (
+        <label {...mark('RadioItem')}>
+            <input
+                type="radio"
+                id={id}
+                name={group.name}
+                value={value}
+                aria-labelledby={`${id}-label`}
+                checked={group.value === value}
+                onChange={event => group.onChange && group.onChange(event, value)}
+                {...rest}
+            />
+            <span id={`${id}-label`}>{label}</span>
+        </label>
+    );
+};
+
+export const Information = props => <svg data-testid="icon-information" {...mark('Information')} {...props}/>;
+export const Warning = props => <svg data-testid="icon-warning" {...mark('Warning')} {...props}/>;

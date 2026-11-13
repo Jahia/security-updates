@@ -72,4 +72,13 @@ describe('locales', () => {
         ['SESSION', 'HOURS', 'UNTIL_CHANGE', 'NEVER'].forEach(policy => expect(en.settings.dismiss[policy]).toBeTruthy());
         expect(en.settings.errors.LOW_CONTRAST).toContain('{{ratio}}');
     });
+
+    test('suggestion buttons and announcements name the colour value', () => {
+        [en, fr].forEach(locale => {
+            ['use_text', 'use_background', 'appliedText', 'appliedBackground', 'text', 'background'].forEach(key => {
+                expect(locale.settings.suggest[key]).toContain('{{value}}');
+            });
+            expect(locale.settings.suggest.useDefaults).toContain('{{background}}');
+        });
+    });
 });
