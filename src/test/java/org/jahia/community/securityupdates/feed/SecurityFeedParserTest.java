@@ -314,6 +314,30 @@ class SecurityFeedParserTest {
         assertThatThrownBy(() -> SecurityFeedParser.parse(apostrophe)).isInstanceOf(FeedFormatException.class);
     }
 
+    @ParameterizedTest(name = "a quote inside an unquoted token ({0}) opens no string and cannot hide deep nesting")
+    @ValueSource(strings = {"a'", "a\"", "a'b'"})
+    void quoteInsideATokenCannotHideNesting(String key) {
+        int depth = 100_000;
+        String json = "{" + key + ":" + "{a:".repeat(depth) + "1" + "}".repeat(depth + 1);
+
+        assertThatThrownBy(() -> SecurityFeedParser.parse(json))
+                .isInstanceOf(FeedFormatException.class)
+                .hasMessageContaining("levels deep")
+                .satisfies(e -> assertThat(((FeedFormatException) e).getDetail()).isEqualTo(StoreErrorDetail.INVALID_JSON));
+        assertThatThrownBy(() -> ModuleCatalogParser.parse("[" + json + "]"))
+                .isInstanceOf(FeedFormatException.class)
+                .hasMessageContaining("levels deep");
+    }
+
+    @Test
+    @DisplayName("a quote after whitespace that follows a key or value start still opens a string")
+    void quoteAfterWhitespaceOpensAString() throws Exception {
+        String brackets = "[{".repeat(100);
+        String json = "{ \"schemaVersion\" :\t1 ,\n 'note' : '" + brackets + "' ; \"advisories\": [ ]}";
+
+        assertThat(SecurityFeedParser.parse(json).getAdvisories()).isEmpty();
+    }
+
     private static String advisoryWithFix(String fix) {
         return "{\"schemaVersion\":1,\"advisories\":[{\"id\":\"JSA-1\",\"fixes\":[" + fix + "]}]}";
     }

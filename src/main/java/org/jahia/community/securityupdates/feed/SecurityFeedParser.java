@@ -121,6 +121,9 @@ public final class SecurityFeedParser {
             return (JSONObject) value;
         } catch (JSONException e) {
             throw new FeedFormatException(StoreErrorDetail.INVALID_JSON, "The security feed is not valid JSON", e);
+        } catch (StackOverflowError e) {
+            // backstop of the nesting pre-scan: the deep recursion is over, the stack is usable again
+            throw new FeedFormatException(StoreErrorDetail.INVALID_JSON, "The security feed is nested too deeply");
         }
     }
 

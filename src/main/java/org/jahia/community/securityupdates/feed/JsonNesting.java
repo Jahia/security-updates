@@ -7,11 +7,18 @@ import org.jahia.community.securityupdates.model.StoreErrorDetail;
  * thousands of levels deep would exhaust the stack. One linear pass, brackets inside strings ignored. Strings are
  * delimited by double quotes, or by single quotes, which org.json's tokenizer also accepts: a quote of the other kind
  * inside a string is a plain character, a backslash escapes the next character in both.
+ *
+ * <p>As in org.json's lenient tokenizer, a quote opens a string only where a value or a key starts: at the start of
+ * the document, or after one of {@code { [ , : ;} (and {@code =}, which some org.json versions accept after a key),
+ * whitespace skipped. A quote anywhere else is part of an unquoted token ({@code a'}) or a syntax error, so it cannot
+ * hide the brackets that follow it.
  */
 final class JsonNesting {
 
     /** Deepest nesting of arrays and objects accepted; the feeds need 6 levels. */
     static final int MAX_DEPTH = 64;
+    /** The characters after which a value or a key starts; 0 stands for the start of the document. */
+    private static final String VALUE_STARTS = "\0{[,:;=";
 
     private JsonNesting() {
     }
@@ -23,10 +30,11 @@ final class JsonNesting {
      */
     static void check(String json, String what) throws FeedFormatException {
         int depth = 0;
+        char previous = 0;
         int i = 0;
         while (i < json.length()) {
             char c = json.charAt(i);
-            if (c == '"' || c == '\'') {
+            if ((c == '"' || c == '\'') && VALUE_STARTS.indexOf(previous) >= 0) {
                 i = closingQuote(json, i + 1, c);
             } else if (c == '[' || c == '{') {
                 depth++;
@@ -36,6 +44,10 @@ final class JsonNesting {
                 }
             } else if (c == ']' || c == '}') {
                 depth--;
+            }
+            if (c > ' ') {
+                // org.json skips every character up to the space between tokens
+                previous = c;
             }
             i++;
         }
