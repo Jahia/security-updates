@@ -24,7 +24,7 @@ public class SecurityUpdatesQuery {
     @GraphQLRequiresPermission(Permissions.ADMIN_TEMPLATES)
     public GqlSecurityReport getReport() {
         SecurityUpdateService service = ServiceLocator.service();
-        return service == null ? GqlSecurityReport.serviceUnavailable() : new GqlSecurityReport(service.getReport());
+        return service == null ? GqlSecurityReport.serviceUnavailable() : new GqlSecurityReport(service.getReportView());
     }
 
     @GraphQLField

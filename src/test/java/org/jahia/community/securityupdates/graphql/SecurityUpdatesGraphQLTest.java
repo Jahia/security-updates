@@ -54,7 +54,7 @@ class SecurityUpdatesGraphQLTest {
     @DisplayName("exposes the report of the service")
     void query() {
         SecurityUpdateService service = mock(SecurityUpdateService.class);
-        when(service.getReport()).thenReturn(report());
+        when(service.getReportView()).thenReturn(new org.jahia.community.securityupdates.model.ReportView(report(), false, null, false));
         ServiceLocator.override(() -> service);
 
         GqlSecurityReport gql = new SecurityUpdatesQuery().getReport();
@@ -89,7 +89,7 @@ class SecurityUpdatesGraphQLTest {
     @DisplayName("only https advisory links are exposed")
     void onlyHttpsLinks() {
         SecurityUpdateService service = mock(SecurityUpdateService.class);
-        when(service.getReport()).thenReturn(report());
+        when(service.getReportView()).thenReturn(new org.jahia.community.securityupdates.model.ReportView(report(), false, null, false));
         ServiceLocator.override(() -> service);
 
         assertThat(new SecurityUpdatesQuery().getReport().getFindings().get(0).getAdvisories().get(1).getUrl()).isNull();
@@ -132,7 +132,7 @@ class SecurityUpdatesGraphQLTest {
     @DisplayName("the refresh mutation runs an on-demand refresh")
     void mutation() {
         SecurityUpdateService service = mock(SecurityUpdateService.class);
-        when(service.refresh()).thenReturn(report());
+        when(service.refresh()).thenReturn(new org.jahia.community.securityupdates.model.ReportView(report(), true, null, false));
         ServiceLocator.override(() -> service);
 
         GqlSecurityReport gql = new SecurityUpdatesMutation().refresh();

@@ -30,7 +30,9 @@ public class SecurityUpdatesMutation {
     @GraphQLField
     @GraphQLName("refresh")
     @GraphQLNonNull
-    @GraphQLDescription("Checks the stores now (at most once every 30 seconds) and returns the resulting report")
+    @GraphQLDescription("Starts a check of the stores in the background (unless one runs, or one started less than "
+            + "onDemandMinIntervalSeconds ago, 30 by default) and returns the current report at once: poll the report "
+            + "until inProgress is false")
     @GraphQLRequiresPermission(Permissions.ADMIN_TEMPLATES)
     public GqlSecurityReport refresh() {
         SecurityUpdateService service = ServiceLocator.service();

@@ -2,7 +2,6 @@ package org.jahia.community.securityupdates.feed;
 
 import org.jahia.services.content.JCRCallback;
 import org.jahia.services.content.JCRTemplate;
-import org.osgi.service.component.annotations.Component;
 
 import javax.jcr.Node;
 import javax.jcr.NodeIterator;
@@ -14,16 +13,18 @@ import java.util.List;
 /**
  * Reads the stores configured in the module manager: the {@code jnt:forgeServerSettings} nodes under
  * {@code /settings/forgesSettings}, with their {@code j:url}, {@code j:user} and {@code j:password}
- * (as Jahia's module manager {@code ForgeService} does), using a system session. The password is only
- * handed to the store client and never logged.
+ * (as Jahia's module manager {@code ForgeService} does up to version 2.12), using a system session. The password is
+ * only handed to the store client and never logged. Used by {@link ModuleManagerForgeSettingsReader}.
  */
-@Component(service = ForgeSettingsReader.class)
-public class JcrForgeSettingsReader implements ForgeSettingsReader {
+public class JcrForgeSettingsReader {
 
     static final String FORGES_PATH = "/settings/forgesSettings";
     static final String FORGE_TYPE = "jnt:forgeServerSettings";
 
-    @Override
+    /**
+     * @return the stores of the JCR forge settings; empty when there is none
+     * @throws RepositoryException when the JCR cannot be read
+     */
     public List<StoreTarget> readForges() throws RepositoryException {
         return JCRTemplate.getInstance().doExecuteWithSystemSession(
                 (JCRCallback<List<StoreTarget>>) JcrForgeSettingsReader::read);
