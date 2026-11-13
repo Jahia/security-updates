@@ -81,8 +81,7 @@ class StoreClientTest {
         client.fetch(StoreTarget.store(BASE, null, null));
 
         verify(fetcher).get(eq(FEED_URL), anyMap(), eq(StoreClient.MAX_FEED_BYTES));
-        verify(fetcher).get(eq(LIST_URL), anyMap(), eq(StoreClient.MAX_CATALOG_BYTES));
-        assertThat(StoreClient.MAX_CATALOG_BYTES).isEqualTo(4 * 1024 * 1024);
+        verify(fetcher).get(eq(LIST_URL), anyMap(), eq(4 * 1024 * 1024));
     }
 
     @Test

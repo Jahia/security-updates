@@ -3,7 +3,7 @@ package org.jahia.community.securityupdates.feed;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
+import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.HttpEntity;
 import org.apache.hc.core5.util.Timeout;
 import org.jahia.services.notification.HttpClientService;
@@ -64,8 +64,7 @@ public class JahiaHttpFetcher implements HttpFetcher {
         }
         CloseableHttpClient client = service.getHttpClient(url);
         HttpGet request = new HttpGet(url);
-        RequestConfig config = service.getRequestConfigBuilder(client)
-                .setConnectTimeout(Timeout.of(timeouts.connect))
+        RequestConfig config = connectTimeout(service.getRequestConfigBuilder(client), timeouts.connect)
                 .setConnectionRequestTimeout(Timeout.of(timeouts.connect))
                 .setResponseTimeout(Timeout.of(timeouts.response))
                 .setRedirectsEnabled(false)
@@ -75,21 +74,35 @@ public class JahiaHttpFetcher implements HttpFetcher {
 
         long deadline = System.nanoTime() + timeouts.readDeadline.toNanos();
         inFlight.add(request);
-        try (CloseableHttpResponse response = client.execute(request)) {
-            int status = response.getCode();
-            HttpEntity entity = response.getEntity();
-            boolean ok = status == HttpStatus.OK;
-            if (ok && entity != null && entity.getContentLength() > maxBytes) {
-                throw new ResponseTooLargeException(maxBytes);
-            }
-            InputStream body = entity == null ? null : entity.getContent();
-            String text = ok
-                    ? BoundedReader.read(body, maxBytes, deadline, false)
-                    : BoundedReader.read(body, MAX_ERROR_BODY_BYTES, deadline, true);
-            return new HttpResult(status, text);
+        try {
+            return client.execute(request, response -> read(response, maxBytes, deadline));
         } finally {
             inFlight.remove(request);
         }
+    }
+
+    /**
+     * Jahia owns and shares the HTTP client, so its connection manager cannot be given a per-request connect
+     * timeout; the request-level setting, deprecated in HttpClient 5.2 in favour of the connection manager, is the
+     * only way to bound the connection of one request.
+     */
+    @SuppressWarnings({"deprecation", "java:S1874"})
+    private static RequestConfig.Builder connectTimeout(RequestConfig.Builder builder, Duration connect) {
+        return builder.setConnectTimeout(Timeout.of(connect));
+    }
+
+    private static HttpResult read(ClassicHttpResponse response, int maxBytes, long deadline) throws IOException {
+        int status = response.getCode();
+        HttpEntity entity = response.getEntity();
+        boolean ok = status == HttpStatus.OK;
+        if (ok && entity != null && entity.getContentLength() > maxBytes) {
+            throw new ResponseTooLargeException(maxBytes);
+        }
+        InputStream body = entity == null ? null : entity.getContent();
+        String text = ok
+                ? BoundedReader.read(body, maxBytes, deadline, false)
+                : BoundedReader.read(body, MAX_ERROR_BODY_BYTES, deadline, true);
+        return new HttpResult(status, text);
     }
 
     @Override

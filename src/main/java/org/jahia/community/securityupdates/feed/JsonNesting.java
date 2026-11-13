@@ -21,20 +21,11 @@ final class JsonNesting {
      */
     static void check(String json, String what) throws FeedFormatException {
         int depth = 0;
-        boolean inString = false;
-        boolean escaped = false;
-        for (int i = 0; i < json.length(); i++) {
+        int i = 0;
+        while (i < json.length()) {
             char c = json.charAt(i);
-            if (inString) {
-                if (escaped) {
-                    escaped = false;
-                } else if (c == '\\') {
-                    escaped = true;
-                } else if (c == '"') {
-                    inString = false;
-                }
-            } else if (c == '"') {
-                inString = true;
+            if (c == '"') {
+                i = closingQuote(json, i + 1);
             } else if (c == '[' || c == '{') {
                 depth++;
                 if (depth > MAX_DEPTH) {
@@ -44,6 +35,26 @@ final class JsonNesting {
             } else if (c == ']' || c == '}') {
                 depth--;
             }
+            i++;
         }
+    }
+
+    /**
+     * @return the index of the quote that closes the string starting at {@code from}, or the document length when
+     *         the string is not closed; escaped characters are skipped
+     */
+    private static int closingQuote(String json, int from) {
+        int i = from;
+        while (i < json.length()) {
+            char c = json.charAt(i);
+            if (c == '\\') {
+                i += 2;
+            } else if (c == '"') {
+                return i;
+            } else {
+                i++;
+            }
+        }
+        return json.length();
     }
 }

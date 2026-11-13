@@ -66,7 +66,11 @@ class JahiaHttpFetcherTest {
         server.createContext("/slow", exchange -> {
             slowRequestReceived.countDown();
             try {
-                Thread.sleep(5_000);
+                // Never released: the handler holds the response for at most 5 s, like a slow store.
+                if (!new CountDownLatch(1).await(5, TimeUnit.SECONDS)) {
+                    respond(exchange, 200, "late");
+                    return;
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }

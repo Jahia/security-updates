@@ -100,12 +100,13 @@ class SecurityUpdatesSettingsGraphQLTest {
     @Test
     @DisplayName("without the store, or when it cannot be read, settings is a GraphQL error without details")
     void settingsUnavailable() throws IOException {
+        SecurityUpdatesQuery query = new SecurityUpdatesQuery();
         ServiceLocator.overrideStore(() -> null);
-        assertThatThrownBy(() -> new SecurityUpdatesQuery().getSettings()).isInstanceOf(DataFetchingException.class);
+        assertThatThrownBy(query::getSettings).isInstanceOf(DataFetchingException.class);
 
         ServiceLocator.overrideStore(() -> store);
         when(store.load()).thenThrow(new IOException("/var/jahia/karaf/etc unreadable"));
-        assertThatThrownBy(() -> new SecurityUpdatesQuery().getSettings()).isInstanceOf(DataFetchingException.class)
+        assertThatThrownBy(query::getSettings).isInstanceOf(DataFetchingException.class)
                 .hasMessageNotContaining("/var/jahia");
     }
 

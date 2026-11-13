@@ -174,7 +174,7 @@ class SettingsStoreTest {
 
     @Test
     @DisplayName("without karaf.etc, a new configuration cannot be written")
-    void noKarafEtc() throws IOException {
+    void noKarafEtc() {
         when(configuration.getProperties()).thenReturn(null);
         SettingsStore noEtc = new SettingsStore(() -> " ", audit::add);
         noEtc.setConfigurationAdmin(configAdmin);
