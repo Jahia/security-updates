@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * Builds one report: reads every store, keeps the last data read from each one, matches the installed components
@@ -75,6 +76,14 @@ final class ReportAssembler {
      * @return the report, or null when the check was stopped
      */
     SecurityReport assemble(Settings settings, Sources sources, Instant now, SecurityReport previous, BooleanSupplier closed) {
+        return assemble(settings, sources, new StoreClient(sources.httpFetcher)::fetch, now, previous, closed);
+    }
+
+    /**
+     * @param fetch reads one store (the {@link StoreClient} of the sources' fetcher, or a test double)
+     */
+    SecurityReport assemble(Settings settings, Sources sources, Function<StoreTarget, StoreFetchResult> fetch, Instant now,
+                            SecurityReport previous, BooleanSupplier closed) {
         List<StoreError> errors = new ArrayList<>();
         List<StoreTarget> targets = StoreTargets.of(settings, sources.forgeSettingsReader, errors);
         boolean complete = errors.isEmpty();
@@ -83,7 +92,6 @@ final class ReportAssembler {
             complete = false;
         }
 
-        StoreClient client = new StoreClient(sources.httpFetcher);
         List<SecurityFeed> feeds = new ArrayList<>();
         List<ModuleCatalog> catalogs = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
@@ -93,7 +101,7 @@ final class ReportAssembler {
             }
             String key = StoreUrls.normalize(target.getUrl()).orElse(StoreUrls.display(target.getUrl()));
             if (seen.add(key)) {
-                StoreOutcome outcome = collect(client.fetch(target));
+                StoreOutcome outcome = collect(fetch.apply(target));
                 outcome.addTo(feeds, catalogs, errors);
                 complete = complete && outcome.complete;
             }
