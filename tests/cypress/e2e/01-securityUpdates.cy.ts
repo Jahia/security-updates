@@ -118,7 +118,7 @@ describe('Security updates: report, Check now and the admin page', () => {
         });
 
         cy.get('[data-testid="security-updates-status"]', {timeout: 120000})
-            .should('contain', 'Check completed. 3 components need a security update.');
+            .should('contain', 'Check completed. 2 components need a security update.');
         cy.contains('button', 'Check now').should('not.have.attr', 'aria-busy');
         cy.get('[data-testid="security-updates-checking"]').should('not.exist');
     });

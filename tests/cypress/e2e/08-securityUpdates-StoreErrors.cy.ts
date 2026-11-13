@@ -124,7 +124,9 @@ describe('Security updates: store errors', () => {
         });
 
         openPage();
-        cy.contains('Partly checked').should('be.visible');
+        // Findings come first: the chip says "Updates needed", and the status line says the list may be incomplete.
+        cy.contains('Updates needed').should('be.visible');
+        cy.contains('Some stores could not be checked: this list may be incomplete.').should('be.visible');
         cy.get(FINDING_ROWS).should('have.length', 3);
         cy.get(ERRORS_TITLE).should('be.visible');
     });
