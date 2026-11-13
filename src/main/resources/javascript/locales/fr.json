@@ -81,5 +81,95 @@
     },
     "link": "Voir les mises à jour de sécurité",
     "dismiss": "Fermer"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "intro": "Les modifications sont enregistrées dans la configuration org.jahia.community.securityupdates (karaf/etc) et s'appliquent immédiatement.",
+    "groups": {
+      "checks": "Vérifications",
+      "banner": "Avis dans l'interface de Jahia"
+    },
+    "fields": {
+      "enabled": {
+        "label": "Rechercher les mises à jour de sécurité dans les stores",
+        "help": "Si la case est décochée, aucun store n'est interrogé et cette page indique que la vérification est désactivée."
+      },
+      "refreshIntervalHours": {
+        "label": "Heures entre deux vérifications",
+        "help": "Un nombre entier de 1 à 720. La première vérification a lieu environ une minute après une modification."
+      },
+      "useForgeSettings": {
+        "label": "Utiliser les stores du gestionnaire de modules",
+        "help": "Interroge les stores configurés dans la gestion des modules, avec leurs identifiants."
+      },
+      "defaultStoreUrl": {
+        "label": "URL du store par défaut",
+        "help": "Utilisée quand aucun store n'est configuré dans le gestionnaire de modules. Une URL http ou https absolue, ou vide pour aucun."
+      },
+      "extraFeedUrls": {
+        "label": "URL de flux de sécurité supplémentaires",
+        "help": "URL complètes de flux de sécurité, séparées par des virgules. URL http ou https absolues, sans identifiants."
+      },
+      "bannerEnabled": {
+        "label": "Afficher l'avis",
+        "help": "Affiche un avis sur toutes les pages de l'interface de Jahia aux utilisateurs qui peuvent gérer les modules."
+      },
+      "bannerMinimumSeverity": {
+        "label": "Gravité la plus basse prise en compte par l'avis",
+        "help": "Les résultats de gravité inférieure ne sont pas comptés."
+      },
+      "bannerIncludeOwnerReports": {
+        "label": "Compter les signalements des propriétaires de modules",
+        "help": "Si la case est décochée, seuls les bulletins Jahia sont comptés."
+      },
+      "bannerBackgroundColor": {
+        "label": "Couleur de fond de l'avis (hexadécimal)",
+        "picker": "Choisir la couleur de fond de l'avis",
+        "help": "#RRGGBB. Le rapport de contraste avec la couleur du texte doit être d'au moins 7:1."
+      },
+      "bannerTextColor": {
+        "label": "Couleur du texte de l'avis (hexadécimal)",
+        "picker": "Choisir la couleur du texte de l'avis",
+        "help": "#RRGGBB. Également utilisée pour le lien, le bouton et l'indicateur de focus."
+      },
+      "bannerDismissPolicy": {
+        "label": "Après la fermeture de l'avis",
+        "help": "Sauf avec « Ne peut pas être fermé », l'avis revient quand d'autres composants sont concernés."
+      },
+      "bannerDismissHours": {
+        "label": "Heures pendant lesquelles l'avis reste masqué",
+        "help": "Un nombre entier de 1 à 720, utilisé par « Masqué pendant un nombre d'heures »."
+      }
+    },
+    "dismiss": {
+      "SESSION": "Masqué jusqu'à la fin de la session du navigateur",
+      "HOURS": "Masqué pendant un nombre d'heures",
+      "UNTIL_CHANGE": "Masqué jusqu'à ce que d'autres composants soient concernés",
+      "NEVER": "Ne peut pas être fermé"
+    },
+    "preview": {
+      "title": "Aperçu",
+      "ratio": "Rapport de contraste :",
+      "pass": "Atteint le minimum de 7:1 (WCAG AAA).",
+      "fail": "En dessous du minimum de 7:1 : cette paire ne peut pas être enregistrée.",
+      "invalid": "Saisissez deux couleurs #RRGGBB pour voir le rapport de contraste."
+    },
+    "save": "Enregistrer les paramètres",
+    "reset": "Rétablir les valeurs par défaut",
+    "saving": "Enregistrement...",
+    "saved": "Paramètres enregistrés.",
+    "resetDone": "Paramètres par défaut rétablis.",
+    "invalid": "Certains paramètres ne sont pas valides : rien n'a été enregistré. Voir les champs signalés en erreur.",
+    "errors": {
+      "MISSING": "Une valeur est requise.",
+      "INVALID_BOOLEAN": "Doit être coché ou décoché.",
+      "INVALID_NUMBER": "Saisissez un nombre entier.",
+      "OUT_OF_RANGE": "Saisissez un nombre de 1 à 720.",
+      "INVALID_URL": "Saisissez des URL http ou https absolues, sans identifiants, paramètres ni fragment.",
+      "INVALID_VALUE": "Choisissez une des valeurs proposées.",
+      "INVALID_COLOR": "Saisissez une couleur au format #RRGGBB, par exemple #0B3D91.",
+      "LOW_CONTRAST": "Le rapport de contraste des deux couleurs est de {{ratio}}:1 ; au moins 7:1 est requis.",
+      "WRITE_FAILED": "Les paramètres n'ont pas pu être enregistrés. Voir le journal de Jahia."
+    }
   }
 }

@@ -35,4 +35,41 @@ describe('locales', () => {
         expect(en.banner.message).not.toMatch(/advisor/i);
         expect(fr.banner.message).not.toMatch(/bulletin/i);
     });
+
+    test('every setting has a label and a help text, every colour a picker label, in both languages', () => {
+        const fields = ['enabled',
+            'refreshIntervalHours',
+            'useForgeSettings',
+            'defaultStoreUrl',
+            'extraFeedUrls',
+            'bannerEnabled',
+            'bannerMinimumSeverity',
+            'bannerIncludeOwnerReports',
+            'bannerBackgroundColor',
+            'bannerTextColor',
+            'bannerDismissPolicy',
+            'bannerDismissHours'];
+        [en, fr].forEach(locale => {
+            fields.forEach(field => {
+                expect(locale.settings.fields[field].label).toBeTruthy();
+                expect(locale.settings.fields[field].help).toBeTruthy();
+            });
+            expect(locale.settings.fields.bannerBackgroundColor.picker).toBeTruthy();
+            expect(locale.settings.fields.bannerTextColor.picker).toBeTruthy();
+        });
+    });
+
+    test('every error code and dismiss policy has a text', () => {
+        ['MISSING',
+            'INVALID_BOOLEAN',
+            'INVALID_NUMBER',
+            'OUT_OF_RANGE',
+            'INVALID_URL',
+            'INVALID_VALUE',
+            'INVALID_COLOR',
+            'LOW_CONTRAST',
+            'WRITE_FAILED'].forEach(code => expect(en.settings.errors[code]).toBeTruthy());
+        ['SESSION', 'HOURS', 'UNTIL_CHANGE', 'NEVER'].forEach(policy => expect(en.settings.dismiss[policy]).toBeTruthy());
+        expect(en.settings.errors.LOW_CONTRAST).toContain('{{ratio}}');
+    });
 });

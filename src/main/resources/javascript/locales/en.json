@@ -81,5 +81,95 @@
     },
     "link": "View security updates",
     "dismiss": "Dismiss"
+  },
+  "settings": {
+    "title": "Settings",
+    "intro": "Changes are saved in the configuration org.jahia.community.securityupdates (karaf/etc) and apply at once.",
+    "groups": {
+      "checks": "Checks",
+      "banner": "Notice in the Jahia UI"
+    },
+    "fields": {
+      "enabled": {
+        "label": "Check the stores for security updates",
+        "help": "When unchecked, no store is checked and this page says the check is disabled."
+      },
+      "refreshIntervalHours": {
+        "label": "Hours between two checks",
+        "help": "A whole number from 1 to 720. The first check runs about one minute after a change."
+      },
+      "useForgeSettings": {
+        "label": "Use the stores of the module manager",
+        "help": "Checks the stores configured in Manage modules, with their credentials."
+      },
+      "defaultStoreUrl": {
+        "label": "Default store URL",
+        "help": "Used when no store is configured in the module manager. An absolute http or https URL, or empty for none."
+      },
+      "extraFeedUrls": {
+        "label": "Additional security feed URLs",
+        "help": "Full URLs of security feeds, separated by commas. Absolute http or https URLs, without credentials."
+      },
+      "bannerEnabled": {
+        "label": "Show the notice",
+        "help": "Shows a notice on every page of the Jahia UI to users who can manage modules."
+      },
+      "bannerMinimumSeverity": {
+        "label": "Lowest severity counted by the notice",
+        "help": "Findings below this severity do not count."
+      },
+      "bannerIncludeOwnerReports": {
+        "label": "Count the reports of module owners",
+        "help": "When unchecked, only Jahia advisories count."
+      },
+      "bannerBackgroundColor": {
+        "label": "Notice background colour (hex)",
+        "picker": "Pick the notice background colour",
+        "help": "#RRGGBB. The contrast ratio with the text colour must be at least 7:1."
+      },
+      "bannerTextColor": {
+        "label": "Notice text colour (hex)",
+        "picker": "Pick the notice text colour",
+        "help": "#RRGGBB. Also used for the link, the button and the focus ring."
+      },
+      "bannerDismissPolicy": {
+        "label": "After the notice is dismissed",
+        "help": "Except with \"Cannot be dismissed\", the notice comes back when other components are concerned."
+      },
+      "bannerDismissHours": {
+        "label": "Hours the notice stays hidden",
+        "help": "A whole number from 1 to 720, used by \"For a number of hours\"."
+      }
+    },
+    "dismiss": {
+      "SESSION": "Hidden until the browser session ends",
+      "HOURS": "Hidden for a number of hours",
+      "UNTIL_CHANGE": "Hidden until other components are concerned",
+      "NEVER": "Cannot be dismissed"
+    },
+    "preview": {
+      "title": "Preview",
+      "ratio": "Contrast ratio:",
+      "pass": "Meets the 7:1 minimum (WCAG AAA).",
+      "fail": "Below the 7:1 minimum: this pair cannot be saved.",
+      "invalid": "Enter two #RRGGBB colours to see the contrast ratio."
+    },
+    "save": "Save settings",
+    "reset": "Reset to defaults",
+    "saving": "Saving...",
+    "saved": "Settings saved.",
+    "resetDone": "Default settings restored.",
+    "invalid": "Some settings are not valid: nothing was saved. See the fields marked with an error.",
+    "errors": {
+      "MISSING": "A value is required.",
+      "INVALID_BOOLEAN": "Must be checked or unchecked.",
+      "INVALID_NUMBER": "Enter a whole number.",
+      "OUT_OF_RANGE": "Enter a number from 1 to 720.",
+      "INVALID_URL": "Enter absolute http or https URLs, without credentials, query or fragment.",
+      "INVALID_VALUE": "Choose one of the proposed values.",
+      "INVALID_COLOR": "Enter a colour as #RRGGBB, for example #0B3D91.",
+      "LOW_CONTRAST": "The contrast ratio of the two colours is {{ratio}}:1; at least 7:1 is required.",
+      "WRITE_FAILED": "The settings could not be saved. See the Jahia log."
+    }
   }
 }

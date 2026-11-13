@@ -5,6 +5,7 @@ import {useTranslation} from 'react-i18next';
 import {Button, Loader} from '@jahia/moonstone';
 import styles from './SecurityUpdates.scss';
 import {GET_SECURITY_REPORT, REFRESH_SECURITY_REPORT} from './SecurityUpdates.gql';
+import {SettingsForm} from '../Settings/SettingsForm';
 import {adminUrl, filterFindings, formatDateTime, safeHttpsUrl, sortFindings} from './securityUpdatesUtils';
 
 const NS = 'security-updates';
@@ -263,6 +264,8 @@ export const SecurityUpdates = () => {
                     )}
                 </>
             )}
+
+            <SettingsForm/>
         </section>
     );
 };
