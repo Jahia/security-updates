@@ -1,0 +1,19 @@
+mutation refreshSecurityUpdates {
+    securityUpdates {
+        refresh {
+            status
+            checkedAt
+            jahiaVersion
+            errors {
+                storeUrl
+                kind
+                message
+            }
+            findings {
+                component
+                severity
+                source
+            }
+        }
+    }
+}

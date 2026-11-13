@@ -1,0 +1,32 @@
+query getSecurityUpdatesReport {
+    securityUpdates {
+        report {
+            status
+            checkedAt
+            lastSuccess
+            jahiaVersion
+            errors {
+                storeUrl
+                kind
+                message
+            }
+            findings {
+                component
+                groupId
+                installedVersion
+                recommendedVersion
+                compatibility
+                requiredJahiaVersion
+                severity
+                source
+                advisories {
+                    id
+                    title
+                    url
+                    cves
+                    severity
+                }
+            }
+        }
+    }
+}
