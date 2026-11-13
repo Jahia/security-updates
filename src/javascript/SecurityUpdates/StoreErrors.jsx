@@ -62,8 +62,11 @@ export const StoreErrors = ({errors}) => {
                                 <strong>{t(texts.title)}</strong>{' '}
                                 <span>{t(texts.help)}</span>
                                 {error.storeUrl && <span className={styles.block}>{t('page.errors.store', values({url: error.storeUrl}))}</span>}
+                                {/* Only the server's message is English: the label is in the language of the page. */}
                                 {texts.isTechnicalShown && (
-                                    <span lang="en" className={styles.block}>{t('page.errors.technical', values({message: error.message}))}</span>
+                                    <span className={styles.block} data-testid="security-updates-technical-details">
+                                        {t('page.errors.technicalLabel')} <span lang="en">{error.message}</span>
+                                    </span>
                                 )}
                             </StatusMessage>
                         </li>

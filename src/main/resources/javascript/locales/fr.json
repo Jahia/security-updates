@@ -61,7 +61,7 @@
       "title": "Problèmes constatés lors de la dernière vérification",
       "infoTitle": "Détails des stores",
       "store": "Store : {{url}}",
-      "technical": "Détails techniques : {{message}}"
+      "technicalLabel": "Détails techniques (en anglais) :"
     },
     "errorKind": {
       "NOT_PUBLISHED": "Pas encore de données de sécurité publiées",

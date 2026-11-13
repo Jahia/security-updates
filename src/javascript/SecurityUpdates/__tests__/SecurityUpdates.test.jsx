@@ -258,7 +258,11 @@ describe('SecurityUpdates page', () => {
             expect(within(errors).getByText('page.errorKind.UNAVAILABLE')).toBeInTheDocument();
             expect(within(errors).getByText('page.errorDetail.SSRF_BLOCKED')).toBeInTheDocument();
             expect(within(errors).getByText('page.errors.store {url=https://internal.example}')).toBeInTheDocument();
-            expect(within(errors).getByText('page.errors.technical {message=Address blocked}')).toHaveAttribute('lang', 'en');
+            // Only the remote message is marked English: the label is read in the language of the page.
+            const technical = within(errors).getByTestId('security-updates-technical-details');
+            expect(technical).toHaveTextContent('page.errors.technicalLabel Address blocked');
+            expect(technical).not.toHaveAttribute('lang');
+            expect(within(technical).getByText('Address blocked')).toHaveAttribute('lang', 'en');
         });
 
         test('the same problem twice is listed twice without key clashes', () => {

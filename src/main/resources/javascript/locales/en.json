@@ -61,7 +61,7 @@
       "title": "Problems found during the last check",
       "infoTitle": "Store details",
       "store": "Store: {{url}}",
-      "technical": "Technical details: {{message}}"
+      "technicalLabel": "Technical details (in English):"
     },
     "errorKind": {
       "NOT_PUBLISHED": "No security data published yet",
