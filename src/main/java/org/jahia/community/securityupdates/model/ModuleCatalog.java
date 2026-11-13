@@ -16,11 +16,24 @@ public final class ModuleCatalog {
 
     /** name -> groupId -> version -> required Jahia version (without the {@code version-} prefix). */
     private final Map<String, Map<String, Map<String, String>>> entries;
+    private final int skippedEntries;
+    private final boolean truncated;
 
     /**
      * @param entries module name -> groupId -> version -> required Jahia version; copied
      */
     public ModuleCatalog(Map<String, Map<String, Map<String, String>>> entries) {
+        this(entries, 0, false);
+    }
+
+    /**
+     * @param entries        module name -> groupId -> version -> required Jahia version; copied
+     * @param skippedEntries modules of the document that were not read (incomplete, or beyond the limit)
+     * @param truncated      true when the document listed more modules than the limit
+     */
+    public ModuleCatalog(Map<String, Map<String, Map<String, String>>> entries, int skippedEntries, boolean truncated) {
+        this.skippedEntries = skippedEntries;
+        this.truncated = truncated;
         Map<String, Map<String, Map<String, String>>> copy = new LinkedHashMap<>();
         entries.forEach((name, byGroup) -> {
             Map<String, Map<String, String>> groupCopy = new LinkedHashMap<>();
@@ -71,6 +84,14 @@ public final class ModuleCatalog {
             }
         }
         return Optional.empty();
+    }
+
+    public int getSkippedEntries() {
+        return skippedEntries;
+    }
+
+    public boolean isTruncated() {
+        return truncated;
     }
 
     public boolean isEmpty() {

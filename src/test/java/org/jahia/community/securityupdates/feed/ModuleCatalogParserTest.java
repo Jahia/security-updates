@@ -36,6 +36,42 @@ class ModuleCatalogParserTest {
     }
 
     @Test
+    @DisplayName("a module without versions is skipped and counted; a module listed twice merges its versions")
+    void moduleWithoutVersionsAndDuplicates() throws Exception {
+        ModuleCatalog catalog = ModuleCatalogParser.parse("[{\"modules\":["
+                + "{\"groupId\":\"g\",\"name\":\"none\"},"
+                + "{\"groupId\":\"g\",\"name\":\"m\",\"versions\":[{\"version\":\"1.0\",\"requiredVersion\":\"version-8.0.0.0\"}]},"
+                + "{\"groupId\":\"g\",\"name\":\"m\",\"versions\":[{\"version\":\"1.0\",\"requiredVersion\":\"version-8.2.0.0\"},"
+                + "{\"version\":\"2.0\",\"requiredVersion\":\"8.2.1.0\"}]},"
+                + "7]}]");
+
+        assertThat(catalog.requiredJahiaVersion("m", "g", "1.0")).contains("8.0.0.0");
+        assertThat(catalog.requiredJahiaVersion("m", "g", "2.0")).contains("8.2.1.0");
+        assertThat(catalog.requiredJahiaVersion("none", "g", "1.0")).isEmpty();
+        assertThat(catalog.getSkippedEntries()).isEqualTo(2);
+        assertThat(catalog.isTruncated()).isFalse();
+    }
+
+    @Test
+    @DisplayName("reads at most MAX_ENTRIES modules and counts the others as skipped")
+    void entriesAreCapped() throws Exception {
+        StringBuilder json = new StringBuilder("[{\"modules\":[");
+        int total = ModuleCatalogParser.MAX_ENTRIES + 3;
+        for (int i = 0; i < total; i++) {
+            json.append(i == 0 ? "" : ",").append("{\"groupId\":\"g\",\"name\":\"m").append(i)
+                    .append("\",\"versions\":[{\"version\":\"1.0\",\"requiredVersion\":\"8.2.0.0\"}]}");
+        }
+        json.append("]}]");
+
+        ModuleCatalog catalog = ModuleCatalogParser.parse(json.toString());
+
+        assertThat(catalog.requiredJahiaVersion("m0", "g", "1.0")).contains("8.2.0.0");
+        assertThat(catalog.requiredJahiaVersion("m" + (total - 1), "g", "1.0")).isEmpty();
+        assertThat(catalog.getSkippedEntries()).isEqualTo(3);
+        assertThat(catalog.isTruncated()).isTrue();
+    }
+
+    @Test
     @DisplayName("an empty list is an empty catalogue")
     void emptyList() throws Exception {
         assertThat(ModuleCatalogParser.parse(Fixtures.read("module-list-empty.json")).isEmpty()).isTrue();

@@ -15,12 +15,14 @@ public enum StoreErrorKind {
     UNAVAILABLE,
     /** The feed was received but its format or schema version is not understood. */
     NOT_UNDERSTOOD,
-    /** The configured URL is not an absolute http(s) URL. */
+    /** The configured URL is not acceptable (detail NOT_HTTPS for a plain http URL): it is not fetched. */
     INVALID_URL,
     /** The module catalogue could not be read: compatibility is unknown for this store. */
     CATALOGUE_UNAVAILABLE,
     /** An installed version could not be compared. */
     MALFORMED_VERSION,
     /** No store is configured. */
-    NO_STORE
+    NO_STORE,
+    /** The last check is older than twice the refresh interval: the schedule may have stopped. */
+    STALE
 }

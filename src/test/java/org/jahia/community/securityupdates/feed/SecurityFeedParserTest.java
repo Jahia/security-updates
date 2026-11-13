@@ -5,6 +5,7 @@ import org.jahia.community.securityupdates.model.AdvisoryFix;
 import org.jahia.community.securityupdates.model.FlaggedVersion;
 import org.jahia.community.securityupdates.model.SecurityFeed;
 import org.jahia.community.securityupdates.model.Severity;
+import org.jahia.community.securityupdates.model.StoreErrorDetail;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -99,20 +100,60 @@ class SecurityFeedParserTest {
     void unknownSchemaFailsClosed(String fixture) {
         assertThatThrownBy(() -> SecurityFeedParser.parse(Fixtures.read(fixture)))
                 .isInstanceOf(FeedFormatException.class)
-                .hasMessageContaining("schemaVersion");
+                .hasMessageContaining("schemaVersion")
+                .satisfies(e -> assertThat(((FeedFormatException) e).getDetail()).isEqualTo(StoreErrorDetail.SCHEMA_UNSUPPORTED));
+    }
+
+    @Test
+    @DisplayName("the refusal of a schema never echoes the remote value")
+    void schemaRefusalDoesNotEchoTheRemoteValue() {
+        assertThatThrownBy(() -> SecurityFeedParser.parse("{\"schemaVersion\":\"<script>evil-9137</script>\"}"))
+                .isInstanceOf(FeedFormatException.class)
+                .hasMessageNotContaining("evil-9137");
     }
 
     @ParameterizedTest(name = "{0} is refused")
     @ValueSource(strings = {"not-an-object.json", "advisories-not-array.json"})
     void wrongStructureIsRefused(String fixture) {
-        assertThatThrownBy(() -> SecurityFeedParser.parse(Fixtures.read(fixture))).isInstanceOf(FeedFormatException.class);
+        assertThatThrownBy(() -> SecurityFeedParser.parse(Fixtures.read(fixture)))
+                .isInstanceOf(FeedFormatException.class)
+                .satisfies(e -> assertThat(((FeedFormatException) e).getDetail()).isEqualTo(StoreErrorDetail.INVALID_JSON));
+    }
+
+    @ParameterizedTest(name = "[{0}] is an entry of the wrong type, skipped and counted")
+    @ValueSource(strings = {
+            "{\"id\":7,\"fixes\":[{\"component\":\"m\",\"fixedVersions\":[\"1.0\"]}]}",
+            "{\"id\":\"JSA-1\",\"fixes\":\"none\"}",
+            "{\"id\":\"JSA-1\",\"fixes\":[]}",
+            "{\"id\":\"JSA-1\",\"fixes\":[{\"component\":3,\"fixedVersions\":[\"1.0\"]}]}",
+            "{\"id\":\"JSA-1\",\"fixes\":[{\"component\":\"m\",\"fixedVersions\":\"1.0\"}]}",
+            "{\"id\":\"JSA-1\",\"fixes\":[{\"component\":\"m\",\"fixedVersions\":[1.0]}]}",
+            "[]",
+            "\"JSA-1\""
+    })
+    void entriesOfTheWrongTypeAreSkipped(String advisory) throws Exception {
+        SecurityFeed feed = SecurityFeedParser.parse("{\"schemaVersion\":1,\"advisories\":[" + advisory + "]}");
+
+        assertThat(feed.getAdvisories()).isEmpty();
+        assertThat(feed.getSkippedEntries()).isPositive();
+    }
+
+    @ParameterizedTest(name = "[{0}] is a flag of the wrong type, skipped and counted")
+    @ValueSource(strings = {"{\"name\":\"m\"}", "{\"version\":\"1.0\"}", "{\"name\":1,\"version\":\"1.0\"}", "3"})
+    void flagsOfTheWrongTypeAreSkipped(String flag) throws Exception {
+        SecurityFeed feed = SecurityFeedParser.parse("{\"schemaVersion\":1,\"flaggedVersions\":[" + flag + "]}");
+
+        assertThat(feed.getFlaggedVersions()).isEmpty();
+        assertThat(feed.getSkippedEntries()).isEqualTo(1);
     }
 
     @ParameterizedTest(name = "[{0}] is refused")
     @NullAndEmptySource
     @ValueSource(strings = {"<html>Maintenance</html>", "{\"schemaVersion\": 1, ", "   "})
     void invalidJsonIsRefused(String body) {
-        assertThatThrownBy(() -> SecurityFeedParser.parse(body)).isInstanceOf(FeedFormatException.class);
+        assertThatThrownBy(() -> SecurityFeedParser.parse(body))
+                .isInstanceOf(FeedFormatException.class)
+                .satisfies(e -> assertThat(((FeedFormatException) e).getDetail()).isEqualTo(StoreErrorDetail.INVALID_JSON));
     }
 
     @Test
@@ -148,7 +189,33 @@ class SecurityFeedParserTest {
     @DisplayName("deeply nested JSON is refused, not a StackOverflowError")
     void deepNestingIsRefused() {
         String json = "{\"schemaVersion\":1,\"advisories\":" + "[".repeat(200_000);
-        assertThatThrownBy(() -> SecurityFeedParser.parse(json)).isInstanceOf(FeedFormatException.class);
+        assertThatThrownBy(() -> SecurityFeedParser.parse(json))
+                .isInstanceOf(FeedFormatException.class)
+                .hasMessageContaining("nested")
+                .satisfies(e -> assertThat(((FeedFormatException) e).getDetail()).isEqualTo(StoreErrorDetail.INVALID_JSON));
         assertThatThrownBy(() -> ModuleCatalogParser.parse("[".repeat(200_000))).isInstanceOf(FeedFormatException.class);
+    }
+
+    @Test
+    @DisplayName("nesting up to the limit is accepted, one level more is refused")
+    void nestingLimit() throws Exception {
+        // the root object is level 1, so the 'extra' value adds MAX_DEPTH - 1 levels
+        String atLimit = "{\"schemaVersion\":1,\"extra\":" + "[".repeat(JsonNesting.MAX_DEPTH - 1)
+                + "]".repeat(JsonNesting.MAX_DEPTH - 1) + "}";
+        String overLimit = "{\"schemaVersion\":1,\"extra\":" + "[".repeat(JsonNesting.MAX_DEPTH)
+                + "]".repeat(JsonNesting.MAX_DEPTH) + "}";
+
+        assertThat(SecurityFeedParser.parse(atLimit).getAdvisories()).isEmpty();
+        assertThatThrownBy(() -> SecurityFeedParser.parse(overLimit)).isInstanceOf(FeedFormatException.class);
+    }
+
+    @Test
+    @DisplayName("brackets inside strings, escaped quotes and backslashes included, do not count as nesting")
+    void bracketsInStringsDoNotCount() throws Exception {
+        String brackets = "[{".repeat(100);
+        // the note is: \"[{[{...\\  (an escaped quote, the brackets, an escaped backslash)
+        String json = "{\"schemaVersion\":1,\"note\":\"\\\"" + brackets + "\\\\\",\"advisories\":[]}";
+
+        assertThat(SecurityFeedParser.parse(json).getAdvisories()).isEmpty();
     }
 }

@@ -6,6 +6,7 @@ import org.jahia.community.securityupdates.model.AdvisoryFix;
 import org.jahia.community.securityupdates.model.FlaggedVersion;
 import org.jahia.community.securityupdates.model.SecurityFeed;
 import org.jahia.community.securityupdates.model.Severity;
+import org.jahia.community.securityupdates.model.StoreErrorDetail;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -17,8 +18,9 @@ import java.util.Locale;
 
 /**
  * Parses {@code modules-repository.securityUpdates.json}. The document must be a JSON object with
- * {@code schemaVersion} 1; anything else fails closed with a {@link FeedFormatException}. Inside a
- * supported document, incomplete entries are skipped and counted. All text is cleaned and bounded.
+ * {@code schemaVersion} 1, nested at most {@link JsonNesting#MAX_DEPTH} levels; anything else fails closed with
+ * a {@link FeedFormatException}. Inside a supported document, incomplete entries are skipped and counted, and
+ * unknown keys are ignored. All text is cleaned and bounded.
  */
 public final class SecurityFeedParser {
 
@@ -46,16 +48,17 @@ public final class SecurityFeedParser {
         JSONObject root = parseObject(json);
         Object schemaVersion = root.opt("schemaVersion");
         if (!(schemaVersion instanceof Integer) || (Integer) schemaVersion != SecurityFeed.SUPPORTED_SCHEMA_VERSION) {
-            throw new FeedFormatException("Unsupported schemaVersion " + describe(schemaVersion)
-                    + "; this module understands schemaVersion " + SecurityFeed.SUPPORTED_SCHEMA_VERSION);
+            // the value read is not repeated: it is remote text
+            throw new FeedFormatException(StoreErrorDetail.SCHEMA_UNSUPPORTED, "Missing or unsupported schemaVersion; "
+                    + "this module understands schemaVersion " + SecurityFeed.SUPPORTED_SCHEMA_VERSION);
         }
-        int[] skipped = {0};
+        Skipped skipped = new Skipped();
         List<Advisory> advisories = new ArrayList<>();
         JSONArray advisoryArray = optArray(root, "advisories");
         for (int i = 0; i < advisoryArray.length() && advisories.size() < MAX_ENTRIES; i++) {
             Advisory advisory = advisory(advisoryArray.opt(i), skipped);
             if (advisory == null) {
-                skipped[0]++;
+                skipped.add();
             } else {
                 advisories.add(advisory);
             }
@@ -65,29 +68,36 @@ public final class SecurityFeedParser {
         for (int i = 0; i < flagArray.length() && flags.size() < MAX_ENTRIES; i++) {
             FlaggedVersion flag = flag(flagArray.opt(i));
             if (flag == null) {
-                skipped[0]++;
+                skipped.add();
             } else {
                 flags.add(flag);
             }
         }
-        return new SecurityFeed(advisories, flags, skipped[0]);
+        return new SecurityFeed(advisories, flags, skipped.count);
+    }
+
+    /** Count of the entries ignored while parsing one document. */
+    private static final class Skipped {
+        private int count;
+
+        void add() {
+            count++;
+        }
     }
 
     private static JSONObject parseObject(String json) throws FeedFormatException {
         if (json == null || json.trim().isEmpty()) {
-            throw new FeedFormatException("Empty document");
+            throw new FeedFormatException(StoreErrorDetail.INVALID_JSON, "Empty document");
         }
+        JsonNesting.check(json, "The security feed");
         try {
             Object value = new JSONTokener(json).nextValue();
             if (!(value instanceof JSONObject)) {
-                throw new FeedFormatException("The security feed is not a JSON object");
+                throw new FeedFormatException(StoreErrorDetail.INVALID_JSON, "The security feed is not a JSON object");
             }
             return (JSONObject) value;
         } catch (JSONException e) {
-            throw new FeedFormatException("The security feed is not valid JSON", e);
-        } catch (StackOverflowError e) {
-            // an org.json without a nesting limit recurses on deeply nested input
-            throw new FeedFormatException("The security feed is nested too deeply");
+            throw new FeedFormatException(StoreErrorDetail.INVALID_JSON, "The security feed is not valid JSON", e);
         }
     }
 
@@ -97,12 +107,12 @@ public final class SecurityFeedParser {
             return new JSONArray();
         }
         if (!(value instanceof JSONArray)) {
-            throw new FeedFormatException("'" + key + "' is not a JSON array");
+            throw new FeedFormatException(StoreErrorDetail.INVALID_JSON, "'" + key + "' is not a JSON array");
         }
         return (JSONArray) value;
     }
 
-    private static Advisory advisory(Object value, int[] skipped) {
+    private static Advisory advisory(Object value, Skipped skipped) {
         if (!(value instanceof JSONObject)) {
             return null;
         }
@@ -116,7 +126,7 @@ public final class SecurityFeedParser {
         for (int i = 0; i < fixArray.length() && fixes.size() < MAX_ITEMS; i++) {
             AdvisoryFix fix = fix(fixArray.opt(i));
             if (fix == null) {
-                skipped[0]++;
+                skipped.add();
             } else {
                 fixes.add(fix);
             }
@@ -171,12 +181,5 @@ public final class SecurityFeedParser {
         }
         String lower = url.toLowerCase(Locale.ROOT);
         return lower.startsWith("https:") || lower.startsWith("http:") ? url : null;
-    }
-
-    private static String describe(Object schemaVersion) {
-        if (schemaVersion == null || JSONObject.NULL.equals(schemaVersion)) {
-            return "(missing)";
-        }
-        return UntrustedText.clean(String.valueOf(schemaVersion), 20) + (schemaVersion instanceof String ? " (text)" : "");
     }
 }
