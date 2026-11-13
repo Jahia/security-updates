@@ -1,3 +1,5 @@
+import type {Interception} from 'cypress/types/net-stubbing';
+
 /**
  * Shared helpers of the security-updates specs: provisioning, GraphQL reads and writes, waiting for a check, the
  * banner request and accessibility checks.
@@ -259,10 +261,34 @@ export const ensureFixtureReport = (): Cypress.Chainable<Report> => readReport()
     return checkUntil(isFixtureReport, 'the report of the fixture store');
 });
 
+type GraphqlOperation = { operationName?: string; query?: string };
+
+/**
+ * The answer to one GraphQL operation of an intercepted request. Jahia's Apollo client batches operations: the
+ * request body and the response body are then arrays, in the same order; otherwise both are single objects.
+ */
+export const answerOf = <T = Record<string, unknown>>(interception: Interception, isOperation: (operation: GraphqlOperation) => boolean, label: string): T => {
+    expect(interception.response?.statusCode, `${label} answered`).to.equal(200);
+    const requestBody = interception.request.body as GraphqlOperation | GraphqlOperation[];
+    const responseBody = interception.response?.body as T | T[];
+    const operations = Array.isArray(requestBody) ? requestBody : [requestBody];
+    const answers = Array.isArray(responseBody) ? responseBody : [responseBody];
+    const index = operations.findIndex(operation => Boolean(operation) && isOperation(operation));
+    expect(index, `${label} in the request`).to.be.greaterThan(-1);
+    expect(answers[index], `answer to ${label}`).to.be.an('object');
+    return answers[index];
+};
+
+/** The operation of an intercepted request named operationName (the Apollo documents of the admin page). */
+export const named = (operationName: string) => (operation: GraphqlOperation): boolean => operation.operationName === operationName;
+
+const isBannerQuery = (operation: GraphqlOperation): boolean => typeof operation.query === 'string' && operation.query.includes('SecurityUpdatesBanner {');
+
 /** Aliases the banner request of the Jahia UI (one GraphQL request, sent with fetch) as @bannerQuery. */
 export const interceptBannerQuery = (): void => {
     cy.intercept('POST', '**/modules/graphql', req => {
-        if (typeof req.body?.query === 'string' && req.body.query.includes('SecurityUpdatesBanner {')) {
+        const operations: GraphqlOperation[] = Array.isArray(req.body) ? req.body : [req.body];
+        if (operations.some(operation => Boolean(operation) && isBannerQuery(operation))) {
             req.alias = 'bannerQuery';
         }
     });
@@ -277,10 +303,7 @@ type BannerAnswer = {
 
 /** Waits for the next banner request and yields its answer (a positive signal before any absence is asserted). */
 export const waitForBannerQuery = (): Cypress.Chainable<BannerAnswer> =>
-    cy.wait('@bannerQuery', {timeout: 60000}).then(interception => {
-        expect(interception.response?.statusCode, 'banner request answered').to.equal(200);
-        return interception.response?.body as BannerAnswer;
-    });
+    cy.wait('@bannerQuery', {timeout: 60000}).then(interception => answerOf<BannerAnswer>(interception, isBannerQuery, 'banner request'));
 
 /** Opens a page of the Jahia UI and yields the answer to its banner request. */
 export const openAppPage = (path = APP_PATH): Cypress.Chainable<BannerAnswer> => {
@@ -292,7 +315,7 @@ export const openAppPage = (path = APP_PATH): Cypress.Chainable<BannerAnswer> =>
 /** Aliases the GraphQL operations of the admin page by operation name (@SecurityUpdatesRefresh, ...). */
 export const interceptPageOperations = (): void => {
     cy.intercept('POST', '**/modules/graphql', req => {
-        const operations = Array.isArray(req.body) ? req.body : [req.body];
+        const operations: GraphqlOperation[] = Array.isArray(req.body) ? req.body : [req.body];
         const name = operations.map(op => op?.operationName).find(n => typeof n === 'string' && n.startsWith('SecurityUpdates'));
         if (name) {
             req.alias = name;
@@ -303,14 +326,17 @@ export const interceptPageOperations = (): void => {
 /** WCAG 2.0/2.1/2.2 A and AA rules, and the AAA rules axe has (wcag2aaa: contrast 7:1, ...). */
 export const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag2aaa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
+/** The banner preview of the settings form (a decorative sample, aria-hidden, showing the edited colours). */
+export const BANNER_PREVIEW = '[data-testid="security-updates-banner-preview"]';
+
 const describeViolations = (violations: Array<{ id: string; impact?: string | null; help: string; nodes: Array<{ target: unknown }> }>) =>
     violations.map(v => `${v.id} (${v.impact}): ${v.help} on ${v.nodes.slice(0, 5).map(n => JSON.stringify(n.target)).join(', ')}`).join('\n');
 
 /**
  * Runs axe on the Security updates page only (from its heading to its settings), not on the rest of the Jahia
- * UI, and fails with the list of violations.
+ * UI, and fails with the list of violations. `exclude` leaves selectors out of this run (see its callers for why).
  */
-export const checkPageAccessibility = (): void => {
+export const checkPageAccessibility = (exclude: string[] = []): void => {
     cy.injectAxe({axeCorePath: 'node_modules/axe-core/axe.min.js'});
     cy.contains('h1', 'Security updates').then($title => {
         cy.get('#security-updates-settings-title').then($settings => {
@@ -320,7 +346,9 @@ export const checkPageAccessibility = (): void => {
             }
 
             expect(root, 'element holding the whole page').to.not.equal(null);
-            cy.checkA11y(root as HTMLElement, {runOnly: {type: 'tag', values: AXE_TAGS}}, violations => {
+            exclude.forEach(selector => cy.get(selector).should('exist'));
+            const context = exclude.length > 0 ? {include: [root as HTMLElement], exclude} : root as HTMLElement;
+            cy.checkA11y(context, {runOnly: {type: 'tag', values: AXE_TAGS}}, violations => {
                 throw new Error(`Accessibility violations:\n${describeViolations(violations)}`);
             });
         });

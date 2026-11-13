@@ -27,12 +27,16 @@ import {
 /**
  * Who may do what:
  *  - adminTemplates (here the web-designer role, granted on the server): report, banner, settings (read-only:
- *    canEdit false), refresh, and the admin page;
+ *    canEdit false) and refresh. The Jahia administration app itself also needs administrationAccess, which
+ *    web-designer does not hold: the page is tested with a server role created here, security-updates-viewer
+ *    (administrationAccess and adminTemplates, both children of admin, without admin itself);
  *  - admin (server administrators, here root): also updateSettings and resetSettings;
  *  - neither (here an editor of systemsite, who can open the Jahia UI): nothing, and no banner.
  */
 describe('Security updates: permissions', () => {
     const DESIGNER = 'securityUpdatesDesigner';
+    const VIEWER = 'securityUpdatesViewer';
+    const VIEWER_ROLE = 'security-updates-viewer';
     const DENIED_USER = 'securityUpdatesDeniedUser';
     const PASSWORD = 'SecUpd9Pwd-Test';
     const DENIED = 'Permission denied';
@@ -40,6 +44,7 @@ describe('Security updates: permissions', () => {
 
     const asRoot = () => cy.apolloClient();
     const asDesigner = () => cy.apolloClient({username: DESIGNER, password: PASSWORD});
+    const asViewer = () => cy.apolloClient({username: VIEWER, password: PASSWORD});
     const asDenied = () => cy.apolloClient({username: DENIED_USER, password: PASSWORD});
 
     before(() => {
@@ -50,8 +55,14 @@ describe('Security updates: permissions', () => {
         cy.login();
         createUser(DESIGNER, PASSWORD);
         createUser(DENIED_USER, PASSWORD);
+        createUser(VIEWER, PASSWORD);
+        cy.executeGroovy('groovy/createServerRole.groovy', {
+            ROLE_NAME: VIEWER_ROLE,
+            PERMISSION_NAMES: 'administrationAccess,adminTemplates'
+        });
         asRoot();
         grantRoles('/', ['web-designer'], DESIGNER, 'USER');
+        grantRoles('/', [VIEWER_ROLE], VIEWER, 'USER');
         grantRoles('/sites/systemsite', ['editor'], DENIED_USER, 'USER');
     });
 
@@ -62,12 +73,26 @@ describe('Security updates: permissions', () => {
     after(() => {
         asRoot();
         revokeRoles('/', ['web-designer'], DESIGNER, 'USER');
+        revokeRoles('/', [VIEWER_ROLE], VIEWER, 'USER');
         revokeRoles('/sites/systemsite', ['editor'], DENIED_USER, 'USER');
         cy.login();
         deleteUser(DESIGNER);
         deleteUser(DENIED_USER);
+        deleteUser(VIEWER);
+        cy.executeGroovy('groovy/deleteRole.groovy', {ROLE_NAME: VIEWER_ROLE});
         asRoot();
         provision('restore-defaults.yml');
+    });
+
+    it('the viewer role grants administrationAccess and adminTemplates, not admin', () => {
+        // Positive control of the role created in before(): without it the page test below would prove nothing.
+        asViewer();
+        cy.apollo({queryFile: 'graphql/query/getPermissions.graphql'}).then(result => {
+            expect(errorText(result), 'no GraphQL error').to.equal('');
+            const root = (result as { data: { jcr: { nodeByPath: Record<string, boolean> } } }).data.jcr.nodeByPath;
+            expect(root).to.deep.equal({administrationAccess: true, adminTemplates: true, admin: false});
+        });
+        readStoredSettings().then(settings => expect(settings.canEdit, 'read-only without admin').to.equal(false));
     });
 
     it('a web designer (adminTemplates, not admin) reads the report, the banner and the settings', () => {
@@ -143,10 +168,10 @@ describe('Security updates: permissions', () => {
         readSettings().then(settings => expect(settings, 'unchanged').to.deep.equal(FIXTURE_SETTINGS));
     });
 
-    it('a web designer opens the page, runs Check now and sees the settings read-only', () => {
+    it('a user with administrationAccess and adminTemplates (not admin) opens the page, runs Check now and sees the settings read-only', () => {
         asRoot();
         ensureFixtureReport();
-        cy.login(DESIGNER, PASSWORD);
+        cy.login(VIEWER, PASSWORD);
         cy.visit(ADMIN_PATH);
         cy.contains('h1', 'Security updates').should('be.visible');
         cy.contains('h2', 'Components to update').should('be.visible');

@@ -1,0 +1,9 @@
+query getPermissions {
+    jcr {
+        nodeByPath(path: "/") {
+            administrationAccess: hasPermission(permissionName: "administrationAccess")
+            adminTemplates: hasPermission(permissionName: "adminTemplates")
+            admin: hasPermission(permissionName: "admin")
+        }
+    }
+}

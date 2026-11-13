@@ -2,6 +2,7 @@ import {
     ADMIN_PATH,
     BANNER,
     BANNER_DISMISS,
+    BANNER_PREVIEW,
     DEFAULT_SETTINGS,
     FIXTURE_SETTINGS,
     FieldError,
@@ -148,7 +149,12 @@ describe('Security updates: settings', () => {
         cy.get(`${field('bannerTextColor')}-error`).should('contain', '1.26:1');
         cy.focused().should('have.id', 'security-updates-setting-refreshIntervalHours');
 
-        checkPageAccessibility();
+        // The banner preview renders the edited pair, #777777 on #888888, on purpose: it shows the user the colours
+        // that were refused, labelled "These colours cannot be saved". That deliberate failing sample is left out of
+        // this run only; everywhere else (spec 01, valid colours) the preview is checked like the rest of the page.
+        cy.get(BANNER_PREVIEW).should('have.css', 'background-color', 'rgb(136, 136, 136)');
+        cy.contains('These colours cannot be saved').should('be.visible');
+        checkPageAccessibility([BANNER_PREVIEW]);
 
         readSettings().then(settings => expect(settings, 'nothing saved').to.deep.equal(FIXTURE_SETTINGS));
     });

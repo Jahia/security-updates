@@ -1,10 +1,12 @@
 import {
     ADMIN_PATH,
     BANNER,
+    answerOf,
     checkPageAccessibility,
     checkUntil,
     interceptPageOperations,
     isFixtureReport,
+    named,
     provision,
     readReport,
     refresh
@@ -102,8 +104,9 @@ describe('Security updates: report, Check now and the admin page', () => {
         cy.contains('button', 'Checking…').should('have.attr', 'aria-busy', 'true');
         cy.get('[data-testid="security-updates-checking"]').should('contain', 'Checking the stores');
         cy.wait('@SecurityUpdatesRefresh').then(interception => {
-            const answer = interception.response?.body?.data?.securityUpdates?.refresh;
-            expect(answer?.inProgress, 'the mutation only started the check').to.equal(true);
+            type RefreshAnswer = { data?: { securityUpdates?: { refresh?: { inProgress?: boolean } } } };
+            const answer = answerOf<RefreshAnswer>(interception, named('SecurityUpdatesRefresh'), 'SecurityUpdatesRefresh');
+            expect(answer.data?.securityUpdates?.refresh?.inProgress, 'the mutation only started the check').to.equal(true);
         });
 
         cy.get('[data-testid="security-updates-status"]', {timeout: 120000})
