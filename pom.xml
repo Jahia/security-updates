@@ -4,7 +4,7 @@
     <parent>
         <groupId>org.jahia.modules</groupId>
         <artifactId>jahia-modules</artifactId>
-        <version>8.2.2.1</version>
+        <version>8.2.3.7</version>
     </parent>
     <groupId>org.jahia.community</groupId>
     <artifactId>security-updates</artifactId>
@@ -23,7 +23,7 @@
         <jahia-module-type>system</jahia-module-type>
         <jahia.plugin.version>6.9</jahia.plugin.version>
         <jahia-deploy-on-site>system</jahia-deploy-on-site>
-        <jahia-depends>serverSettings,graphql-dxm-provider,default</jahia-depends>
+        <jahia-depends>serverSettings,graphql-dxm-provider</jahia-depends>
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
         <maven.compiler.release>11</maven.compiler.release>
