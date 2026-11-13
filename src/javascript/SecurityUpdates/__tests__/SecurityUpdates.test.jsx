@@ -129,7 +129,9 @@ describe('SecurityUpdates page', () => {
             const item = within(details).getByText('page.errorKind.NOT_PUBLISHED').closest('[data-tone]');
             expect(item).toHaveAttribute('data-tone', 'info');
             expect(item).toHaveTextContent('page.errors.store {url=https://store.jahia.com}');
-            expect(screen.getByRole('heading', {level: 2, name: 'page.errors.infoTitle'})).toBeInTheDocument();
+            // Its own id: the problems heading keeps security-updates-errors-title.
+            expect(screen.getByRole('heading', {level: 2, name: 'page.errors.infoTitle'})).toHaveAttribute('id', 'security-updates-store-details-title');
+            expect(document.getElementById('security-updates-errors-title')).toBeNull();
         });
 
         test('a store without address that does not publish yet is listed without address', () => {

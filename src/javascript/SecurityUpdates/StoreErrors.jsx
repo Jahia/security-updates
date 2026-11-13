@@ -9,6 +9,7 @@ import {StatusMessage} from './StatusMessage';
 import {storeErrorShape} from './propTypes';
 
 const TITLE_ID = 'security-updates-errors-title';
+const DETAILS_TITLE_ID = 'security-updates-store-details-title';
 
 /**
  * Stores that do not publish security data yet: the expected state before the data is published, explained by the
@@ -18,8 +19,8 @@ const StoreDetails = ({errors}) => {
     const {t} = useTranslation(NS);
     return (
         <div className={styles.section}>
-            <Typography component="h2" variant="heading" id={TITLE_ID}>{t('page.errors.infoTitle')}</Typography>
-            <ul className={styles.list} aria-labelledby={TITLE_ID}>
+            <Typography component="h2" variant="heading" id={DETAILS_TITLE_ID}>{t('page.errors.infoTitle')}</Typography>
+            <ul className={styles.list} aria-labelledby={DETAILS_TITLE_ID}>
                 {errors.map((error, index) => (
                     // eslint-disable-next-line react/no-array-index-key
                     <li key={`${index}:${error.storeUrl}`}>
