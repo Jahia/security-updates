@@ -19,6 +19,7 @@ public final class StoreUrls {
     private static final String JAHIA_STORE_HOST = "store.jahia.com";
     private static final char LAST_ASCII = 0x7E;
     private static final char FIRST_PRINTABLE = 0x21;
+    private static final String SCHEME_SEPARATOR = "://";
 
     private StoreUrls() {
     }
@@ -69,6 +70,38 @@ public final class StoreUrls {
             // fall through: nothing of the URL is shown
         }
         return "(invalid URL)";
+    }
+
+    /**
+     * Drops the user information ({@code user:password@}) of every URL in {@code text} and keeps everything else as
+     * written: unlike {@link #display}, the path stays, so that a value shown and saved again keeps its meaning.
+     * Used where stored settings are shown or logged; a stored URL with user information is refused when checked.
+     *
+     * @param text one URL, or a list of URLs (as {@code extraFeedUrls}); null gives null
+     */
+    public static String withoutUserInfo(String text) {
+        if (text == null) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder(text.length());
+        int from = 0;
+        int scheme = text.indexOf(SCHEME_SEPARATOR);
+        while (scheme >= 0) {
+            int authorityStart = scheme + SCHEME_SEPARATOR.length();
+            int authorityEnd = authorityStart;
+            while (authorityEnd < text.length() && !endsAuthority(text.charAt(authorityEnd))) {
+                authorityEnd++;
+            }
+            int at = text.lastIndexOf('@', authorityEnd - 1);
+            sb.append(text, from, authorityStart);
+            from = at >= authorityStart ? at + 1 : authorityStart;
+            scheme = text.indexOf(SCHEME_SEPARATOR, from);
+        }
+        return sb.append(text, from, text.length()).toString();
+    }
+
+    private static boolean endsAuthority(char c) {
+        return c == '/' || c == '?' || c == '#' || c == ',' || Character.isWhitespace(c);
     }
 
     private static Optional<String> check(String url, String expectedScheme) {

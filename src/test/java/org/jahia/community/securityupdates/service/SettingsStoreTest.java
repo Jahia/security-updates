@@ -205,6 +205,105 @@ class SettingsStoreTest {
     }
 
     @Test
+    @DisplayName("load never returns the user information of a stored URL")
+    void loadHidesUserInfo() throws IOException {
+        Dictionary<String, Object> current = new Hashtable<>(Settings.defaults().toValues());
+        current.put(SettingsKeys.DEFAULT_STORE_URL, "https://user:token@store.example.org/store");
+        current.put(SettingsKeys.EXTRA_FEED_URLS, "https://a:b@mirror.example.org/s.json, https://mirror2.example.org/s.json");
+        when(configuration.getProperties()).thenReturn(current);
+
+        Map<String, String> loaded = store.load();
+
+        assertThat(loaded).containsEntry(SettingsKeys.DEFAULT_STORE_URL, "https://store.example.org/store")
+                .containsEntry(SettingsKeys.EXTRA_FEED_URLS, "https://mirror.example.org/s.json, https://mirror2.example.org/s.json");
+        assertThat(String.valueOf(loaded)).doesNotContain("token").doesNotContain("a:b");
+    }
+
+    @Test
+    @DisplayName("the audit line never shows the user information of a stored URL")
+    void auditHidesUserInfo() throws IOException {
+        Dictionary<String, Object> current = new Hashtable<>(Settings.defaults().toValues());
+        current.put(SettingsKeys.DEFAULT_STORE_URL, "https://user:token@store.example.org");
+        current.put(SettingsKeys.EXTRA_FEED_URLS, "https://a:b@mirror.example.org/s.json");
+        when(configuration.getProperties()).thenReturn(current);
+
+        store.save(Settings.defaults().toValues(), "jdoe");
+
+        assertThat(audit).singleElement().satisfies(line -> assertThat(line)
+                .contains("defaultStoreUrl: https://store.example.org -> https://store.jahia.com")
+                .contains("extraFeedUrls: https://mirror.example.org/s.json -> ")
+                .doesNotContain("token").doesNotContain("a:b"));
+    }
+
+    @Test
+    @DisplayName("a .cfg file not loaded yet by ConfigurationAdmin is never overwritten: the save fails, to be retried")
+    void existingFileNotLoadedYet() throws IOException {
+        when(configuration.getProperties()).thenReturn(null);
+        Path file = etc.resolve(SecurityUpdateService.PID + ".cfg");
+        String handWritten = SettingsStore.MARKER + "\n# my comment\nonDemandMinIntervalSeconds=0\nenabled=false\n";
+        Files.writeString(file, handWritten, StandardCharsets.ISO_8859_1);
+
+        assertThatThrownBy(() -> store.save(Settings.defaults().toValues(), "jdoe")).isInstanceOf(IOException.class)
+                .hasMessageContaining("try again");
+
+        assertThat(Files.readString(file, StandardCharsets.ISO_8859_1)).isEqualTo(handWritten);
+        try (java.util.stream.Stream<Path> files = Files.list(etc)) {
+            assertThat(files.map(f -> f.getFileName().toString())).containsExactly(SecurityUpdateService.PID + ".cfg");
+        }
+        verify(configuration, never()).update(any());
+        assertThat(audit).isEmpty();
+    }
+
+    @Test
+    @DisplayName("two saves at once, the first creating the file, leave a complete file, no temporary file, and both updates")
+    void concurrentSaves() throws Exception {
+        java.util.concurrent.atomic.AtomicReference<Dictionary<String, Object>> stored = new java.util.concurrent.atomic.AtomicReference<>();
+        when(configuration.getProperties()).thenAnswer(invocation -> stored.get());
+        org.mockito.Mockito.doAnswer(invocation -> {
+            Dictionary<String, Object> next = invocation.getArgument(0);
+            Thread.sleep(20);
+            stored.set(next);
+            return null;
+        }).when(configuration).update(any());
+        Map<String, String> first = new HashMap<>(Settings.defaults().toValues());
+        first.put(SettingsKeys.REFRESH_INTERVAL_HOURS, "6");
+        Map<String, String> second = new HashMap<>(Settings.defaults().toValues());
+        second.put(SettingsKeys.REFRESH_INTERVAL_HOURS, "12");
+        java.util.concurrent.ExecutorService callers = java.util.concurrent.Executors.newFixedThreadPool(2);
+        java.util.concurrent.CountDownLatch go = new java.util.concurrent.CountDownLatch(1);
+        try {
+            java.util.concurrent.Future<?> a = callers.submit(() -> {
+                go.await();
+                store.save(first, "a");
+                return null;
+            });
+            java.util.concurrent.Future<?> b = callers.submit(() -> {
+                go.await();
+                store.save(second, "b");
+                return null;
+            });
+            go.countDown();
+            a.get(10, java.util.concurrent.TimeUnit.SECONDS);
+            b.get(10, java.util.concurrent.TimeUnit.SECONDS);
+        } finally {
+            callers.shutdownNow();
+        }
+
+        Path file = etc.resolve(SecurityUpdateService.PID + ".cfg");
+        List<String> lines = Files.readAllLines(file, StandardCharsets.ISO_8859_1);
+        assertThat(lines.get(0)).isEqualTo(SettingsStore.MARKER);
+        for (String key : SettingsKeys.ALL) {
+            assertThat(lines).as(key).filteredOn(line -> line.startsWith(key + "=")).hasSize(1);
+        }
+        try (java.util.stream.Stream<Path> files = Files.list(etc)) {
+            assertThat(files.map(f -> f.getFileName().toString())).containsExactly(SecurityUpdateService.PID + ".cfg");
+        }
+        verify(configuration, org.mockito.Mockito.times(2)).update(any());
+        assertThat(stored.get().get(SettingsStore.FILEINSTALL_FILENAME)).isEqualTo(file.toUri().toString());
+        assertThat(audit).hasSize(2);
+    }
+
+    @Test
     @DisplayName("load fails cleanly when ConfigurationAdmin is not bound")
     void loadNotBound() {
         SettingsStore unbound = new SettingsStore(() -> etc.toString(), audit::add);

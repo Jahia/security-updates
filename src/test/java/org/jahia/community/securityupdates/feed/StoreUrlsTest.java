@@ -26,6 +26,27 @@ class StoreUrlsTest {
         assertThat(StoreUrls.normalize(url)).contains(expected);
     }
 
+    @ParameterizedTest(name = "{0} -> {1}")
+    @CsvSource({
+            "https://user:token@store.example.org/x.json, https://store.example.org/x.json",
+            "'https://a@b:c@store.example.org:8443/x.json', 'https://store.example.org:8443/x.json'",
+            "'https://store.jahia.com, https://u:p@mirror.example.org/s.json', 'https://store.jahia.com, https://mirror.example.org/s.json'",
+            "'HTTP://u:p@h/x https://v@k/y', 'HTTP://h/x https://k/y'",
+            "https://store.example.org/a@b, https://store.example.org/a@b",
+            "https://store.example.org/?u=a@b, https://store.example.org/?u=a@b",
+            "not a url, not a url",
+            "'', ''"
+    })
+    @DisplayName("withoutUserInfo drops the user information of each URL of a text, and changes nothing else")
+    void withoutUserInfo(String text, String expected) {
+        assertThat(StoreUrls.withoutUserInfo(text)).isEqualTo(expected);
+    }
+
+    @Test
+    void withoutUserInfoOfNull() {
+        assertThat(StoreUrls.withoutUserInfo(null)).isNull();
+    }
+
     @ParameterizedTest(name = "[{0}] is refused")
     @NullAndEmptySource
     @ValueSource(strings = {

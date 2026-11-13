@@ -1,5 +1,6 @@
 package org.jahia.community.securityupdates.service;
 
+import org.jahia.community.securityupdates.feed.StoreUrls;
 import org.osgi.service.cm.Configuration;
 import org.osgi.service.cm.ConfigurationAdmin;
 import org.osgi.service.component.annotations.Component;
@@ -10,17 +11,19 @@ import org.slf4j.LoggerFactory;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Dictionary;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -39,7 +42,9 @@ import java.util.function.Supplier;
  *
  * <p>When no configuration exists yet (no file in {@code karaf/etc}), the file is written first, starting with
  * the default-configuration marker, and FileInstall is pointed at it; the file is removed again when the update
- * fails. Each save is logged at INFO with the user and the keys changed (old -> new).
+ * fails. When the file exists but ConfigurationAdmin has no configuration yet (FileInstall has not delivered it),
+ * the save fails, to be tried again: the file, its comments and its hidden keys are never overwritten. The
+ * {@code settings} query and the audit log never show the user information of a URL edited by hand. Each save is logged at INFO with the user and the keys changed (old -> new).
  */
 @Component(service = SettingsStore.class)
 public class SettingsStore {
@@ -48,6 +53,8 @@ public class SettingsStore {
     static final String MARKER = "# default configuration - won't be overridden";
     private static final String KARAF_ETC = "karaf.etc";
     private static final String UNSET = "(unset)";
+    /** The keys holding URLs, which may carry user information when edited by hand. */
+    private static final List<String> URL_KEYS = List.of(SettingsKeys.DEFAULT_STORE_URL, SettingsKeys.EXTRA_FEED_URLS);
     private static final Logger logger = LoggerFactory.getLogger(SettingsStore.class);
 
     private final Supplier<String> karafEtc;
@@ -83,7 +90,13 @@ public class SettingsStore {
                 values.put(key, properties.get(key));
             }
         }
-        return Settings.fromProperties(values, warning -> logger.debug("Stored settings: {}", warning)).toValues();
+        Map<String, String> loaded = new LinkedHashMap<>(
+                Settings.fromProperties(values, warning -> logger.debug("Stored settings: {}", warning)).toValues());
+        // a URL edited by hand may carry credentials: they are never shown (the URL is refused when checked)
+        for (String key : URL_KEYS) {
+            loaded.computeIfPresent(key, (k, value) -> StoreUrls.withoutUserInfo(value));
+        }
+        return loaded;
     }
 
     /**
@@ -134,17 +147,24 @@ public class SettingsStore {
         return admin.getConfiguration(SecurityUpdateService.PID, "?");
     }
 
-    /** The keys whose value changes, as {@code key: old -> new}. The values are not secret (no credential). */
+    /**
+     * The keys whose value changes, as {@code key: old -> new}. The values are not secret, except the user
+     * information of a URL edited by hand, which is dropped.
+     */
     private static String changes(Dictionary<String, Object> current, Map<String, String> values) {
         List<String> changes = new ArrayList<>();
         for (String key : SettingsKeys.ALL) {
             Object old = current == null ? null : current.get(key);
             String oldValue = old == null ? UNSET : String.valueOf(old);
             if (!oldValue.equals(values.get(key))) {
-                changes.add(key + ": " + logged(oldValue) + " -> " + logged(values.get(key)));
+                changes.add(key + ": " + logged(shown(key, oldValue)) + " -> " + logged(shown(key, values.get(key))));
             }
         }
         return changes.isEmpty() ? "no change" : String.join("; ", changes);
+    }
+
+    private static String shown(String key, String value) {
+        return URL_KEYS.contains(key) ? StoreUrls.withoutUserInfo(value) : value;
     }
 
     /** A value as it may appear in a log line: control characters replaced, so that no line can be forged. */
@@ -167,6 +187,11 @@ public class SettingsStore {
         Path file = directory.resolve(SecurityUpdateService.PID + ".cfg");
         Path temp = Files.createTempFile(directory, SecurityUpdateService.PID, ".tmp");
         try {
+            if (Files.exists(file, LinkOption.NOFOLLOW_LINKS)) {
+                // FileInstall has not delivered it yet: overwriting it would lose its comments and hidden keys
+                throw new FileAlreadyExistsException(file.toString(), null, "the configuration file exists but is not "
+                        + "loaded yet; try again in a few seconds");
+            }
             try (BufferedWriter writer = Files.newBufferedWriter(temp, StandardCharsets.ISO_8859_1)) {
                 writer.write(MARKER);
                 writer.newLine();
@@ -179,7 +204,8 @@ public class SettingsStore {
                 // as the other karaf/etc files; the file holds no secret
                 Files.setPosixFilePermissions(temp, PosixFilePermissions.fromString("rw-r--r--"));
             }
-            Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            // no REPLACE_EXISTING: a file created meanwhile is never overwritten (FileAlreadyExistsException)
+            Files.move(temp, file);
         } catch (IOException | RuntimeException e) {
             Files.deleteIfExists(temp);
             throw e;
