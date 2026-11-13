@@ -113,6 +113,15 @@
         </repository>
     </repositories>
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <excludes>
+                    <!-- webpack's hidden source maps: for debugging a build, not shipped or served -->
+                    <exclude>javascript/apps/**/*.map</exclude>
+                </excludes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
