@@ -153,6 +153,8 @@ describe('Security updates: settings', () => {
         // that were refused, labelled "These colours cannot be saved". That deliberate failing sample is left out of
         // this run only; everywhere else (spec 01, valid colours) the preview is checked like the rest of the page.
         cy.get(BANNER_PREVIEW).should('have.css', 'background-color', 'rgb(136, 136, 136)');
+        // The last field error was scrolled into view above: bring the preview back before checking it is visible.
+        cy.contains('These colours cannot be saved').scrollIntoView();
         cy.contains('These colours cannot be saved').should('be.visible');
         checkPageAccessibility([BANNER_PREVIEW]);
 

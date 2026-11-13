@@ -90,7 +90,8 @@ describe('Security updates: permissions', () => {
         cy.apollo({queryFile: 'graphql/query/getPermissions.graphql'}).then(result => {
             expect(errorText(result), 'no GraphQL error').to.equal('');
             const root = (result as { data: { jcr: { nodeByPath: Record<string, boolean> } } }).data.jcr.nodeByPath;
-            expect(root).to.deep.equal({administrationAccess: true, adminTemplates: true, admin: false});
+            // Apollo adds __typename to the node, hence deep.include.
+            expect(root).to.deep.include({administrationAccess: true, adminTemplates: true, admin: false});
         });
         readStoredSettings().then(settings => expect(settings.canEdit, 'read-only without admin').to.equal(false));
     });
