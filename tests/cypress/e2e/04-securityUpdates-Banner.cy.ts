@@ -36,20 +36,26 @@ describe('Security updates banner', () => {
     const readBanner = () =>
         cy
             .apollo({ query: getBanner, fetchPolicy: 'no-cache' })
-            .then((result: never) => (result as { data: { securityUpdates: { banner: Banner } } }).data.securityUpdates.banner)
+            .then(
+                (result: never) =>
+                    (result as { data: { securityUpdates: { banner: Banner } } }).data.securityUpdates.banner,
+            )
 
     const readReport = () =>
         cy
             .apollo({ query: getReport, fetchPolicy: 'no-cache' })
-            .then((result: never) => (result as { data: { securityUpdates: { report: Report } } }).data.securityUpdates.report)
+            .then(
+                (result: never) =>
+                    (result as { data: { securityUpdates: { report: Report } } }).data.securityUpdates.report,
+            )
 
     /** On-demand checks are rate limited to one per 30 s: retry until the three fixture rows are there. */
     const refreshUntilFixtureRead = (attempt = 0): Cypress.Chainable<Report> => {
         cy.apollo({ mutation: refresh })
-        return readReport().then(report => {
+        return readReport().then((report) => {
             const fromFixture =
-                report.findings.some(f => f.component === 'jahia-core') &&
-                report.findings.some(f => f.source === 'OWNER_REPORTED')
+                report.findings.some((f) => f.component === 'jahia-core') &&
+                report.findings.some((f) => f.source === 'OWNER_REPORTED')
             if (fromFixture || attempt >= 5) {
                 return cy.wrap(report)
             }
@@ -61,9 +67,9 @@ describe('Security updates banner', () => {
 
     /** A configuration change reaches the service asynchronously: poll the banner field until it matches. */
     const bannerUntil = (expected: Partial<Banner>, attempt = 0): Cypress.Chainable<Banner> =>
-        readBanner().then(banner => {
+        readBanner().then((banner) => {
             const matches = Object.entries(expected).every(
-                ([key, value]) => JSON.stringify(banner[key as keyof Banner]) === JSON.stringify(value)
+                ([key, value]) => JSON.stringify(banner[key as keyof Banner]) === JSON.stringify(value),
             )
             if (matches || attempt >= 15) {
                 return cy.wrap(banner)
@@ -75,7 +81,7 @@ describe('Security updates banner', () => {
 
     /** Opens an app shell page and waits for the banner callback to have asked the server. */
     const openAppAndWaitForBannerQuery = () => {
-        cy.intercept('POST', '**/modules/graphql', req => {
+        cy.intercept('POST', '**/modules/graphql', (req) => {
             if (typeof req.body?.query === 'string' && req.body.query.includes('SecurityUpdatesBanner {')) {
                 req.alias = 'bannerQuery'
             }
@@ -87,7 +93,7 @@ describe('Security updates banner', () => {
     before(() => {
         cy.apolloClient()
         provision('banner-defaults.yml')
-        refreshUntilFixtureRead().then(report => {
+        refreshUntilFixtureRead().then((report) => {
             expect(report.findings, 'the three fixture rows').to.have.length(3)
         })
         cy.login()
@@ -107,7 +113,7 @@ describe('Security updates banner', () => {
 
     it('defaults: visible, counts the three rows, links to the page', () => {
         provision('banner-defaults.yml')
-        bannerUntil({ visible: true, count: 3 }).then(banner => {
+        bannerUntil({ visible: true, count: 3 }).then((banner) => {
             expect(banner.visible).to.equal(true)
             expect(banner.count).to.equal(3)
             expect(banner.minimumSeverity).to.equal('HIGH')
@@ -119,12 +125,14 @@ describe('Security updates banner', () => {
         cy.get(BANNER, { timeout: 30000 }).should('be.visible').and('have.attr', 'data-count', '3')
         cy.get(BANNER).should('contain', 'high severity or above').and('contain', '3')
         cy.get(BANNER).should('not.contain', 'Jahia advisories')
-        cy.get(LINK).should('have.attr', 'href').and('match', /\/jahia\/administration\/securityUpdates$/)
+        cy.get(LINK)
+            .should('have.attr', 'href')
+            .and('match', /\/jahia\/administration\/securityUpdates$/)
     })
 
     it('bannerIncludeOwnerReports=false: counts the two Jahia advisories', () => {
         provision('banner-advisories-only.yml')
-        bannerUntil({ count: 2 }).then(banner => {
+        bannerUntil({ count: 2 }).then((banner) => {
             expect(banner.visible).to.equal(true)
             expect(banner.count).to.equal(2)
             expect(banner.components).to.deep.equal(['jahia-core', 'security-updates'])
@@ -137,7 +145,7 @@ describe('Security updates banner', () => {
 
     it('bannerMinimumSeverity=CRITICAL: counts the critical row only', () => {
         provision('banner-critical-only.yml')
-        bannerUntil({ minimumSeverity: 'CRITICAL', count: 1 }).then(banner => {
+        bannerUntil({ minimumSeverity: 'CRITICAL', count: 1 }).then((banner) => {
             expect(banner.visible).to.equal(true)
             expect(banner.count).to.equal(1)
             expect(banner.components).to.deep.equal(['jahia-core'])
@@ -150,7 +158,7 @@ describe('Security updates banner', () => {
 
     it('bannerEnabled=false: no banner', () => {
         provision('banner-disabled.yml')
-        bannerUntil({ visible: false }).then(banner => {
+        bannerUntil({ visible: false }).then((banner) => {
             expect(banner.visible).to.equal(false)
         })
 
@@ -186,11 +194,11 @@ describe('Security updates banner', () => {
         cy.apollo({ query: getBanner, errorPolicy: 'all' }).then((result: never) => {
             const r = result as { graphQLErrors?: Array<{ message: string }>; errors?: Array<{ message: string }> }
             const errors = r.graphQLErrors ?? r.errors ?? []
-            expect(errors.map(e => e.message).join(' ')).to.contain('Permission denied')
+            expect(errors.map((e) => e.message).join(' ')).to.contain('Permission denied')
         })
 
         let bannerQueries = 0
-        cy.intercept('POST', '**/modules/graphql', req => {
+        cy.intercept('POST', '**/modules/graphql', (req) => {
             if (typeof req.body?.query === 'string' && req.body.query.includes('SecurityUpdatesBanner {')) {
                 bannerQueries += 1
             }
