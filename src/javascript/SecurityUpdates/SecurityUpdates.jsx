@@ -131,7 +131,7 @@ export const SecurityUpdates = () => {
                     <Typography component="a" className={styles.link} href={adminUrl('manageModules')}>{t('page.manageModules')}</Typography>
                     <ReportStatus report={{...report, findings}}/>
                     <StoreErrors errors={report.errors}/>
-                    {findings.length > 0 && !isDisabled && <Findings findings={findings}/>}
+                    {findings.length > 0 && !isDisabled && <Findings findings={findings} banner={data?.securityUpdates?.banner}/>}
                 </>
             )}
 

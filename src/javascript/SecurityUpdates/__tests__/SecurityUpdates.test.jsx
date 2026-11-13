@@ -35,13 +35,13 @@ const report = (overrides = {}) => ({
     ...overrides
 });
 
-const answer = r => ({data: {securityUpdates: {report: r}}});
+const answer = (r, banner) => ({data: {securityUpdates: {report: r, banner}}});
 
 describe('SecurityUpdates page', () => {
     let refresh;
     let refetch;
 
-    const mockReport = r => useQuery.mockReturnValue({...answer(r), loading: false, error: undefined, refetch});
+    const mockReport = (r, banner) => useQuery.mockReturnValue({...answer(r, banner), loading: false, error: undefined, refetch});
 
     beforeEach(() => {
         refetch = jest.fn(() => Promise.resolve(answer(report())));
@@ -308,6 +308,34 @@ describe('SecurityUpdates page', () => {
             expect(screen.getByText(/page\.ownerReport/)).toBeInTheDocument();
             expect(screen.getByText('Upgrade please')).toHaveAttribute('lang', 'en');
             expect(screen.getByRole('link', {name: /page\.ownerLink \{host=github\.com\}/})).toHaveAttribute('href', 'https://github.com/owner/repo/security');
+        });
+    });
+
+    describe('what the banner counts', () => {
+        const findings = [finding('a', 'CRITICAL'), finding('b', 'LOW'), finding('c', 'MEDIUM', 'OWNER_REPORTED')];
+
+        test('when the banner counts fewer components than the page lists, the page says what it counts', () => {
+            mockReport(report({findings}), {visible: true, count: 1, minimumSeverity: 'HIGH'});
+            render(<SecurityUpdates/>);
+            expect(screen.getByTestId('security-updates-banner-count'))
+                .toHaveTextContent('page.bannerCount.one {n=1, threshold=banner.threshold.HIGH}');
+        });
+
+        test('an unknown threshold is the server default, HIGH, as in the banner', () => {
+            mockReport(report({findings}), {visible: true, count: 2, minimumSeverity: 'BOGUS'});
+            render(<SecurityUpdates/>);
+            expect(screen.getByTestId('security-updates-banner-count'))
+                .toHaveTextContent('page.bannerCount.other {n=2, threshold=banner.threshold.HIGH}');
+        });
+
+        test.each([
+            ['the same count', {visible: true, count: 3, minimumSeverity: 'LOW'}],
+            ['no banner shown', {visible: false, count: 0, minimumSeverity: 'HIGH'}],
+            ['no banner answer', undefined]
+        ])('says nothing with %s', (name, banner) => {
+            mockReport(report({findings}), banner);
+            render(<SecurityUpdates/>);
+            expect(screen.queryByTestId('security-updates-banner-count')).toBeNull();
         });
     });
 

@@ -30,6 +30,10 @@
       "bySeverity": "By highest severity: {{list}}.",
       "severityCount": "{{severity}}: {{n}}"
     },
+    "bannerCount": {
+      "one": "The banner in the Jahia interface counts {{n}} component ({{threshold}}).",
+      "other": "The banner in the Jahia interface counts {{n}} components ({{threshold}})."
+    },
     "filteredEmpty": "No Jahia advisory concerns this Jahia, but module owners have reported problems. Select \"All, including reports by module owners\" to see them.",
     "newTab": "(opens in a new tab)",
     "requires": "Minimum Jahia: {{version}}",
@@ -154,7 +158,15 @@
       "CRITICAL": "critical severity"
     },
     "link": "View security updates",
-    "dismiss": "Hide this banner"
+    "dismiss": "Hide this banner",
+    "hidden": {
+      "SESSION": "Banner hidden until you close this browser tab. It comes back sooner if a new advisory or a new component is counted.",
+      "HOURS": {
+        "one": "Banner hidden for {{n}} hour. It comes back sooner if a new advisory or a new component is counted.",
+        "other": "Banner hidden for {{n}} hours. It comes back sooner if a new advisory or a new component is counted."
+      },
+      "UNTIL_CHANGE": "Banner hidden. It comes back when a new advisory or a new component is counted."
+    }
   },
   "settings": {
     "title": "Settings",

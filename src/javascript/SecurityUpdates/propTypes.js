@@ -37,3 +37,10 @@ export const reportShape = PropTypes.shape({
     errors: PropTypes.arrayOf(storeErrorShape),
     findings: PropTypes.arrayOf(findingShape)
 });
+
+/** What the banner of the Jahia interface counts (Query.securityUpdates.banner). */
+export const bannerShape = PropTypes.shape({
+    visible: PropTypes.bool,
+    count: PropTypes.number,
+    minimumSeverity: PropTypes.string
+});

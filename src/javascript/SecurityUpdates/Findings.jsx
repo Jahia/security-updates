@@ -3,13 +3,13 @@ import PropTypes from 'prop-types';
 import {useTranslation} from 'react-i18next';
 import {RadioGroup, RadioItem, Typography} from '@jahia/moonstone';
 import styles from './SecurityUpdates.scss';
-import {NS} from '../common/constants';
+import {NS, THRESHOLD_SEVERITIES} from '../common/constants';
 import {pluralKey, values} from '../common/i18n';
 import {filterFindings} from './securityUpdatesUtils';
 import {countBySource, defaultFilter, severitySummary} from './reportView';
 import {FindingsTable} from './FindingsTable';
 import {StatusMessage} from './StatusMessage';
-import {findingShape} from './propTypes';
+import {bannerShape, findingShape} from './propTypes';
 
 const TITLE_ID = 'security-updates-findings-title';
 const HINT_ID = 'security-updates-filter-hint';
@@ -34,8 +34,29 @@ const Summary = ({findings}) => {
 
 Summary.propTypes = {findings: PropTypes.arrayOf(findingShape).isRequired};
 
+/**
+ * The banner counts the components at or above its threshold (and the module owner reports only when set to): when
+ * that is not every component listed here, the page says what the banner counts, so that the two numbers agree.
+ */
+const BannerCount = ({banner, findings}) => {
+    const {t, i18n} = useTranslation(NS);
+    const count = Number(banner?.count) || 0;
+    if (!banner?.visible || count === severitySummary(findings).total) {
+        return null;
+    }
+
+    const severity = THRESHOLD_SEVERITIES.includes(banner.minimumSeverity) ? banner.minimumSeverity : 'HIGH';
+    return (
+        <Typography className={styles.text} data-testid="security-updates-banner-count">
+            {t(`page.bannerCount.${pluralKey(count, i18n?.language)}`, values({n: count, threshold: t(`banner.threshold.${severity}`)}))}
+        </Typography>
+    );
+};
+
+BannerCount.propTypes = {banner: bannerShape, findings: PropTypes.arrayOf(findingShape).isRequired};
+
 /** The "Components to update" section: summary, filter (Jahia advisories / all), table and what to do next. */
-export const Findings = ({findings}) => {
+export const Findings = ({findings, banner}) => {
     const {t, i18n} = useTranslation(NS);
     const [filter, setFilter] = useState(() => defaultFilter(findings, window.location.search));
     // Said after a change of filter only (one short message per change), never when the page opens.
@@ -52,6 +73,7 @@ export const Findings = ({findings}) => {
         <div className={styles.section}>
             <Typography component="h2" variant="heading" id={TITLE_ID}>{t('page.findingsTitle')}</Typography>
             <Summary findings={shown}/>
+            <BannerCount banner={banner} findings={findings}/>
             <fieldset className={styles.filter} aria-describedby={HINT_ID}>
                 <Typography component="legend" weight="bold">{t('page.filter.legend')}</Typography>
                 <Typography id={HINT_ID} className={styles.hint}>{t('page.filter.hint')}</Typography>
@@ -79,4 +101,4 @@ export const Findings = ({findings}) => {
     );
 };
 
-Findings.propTypes = {findings: PropTypes.arrayOf(findingShape).isRequired};
+Findings.propTypes = {findings: PropTypes.arrayOf(findingShape).isRequired, banner: bannerShape};

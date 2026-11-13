@@ -30,6 +30,10 @@
       "bySeverity": "Par gravité la plus haute : {{list}}.",
       "severityCount": "{{severity}} : {{n}}"
     },
+    "bannerCount": {
+      "one": "Le bandeau de l’interface de Jahia compte {{n}} composant ({{threshold}}).",
+      "other": "Le bandeau de l’interface de Jahia compte {{n}} composants ({{threshold}})."
+    },
     "filteredEmpty": "Aucun bulletin Jahia ne concerne ce Jahia, mais des propriétaires de modules ont signalé des problèmes. Choisissez « Tout, y compris les signalements des propriétaires de modules » pour les voir.",
     "newTab": "(s’ouvre dans un nouvel onglet)",
     "requires": "Jahia minimum : {{version}}",
@@ -154,7 +158,15 @@
       "CRITICAL": "gravité critique"
     },
     "link": "Voir les mises à jour de sécurité",
-    "dismiss": "Masquer ce bandeau"
+    "dismiss": "Masquer ce bandeau",
+    "hidden": {
+      "SESSION": "Bandeau masqué jusqu’à la fermeture de cet onglet du navigateur. Il revient plus tôt si un nouveau bulletin ou un nouveau composant est compté.",
+      "HOURS": {
+        "one": "Bandeau masqué pendant {{n}} heure. Il revient plus tôt si un nouveau bulletin ou un nouveau composant est compté.",
+        "other": "Bandeau masqué pendant {{n}} heures. Il revient plus tôt si un nouveau bulletin ou un nouveau composant est compté."
+      },
+      "UNTIL_CHANGE": "Bandeau masqué. Il revient quand un nouveau bulletin ou un nouveau composant est compté."
+    }
   },
   "settings": {
     "title": "Paramètres",

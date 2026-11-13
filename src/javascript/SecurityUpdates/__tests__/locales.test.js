@@ -50,7 +50,7 @@ describe('locales', () => {
     });
 
     test('plural texts have a one and an other form, and say the number', () => {
-        ['page.summary', 'banner.message'].forEach(key => {
+        ['page.summary', 'page.bannerCount', 'page.filter.showing', 'banner.message', 'banner.hidden.HOURS'].forEach(key => {
             [en, fr].forEach(locale => {
                 expect(get(locale, `${key}.one`)).toContain('{{n}}');
                 expect(get(locale, `${key}.other`)).toContain('{{n}}');
@@ -104,8 +104,11 @@ describe('locales', () => {
         [en, fr].forEach(locale => {
             expect(locale.banner.message.other).toContain('{{threshold}}');
         });
-        expect(JSON.stringify(en.banner)).not.toMatch(/advisor/i);
-        expect(JSON.stringify(fr.banner)).not.toMatch(/bulletin/i);
+        // The message counts module owner reports too (when set to): it does not call them advisories. The text said
+        // after hiding the banner names what makes it come back (a new advisory or component), and is not checked.
+        const shown = locale => JSON.stringify({message: locale.banner.message, threshold: locale.banner.threshold, link: locale.banner.link});
+        expect(shown(en)).not.toMatch(/advisor/i);
+        expect(shown(fr)).not.toMatch(/bulletin/i);
     });
 
     test('the banner is a "banner" in English and a "bandeau" in French, never a notice or an avis', () => {

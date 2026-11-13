@@ -1,4 +1,14 @@
-import {BANNER_ID, DISMISS_KEY, REFRESH_INTERVAL_MS, showSecurityBanner, startSecurityBanner} from '../securityBanner';
+import {
+    ANNOUNCED_KEY,
+    BANNER_ID,
+    DISMISS_KEY,
+    FEEDBACK_ID,
+    REFRESH_INTERVAL_MS,
+    removeBanner,
+    showSecurityBanner,
+    startSecurityBanner,
+    VISIBILITY_MIN_INTERVAL_MS
+} from '../securityBanner';
 import {localKey} from '../bannerDismissal';
 import {translate as t} from '../../__mocks__/reactI18next';
 import {CHANGED_EVENT, PAGE_EVENT} from '../../common/constants';
@@ -40,8 +50,13 @@ const banner = () => document.getElementById(BANNER_ID);
 const dismissButton = () => document.querySelector('[data-sel-role="security-updates-banner-dismiss"]');
 const queryOf = (fetchImpl, call) => JSON.parse(fetchImpl.mock.calls[call][1].body).query;
 
+const live = () => banner().querySelector('[role="status"]');
+const feedback = () => document.getElementById(FEEDBACK_ID);
+
 describe('showSecurityBanner', () => {
     beforeEach(() => {
+        removeBanner();
+        document.documentElement.style.cssText = '';
         document.body.innerHTML = '<main id="content"><button type="button">Page button</button></main>';
         window.sessionStorage.clear();
         window.localStorage.clear();
@@ -97,10 +112,53 @@ describe('showSecurityBanner', () => {
         jest.useFakeTimers();
         await show(fetchAnswering(answer()));
 
-        const live = banner().querySelector('[role="status"]');
-        expect(live.textContent).toBe('');
+        expect(live().textContent).toBe('');
         jest.advanceTimersByTime(1500);
-        expect(live.textContent).toBe('banner.message.other {n=2, threshold=banner.threshold.HIGH}');
+        expect(live().textContent).toBe('banner.message.other {n=2, threshold=banner.threshold.HIGH}');
+    });
+
+    test('is not announced again when it comes back with the same count and keys, only when they change', async () => {
+        jest.useFakeTimers();
+        await show(fetchAnswering(answer()));
+        jest.advanceTimersByTime(1500);
+        removeBanner();
+
+        await show(fetchAnswering(answer()));
+        jest.advanceTimersByTime(1500);
+        expect(live().textContent).toBe('');
+        await show(fetchAnswering(answer()));
+        jest.advanceTimersByTime(1500);
+        expect(live().textContent).toBe('');
+
+        await show(fetchAnswering(answer({count: 3, dismissalKeys: [...KEYS, 'jcontent|JSA-3']})));
+        jest.advanceTimersByTime(1500);
+        expect(live().textContent).toBe('banner.message.other {n=3, threshold=banner.threshold.HIGH}');
+        expect(window.sessionStorage.getItem(ANNOUNCED_KEY)).toBe(`3|${[...KEYS, 'jcontent|JSA-3'].sort().join(',')}`);
+    });
+
+    test('without a usable session storage, the page remembers what it announced', async () => {
+        jest.useFakeTimers();
+        const debug = jest.spyOn(console, 'debug').mockImplementation(() => undefined);
+        const broken = {
+            getItem: () => {
+                throw new Error('SecurityError');
+            },
+            setItem: () => {
+                throw new Error('SecurityError');
+            }
+        };
+        await show(fetchAnswering(answer({count: 7})), {session: broken});
+        jest.advanceTimersByTime(1500);
+        expect(live().textContent).toContain('n=7');
+        removeBanner();
+
+        await show(fetchAnswering(answer({count: 7})), {session: broken});
+        jest.advanceTimersByTime(1500);
+        expect(live().textContent).toBe('');
+        await show(fetchAnswering(answer({count: 7})), {session: null});
+        jest.advanceTimersByTime(1500);
+        expect(live().textContent).toBe('');
+        debug.mockRestore();
     });
 
     test.each(['CRITICAL', 'MEDIUM', 'LOW'])('states the %s threshold', async severity => {
@@ -164,25 +222,81 @@ describe('showSecurityBanner', () => {
     });
 
     describe('hiding', () => {
-        test('hiding removes the banner, gives the focus to the main content, and is remembered for the tab', async () => {
+        test('hiding removes the banner, gives the focus back to where it was, and is remembered for the tab', async () => {
             await show(fetchAnswering(answer()));
+            const pageButton = document.querySelector('main button');
+            pageButton.focus();
             dismissButton().focus();
 
             dismissButton().click();
 
             expect(banner()).toBeNull();
-            expect(document.activeElement).toBe(document.getElementById('content'));
+            expect(document.activeElement).toBe(pageButton);
+            expect(document.getElementById('content')).not.toHaveAttribute('tabindex');
             expect(JSON.parse(window.sessionStorage.getItem(DISMISS_KEY))).toEqual(KEYS);
             expect(await show(fetchAnswering(answer()))).toBe(false);
         });
 
-        test('without a main element, the focus goes to the page body', async () => {
-            document.body.innerHTML = '<div>no main</div>';
+        test('when the focus came from nowhere, it stays on the document: Jahia\'s main element is not made focusable', async () => {
             await show(fetchAnswering(answer()));
+            dismissButton().focus();
 
             dismissButton().click();
 
             expect(document.activeElement).toBe(document.body);
+            expect(document.getElementById('content')).not.toHaveAttribute('tabindex');
+        });
+
+        test('an element that left the page does not get the focus back', async () => {
+            await show(fetchAnswering(answer()));
+            document.querySelector('main button').focus();
+            document.querySelector('main').innerHTML = '';
+
+            dismissButton().click();
+
+            expect(document.activeElement).toBe(document.body);
+        });
+
+        test.each([
+            ['SESSION', {}, 'banner.hidden.SESSION'],
+            ['HOURS', {dismissHours: 2}, 'banner.hidden.HOURS.other {n=2}'],
+            ['HOURS', {dismissHours: 1}, 'banner.hidden.HOURS.one {n=1}'],
+            ['UNTIL_CHANGE', {}, 'banner.hidden.UNTIL_CHANGE']
+        ])('hiding with the %s policy says so politely, and when the banner comes back', async (policy, extra, text) => {
+            jest.useFakeTimers();
+            await show(fetchAnswering(answer({dismissPolicy: policy, ...extra})), {language: 'en'});
+            expect(feedback()).toHaveAttribute('role', 'status');
+            expect(feedback().textContent).toBe('');
+
+            dismissButton().click();
+            jest.advanceTimersByTime(200);
+
+            expect(feedback().textContent).toBe(text);
+            expect(banner()).toBeNull();
+        });
+
+        test('the hide button is kept across updates, so that it keeps the focus, and acts with the latest settings', async () => {
+            await show(fetchAnswering(answer()));
+            const button = dismissButton();
+            button.focus();
+
+            await show(fetchAnswering(answer({dismissPolicy: 'HOURS', dismissHours: 3, count: 3, dismissalKeys: [...KEYS, 'jcontent|JSA-3']})));
+
+            expect(dismissButton()).toBe(button);
+            expect(document.activeElement).toBe(button);
+            expect(document.querySelectorAll('[data-sel-role="security-updates-banner-dismiss"]')).toHaveLength(1);
+            button.click();
+            expect(window.sessionStorage.getItem(DISMISS_KEY)).toBeNull();
+            expect(JSON.parse(window.localStorage.getItem(localKey('hash(jdoe)'))).keys).toHaveLength(3);
+        });
+
+        test('the hide button goes when the policy becomes NEVER, and comes back after', async () => {
+            await show(fetchAnswering(answer()));
+            await show(fetchAnswering(answer({dismissPolicy: 'NEVER'})));
+            expect(dismissButton()).toBeNull();
+
+            await show(fetchAnswering(answer()));
+            expect(dismissButton().textContent).toBe('banner.dismiss');
         });
 
         test('a new advisory for a component already hidden shows the banner again', async () => {
@@ -284,6 +398,72 @@ describe('showSecurityBanner', () => {
             expect(banner().style.getPropertyValue('--security-updates-banner-fg')).toBe('#FFFFFF');
         });
 
+        test('keeps a scroll padding as tall as the banner on its edge, and restores the page\'s own when it goes', async () => {
+            jest.useFakeTimers();
+            document.documentElement.style.setProperty('scroll-padding-top', '5px');
+            await show(fetchAnswering(answer()));
+            const style = document.documentElement.style;
+            expect(style.getPropertyValue('scroll-padding-bottom')).toBe('calc(0px + 1rem)');
+
+            banner().getBoundingClientRect = () => ({top: 600, bottom: 700, left: 800, right: 1200, height: 100});
+            window.dispatchEvent(new Event('resize'));
+            jest.advanceTimersByTime(20);
+            expect(style.getPropertyValue('scroll-padding-bottom')).toBe('calc(100px + 1rem)');
+
+            const button = document.querySelector('main button');
+            button.getBoundingClientRect = () => ({top: 650, bottom: 680, left: 900, right: 1000});
+            button.focus();
+            expect(banner().getAttribute('data-position')).toBe('top');
+            expect(style.getPropertyValue('scroll-padding-top')).toBe('calc(100px + 1rem)');
+            expect(style.getPropertyValue('scroll-padding-bottom')).toBe('');
+
+            removeBanner();
+            expect(style.getPropertyValue('scroll-padding-top')).toBe('5px');
+            expect(style.getPropertyValue('scroll-padding-bottom')).toBe('');
+        });
+
+        test('checks the focused element again after the browser scrolled it, and on scroll and resize, once per frame', async () => {
+            jest.useFakeTimers();
+            await show(fetchAnswering(answer()));
+            const frames = jest.spyOn(window, 'requestAnimationFrame');
+            const button = document.querySelector('main button');
+            banner().getBoundingClientRect = () => ({top: 600, bottom: 700, left: 800, right: 1200, height: 100});
+            button.getBoundingClientRect = () => ({top: 10, bottom: 40, left: 10, right: 100});
+            button.focus();
+            expect(banner().getAttribute('data-position')).toBe('bottom');
+
+            // Scrolled into view under the banner, inside a container of the page (its scroll event does not bubble).
+            button.getBoundingClientRect = () => ({top: 650, bottom: 680, left: 900, right: 1000});
+            jest.advanceTimersByTime(20);
+            expect(banner().getAttribute('data-position')).toBe('top');
+
+            banner().getBoundingClientRect = () => ({top: 0, bottom: 100, left: 800, right: 1200, height: 100});
+            button.getBoundingClientRect = () => ({top: 50, bottom: 80, left: 900, right: 1000});
+            frames.mockClear();
+            document.querySelector('main').dispatchEvent(new Event('scroll'));
+            document.querySelector('main').dispatchEvent(new Event('scroll'));
+            window.dispatchEvent(new Event('resize'));
+            expect(frames).toHaveBeenCalledTimes(1);
+            jest.advanceTimersByTime(20);
+            expect(banner().getAttribute('data-position')).toBe('bottom');
+
+            removeBanner();
+            document.querySelector('main').dispatchEvent(new Event('scroll'));
+            expect(frames).toHaveBeenCalledTimes(1);
+            frames.mockRestore();
+        });
+
+        test('a frame still pending when the banner goes does nothing', async () => {
+            jest.useFakeTimers();
+            await show(fetchAnswering(answer()));
+            window.dispatchEvent(new Event('resize'));
+            const element = banner();
+            element.remove();
+
+            expect(() => jest.advanceTimersByTime(20)).not.toThrow();
+            removeBanner();
+        });
+
         test('moves to the other edge when the focused element would be under it', async () => {
             await show(fetchAnswering(answer()));
             const button = document.querySelector('main button');
@@ -303,6 +483,7 @@ describe('showSecurityBanner', () => {
 
 describe('startSecurityBanner', () => {
     beforeEach(() => {
+        removeBanner();
         document.body.innerHTML = '<main id="content"></main>';
         window.sessionStorage.clear();
         window.history.replaceState(null, '', '/ctx/jahia/jcontent');
@@ -333,6 +514,13 @@ describe('startSecurityBanner', () => {
         expect(fetchImpl).toHaveBeenCalledTimes(3);
         expect(REFRESH_INTERVAL_MS).toBe(15 * 60 * 1000);
 
+        // Shown again right after an answer: the server is not asked again.
+        document.dispatchEvent(new Event('visibilitychange'));
+        await flush();
+        expect(fetchImpl).toHaveBeenCalledTimes(3);
+        expect(VISIBILITY_MIN_INTERVAL_MS).toBe(30 * 1000);
+
+        jest.advanceTimersByTime(VISIBILITY_MIN_INTERVAL_MS);
         document.dispatchEvent(new Event('visibilitychange'));
         await flush();
         expect(fetchImpl).toHaveBeenCalledTimes(4);
@@ -343,6 +531,20 @@ describe('startSecurityBanner', () => {
         jest.advanceTimersByTime(REFRESH_INTERVAL_MS);
         await flush();
         expect(fetchImpl).toHaveBeenCalledTimes(4);
+    });
+
+    test('the tab shown again asks the server when the last request failed', async () => {
+        const debug = jest.spyOn(console, 'debug').mockImplementation(() => undefined);
+        const fetchImpl = jest.fn(() => Promise.reject(new Error('offline')));
+        const stop = startSecurityBanner({t, fetchImpl, hash});
+        await flush();
+
+        document.dispatchEvent(new Event('visibilitychange'));
+        await flush();
+
+        expect(fetchImpl).toHaveBeenCalledTimes(2);
+        stop();
+        debug.mockRestore();
     });
 
     test('is hidden while the Security updates page is open, and asked again when it closes', async () => {
