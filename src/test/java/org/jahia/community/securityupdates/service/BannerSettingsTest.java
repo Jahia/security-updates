@@ -103,13 +103,13 @@ class BannerSettingsTest {
     }
 
     @Test
-    @DisplayName("Settings.from reads the banner keys of the configuration")
+    @DisplayName("Settings.fromProperties reads the banner keys of the configuration")
     void fromConfiguration() {
-        SecurityUpdatesConfig config = config("bannerEnabled", false, "bannerMinimumSeverity", "bogus",
+        Map<String, Object> config = config("bannerEnabled", false, "bannerMinimumSeverity", "bogus",
                 "bannerIncludeOwnerReports", false);
         List<String> warnings = new ArrayList<>();
 
-        Settings settings = Settings.from(config, warnings::add);
+        Settings settings = Settings.fromProperties(config, warnings::add);
 
         assertThat(settings.getBanner().isEnabled()).isFalse();
         assertThat(settings.getBanner().getMinimumSeverity()).isEqualTo(Severity.HIGH);
@@ -119,17 +119,17 @@ class BannerSettingsTest {
     }
 
     @Test
-    @DisplayName("Settings.from reads colours and dismiss settings; each invalid group gives one warning")
+    @DisplayName("Settings.fromProperties reads colours and dismiss settings; each invalid group gives one warning")
     void fromConfigurationColoursAndDismiss() {
         List<String> warnings = new ArrayList<>();
-        Settings ok = Settings.from(config("bannerBackgroundColor", "#0b3d91", "bannerTextColor", "#FFFFFF",
+        Settings ok = Settings.fromProperties(config("bannerBackgroundColor", "#0b3d91", "bannerTextColor", "#FFFFFF",
                 "bannerDismissPolicy", "HOURS", "bannerDismissHours", 48), warnings::add);
         assertThat(ok.getBanner().getBackgroundColor()).isEqualTo("#0B3D91");
         assertThat(ok.getBanner().getDismissPolicy()).isEqualTo(DismissPolicy.HOURS);
         assertThat(ok.getBanner().getDismissHours()).isEqualTo(48);
         assertThat(warnings).isEmpty();
 
-        Settings bad = Settings.from(config("bannerBackgroundColor", "#888888", "bannerTextColor", "#777777",
+        Settings bad = Settings.fromProperties(config("bannerBackgroundColor", "#888888", "bannerTextColor", "#777777",
                 "bannerDismissPolicy", "FOREVER"), warnings::add);
         assertThat(bad.getBanner().getBackgroundColor()).isEqualTo(BannerSettings.DEFAULT_BACKGROUND_COLOR);
         assertThat(bad.getBanner().getDismissPolicy()).isEqualTo(DismissPolicy.SESSION);
@@ -150,14 +150,12 @@ class BannerSettingsTest {
                 .containsEntry("bannerDismissHours", "24");
     }
 
-    /** A configuration answering the given values, and the OCD defaults for every other key. */
-    static SecurityUpdatesConfig config(Object... keyValues) {
-        java.util.Map<String, Object> values = new java.util.HashMap<>();
+    /** Component properties holding the given values (typed, as DS may deliver them); other keys are missing. */
+    static Map<String, Object> config(Object... keyValues) {
+        Map<String, Object> values = new java.util.HashMap<>();
         for (int i = 0; i < keyValues.length; i += 2) {
             values.put((String) keyValues[i], keyValues[i + 1]);
         }
-        return (SecurityUpdatesConfig) java.lang.reflect.Proxy.newProxyInstance(SecurityUpdatesConfig.class.getClassLoader(),
-                new Class<?>[]{SecurityUpdatesConfig.class}, (proxy, method, args) -> values.containsKey(method.getName())
-                        ? values.get(method.getName()) : method.getDefaultValue());
+        return values;
     }
 }

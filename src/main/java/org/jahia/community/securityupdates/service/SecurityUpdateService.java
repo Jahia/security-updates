@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
@@ -78,6 +79,8 @@ public class SecurityUpdateService {
     private final Supplier<ScheduledExecutorService> executorFactory;
     private final ReportAssembler assembler;
     private final AtomicBoolean closed = new AtomicBoolean(false);
+    /** Where a configuration value not used as is gets reported; the WARN log, or a test's list. */
+    private Consumer<String> configWarnings = logger::warn;
     private final Object lock = new Object();
 
     // ------------------------------------------------ guarded by lock
@@ -113,6 +116,11 @@ public class SecurityUpdateService {
         this.assembler = new ReportAssembler(warnSink);
     }
 
+    /** Test hook: where the configuration warnings go. */
+    void setConfigWarnings(Consumer<String> configWarnings) {
+        this.configWarnings = configWarnings;
+    }
+
     @Reference
     void setHttpFetcher(HttpFetcher httpFetcher) {
         this.httpFetcher = httpFetcher;
@@ -128,15 +136,21 @@ public class SecurityUpdateService {
         this.installedComponentsProvider = installedComponentsProvider;
     }
 
+    /**
+     * Reads the raw component properties, not the typed {@link SecurityUpdatesConfig} (which describes them for the
+     * configuration UI): Declarative Services would convert a value that cannot be read ({@code enabled=ture}) to
+     * false or 0 silently, or fail the activation; {@link Settings#fromProperties} takes the default instead, with
+     * one WARN.
+     */
     @Activate
-    void activate(SecurityUpdatesConfig config) {
+    void activate(Map<String, Object> properties) {
         closed.set(false);
-        apply(Settings.from(config, logger::warn));
+        apply(Settings.fromProperties(properties, configWarnings));
     }
 
     @Modified
-    void modified(SecurityUpdatesConfig config) {
-        apply(Settings.from(config, logger::warn));
+    void modified(Map<String, Object> properties) {
+        apply(Settings.fromProperties(properties, configWarnings));
     }
 
     /**

@@ -11,7 +11,7 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 /**
- * Validated, immutable form of {@link SecurityUpdatesConfig}. The factories are lenient, as a configuration file
+ * Validated, immutable form of the configuration described by {@link SecurityUpdatesConfig}. The factories are lenient, as a configuration file
  * edited by hand must not stop the module: a value that cannot be read falls back to its default and a number out
  * of range is clamped, each with one warning (logged once per configuration change).
  */
@@ -62,28 +62,10 @@ public final class Settings {
         this.onDemandMinIntervalSeconds = clamp(onDemandMinIntervalSeconds, 0, MAX_ON_DEMAND_MIN_INTERVAL_SECONDS);
     }
 
-    /** The settings of a configuration delivered by Declarative Services. */
-    static Settings from(SecurityUpdatesConfig config, Consumer<String> warnings) {
-        Map<String, Object> values = new LinkedHashMap<>();
-        values.put(SettingsKeys.ENABLED, config.enabled());
-        values.put(SettingsKeys.REFRESH_INTERVAL_HOURS, config.refreshIntervalHours());
-        values.put(SettingsKeys.USE_FORGE_SETTINGS, config.useForgeSettings());
-        values.put(SettingsKeys.EXTRA_FEED_URLS, config.extraFeedUrls());
-        values.put(SettingsKeys.DEFAULT_STORE_URL, config.defaultStoreUrl());
-        values.put(SettingsKeys.BANNER_ENABLED, config.bannerEnabled());
-        values.put(SettingsKeys.BANNER_MINIMUM_SEVERITY, config.bannerMinimumSeverity());
-        values.put(SettingsKeys.BANNER_INCLUDE_OWNER_REPORTS, config.bannerIncludeOwnerReports());
-        values.put(SettingsKeys.BANNER_BACKGROUND_COLOR, config.bannerBackgroundColor());
-        values.put(SettingsKeys.BANNER_TEXT_COLOR, config.bannerTextColor());
-        values.put(SettingsKeys.BANNER_DISMISS_POLICY, config.bannerDismissPolicy());
-        values.put(SettingsKeys.BANNER_DISMISS_HOURS, config.bannerDismissHours());
-        values.put(ON_DEMAND_MIN_INTERVAL_SECONDS, config.onDemandMinIntervalSeconds());
-        return fromProperties(values, warnings);
-    }
-
     /**
-     * The settings of stored configuration properties (as ConfigurationAdmin gives them: strings from a .cfg file,
-     * or typed values). A missing key takes its default without warning.
+     * The settings of configuration properties as they are stored: strings from a .cfg file, or typed values (the
+     * raw component properties of Declarative Services, read before any type conversion, so that a value that cannot
+     * be read is noticed). A missing key takes its default without warning; unknown keys are ignored.
      */
     public static Settings fromProperties(Map<String, ?> properties, Consumer<String> warnings) {
         Reader reader = new Reader(properties, warnings);

@@ -87,21 +87,36 @@ class SecurityUpdateServiceSchedulingTest {
         @Test
         @DisplayName("activate and modified read the OSGi configuration")
         void activateAndModified() {
-            SecurityUpdatesConfig enabled = mock(SecurityUpdatesConfig.class);
-            when(enabled.enabled()).thenReturn(true);
-            when(enabled.refreshIntervalHours()).thenReturn(12);
-            when(enabled.useForgeSettings()).thenReturn(true);
-            when(enabled.defaultStoreUrl()).thenReturn(DEFAULT_STORE);
-            when(enabled.onDemandMinIntervalSeconds()).thenReturn(30);
-            service.activate(enabled);
+            service.activate(java.util.Map.of("enabled", "true", "refreshIntervalHours", "12", "component.name",
+                    SecurityUpdateService.PID));
             verify(fixture.executor).scheduleWithFixedDelay(any(Runnable.class), anyLong(), eq(12L * 3600), any(TimeUnit.class));
 
-            service.modified(mock(SecurityUpdatesConfig.class));
+            service.modified(java.util.Map.of("enabled", Boolean.FALSE));
 
             assertThat(service.getReport().getStatus()).isEqualTo(ReportStatus.DISABLED);
             verify(fixture.future).cancel(false);
             verify(fixture.executor).shutdownNow();
             assertThat(service.getReportView().getNextCheckAt()).isNull();
+        }
+
+        @Test
+        @DisplayName("a value that cannot be read takes its default with one WARN, and the component activates")
+        void unreadableValuesTakeTheirDefault() {
+            List<String> warnings = new java.util.ArrayList<>();
+            service.setConfigWarnings(warnings::add);
+
+            service.activate(java.util.Map.of("enabled", "ture", "refreshIntervalHours", "abc"));
+
+            assertThat(service.getSettings().isEnabled()).isTrue();
+            assertThat(service.getSettings().getRefreshIntervalHours()).isEqualTo(Settings.DEFAULT_REFRESH_INTERVAL_HOURS);
+            assertThat(warnings).hasSize(2).anyMatch(w -> w.startsWith("Invalid enabled 'ture'"))
+                    .anyMatch(w -> w.startsWith("Invalid refreshIntervalHours 'abc'"));
+            verify(fixture.executor).scheduleWithFixedDelay(any(Runnable.class), anyLong(), eq(24L * 3600), any(TimeUnit.class));
+
+            warnings.clear();
+            service.modified(java.util.Map.of("enabled", "ture"));
+            assertThat(warnings).hasSize(1);
+            assertThat(service.getSettings().isEnabled()).isTrue();
         }
 
         @Test
