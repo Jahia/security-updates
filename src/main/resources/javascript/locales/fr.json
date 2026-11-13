@@ -1,0 +1,79 @@
+{
+  "label": "Mises à jour de sécurité",
+  "page": {
+    "intro": "Composants installés (Jahia et modules) pour lesquels le Jahia Store publie des mises à jour corrigeant des problèmes de sécurité.",
+    "loading": "Chargement du rapport de sécurité...",
+    "error": "Le rapport de sécurité n'a pas pu être chargé.",
+    "refresh": "Vérifier maintenant",
+    "refreshing": "Interrogation des stores...",
+    "refreshed": "Vérification terminée.",
+    "refreshError": "La vérification n'a pas pu être lancée.",
+    "jahiaVersion": "Version de Jahia",
+    "checkedAt": "Dernière vérification",
+    "lastSuccess": "Dernière vérification complète",
+    "never": "Jamais",
+    "unknown": "Inconnue",
+    "manageModules": "Ouvrir la gestion des modules",
+    "empty": "Aucune mise à jour de sécurité connue pour ce Jahia.",
+    "filteredEmpty": "Aucun bulletin Jahia ne concerne ce Jahia. Choisissez « Tout » pour voir les signalements des propriétaires de modules.",
+    "ownerReportedNote": "Les signalements des propriétaires de modules sont publiés sur le store par les développeurs des modules et ne sont pas vérifiés par Jahia.",
+    "newTab": "(s'ouvre dans un nouvel onglet)",
+    "requires": "Nécessite Jahia {{version}}",
+    "status": {
+      "NOT_CHECKED": "Aucune vérification n'a encore eu lieu. La première a lieu environ une minute après le démarrage ; utilisez « Vérifier maintenant » pour la lancer tout de suite.",
+      "DISABLED": "La vérification des mises à jour de sécurité est désactivée par la configuration.",
+      "PARTIAL": "Certains stores n'ont pas pu être interrogés : cette liste peut être incomplète.",
+      "UNAVAILABLE": "Flux de sécurité indisponible : impossible de dire si ce Jahia a besoin de mises à jour de sécurité."
+    },
+    "errors": {
+      "title": "Problèmes rencontrés lors de la dernière vérification"
+    },
+    "errorKind": {
+      "NOT_PUBLISHED": "Le store ne publie pas de données de sécurité",
+      "UNAVAILABLE": "Store indisponible",
+      "NOT_UNDERSTOOD": "Flux non compris",
+      "INVALID_URL": "URL de store invalide",
+      "CATALOGUE_UNAVAILABLE": "Liste des modules indisponible (compatibilité inconnue)",
+      "MALFORMED_VERSION": "Version non comparable",
+      "NO_STORE": "Aucun store configuré"
+    },
+    "filter": {
+      "legend": "Afficher",
+      "advisories": "Bulletins Jahia uniquement",
+      "all": "Tout, y compris les signalements des propriétaires de modules"
+    },
+    "table": {
+      "caption": "Composants ayant des mises à jour de sécurité, les plus graves d'abord",
+      "component": "Composant",
+      "installed": "Version installée",
+      "recommended": "Version recommandée",
+      "compatibility": "Compatibilité",
+      "severity": "Gravité",
+      "source": "Source",
+      "advisories": "Bulletins"
+    },
+    "severity": {
+      "CRITICAL": "Critique",
+      "HIGH": "Élevée",
+      "MEDIUM": "Moyenne",
+      "LOW": "Faible",
+      "UNKNOWN": "Inconnue"
+    },
+    "compatibility": {
+      "COMPATIBLE": "Compatible avec ce Jahia",
+      "INCOMPATIBLE": "Nécessite une autre version de Jahia",
+      "UNKNOWN": "Inconnue (absente du catalogue du store)",
+      "JAHIA_UPGRADE": "Mise à jour de Jahia nécessaire"
+    },
+    "source": {
+      "ADVISORY": "Bulletin Jahia",
+      "OWNER_REPORTED": "Signalé par le propriétaire du module"
+    }
+  },
+  "banner": {
+    "label": "Mises à jour de sécurité",
+    "message": "Bulletins de sécurité Jahia de gravité élevée ou critique concernant ce Jahia : {{count}}.",
+    "link": "Voir les mises à jour de sécurité",
+    "dismiss": "Fermer"
+  }
+}

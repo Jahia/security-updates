@@ -1,0 +1,79 @@
+{
+  "label": "Security updates",
+  "page": {
+    "intro": "Installed components (Jahia and modules) for which the Jahia Store publishes updates that fix security issues.",
+    "loading": "Loading the security report...",
+    "error": "The security report could not be loaded.",
+    "refresh": "Check now",
+    "refreshing": "Checking the stores...",
+    "refreshed": "Check completed.",
+    "refreshError": "The check could not be run.",
+    "jahiaVersion": "Jahia version",
+    "checkedAt": "Last check",
+    "lastSuccess": "Last complete check",
+    "never": "Never",
+    "unknown": "Unknown",
+    "manageModules": "Open Manage modules",
+    "empty": "No known security update for this Jahia.",
+    "filteredEmpty": "No Jahia advisory concerns this Jahia. Select \"All\" to see the reports of module owners.",
+    "ownerReportedNote": "Reports by module owners are published by the module developers on the store and are not reviewed by Jahia.",
+    "newTab": "(opens in a new tab)",
+    "requires": "Requires Jahia {{version}}",
+    "status": {
+      "NOT_CHECKED": "No check has run yet. The first check runs about one minute after startup; use \"Check now\" to run it immediately.",
+      "DISABLED": "The security updates check is disabled by configuration.",
+      "PARTIAL": "Some stores could not be checked: this list may be incomplete.",
+      "UNAVAILABLE": "Security feed unavailable: it cannot be said whether this Jahia needs security updates."
+    },
+    "errors": {
+      "title": "Problems met during the last check"
+    },
+    "errorKind": {
+      "NOT_PUBLISHED": "Store does not publish security data",
+      "UNAVAILABLE": "Store unavailable",
+      "NOT_UNDERSTOOD": "Feed not understood",
+      "INVALID_URL": "Invalid store URL",
+      "CATALOGUE_UNAVAILABLE": "Module list unavailable (compatibility unknown)",
+      "MALFORMED_VERSION": "Version not comparable",
+      "NO_STORE": "No store configured"
+    },
+    "filter": {
+      "legend": "Show",
+      "advisories": "Jahia advisories only",
+      "all": "All, including reports by module owners"
+    },
+    "table": {
+      "caption": "Components with security updates, most severe first",
+      "component": "Component",
+      "installed": "Installed version",
+      "recommended": "Recommended version",
+      "compatibility": "Compatibility",
+      "severity": "Severity",
+      "source": "Source",
+      "advisories": "Advisories"
+    },
+    "severity": {
+      "CRITICAL": "Critical",
+      "HIGH": "High",
+      "MEDIUM": "Medium",
+      "LOW": "Low",
+      "UNKNOWN": "Unknown"
+    },
+    "compatibility": {
+      "COMPATIBLE": "Compatible with this Jahia",
+      "INCOMPATIBLE": "Needs another Jahia version",
+      "UNKNOWN": "Unknown (not in the store catalogue)",
+      "JAHIA_UPGRADE": "Jahia upgrade required"
+    },
+    "source": {
+      "ADVISORY": "Jahia advisory",
+      "OWNER_REPORTED": "Reported by the module owner"
+    }
+  },
+  "banner": {
+    "label": "Security updates",
+    "message": "High or critical Jahia security advisories concerning this Jahia: {{count}}.",
+    "link": "View security updates",
+    "dismiss": "Dismiss"
+  }
+}

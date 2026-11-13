@@ -1,0 +1,14 @@
+{
+  "extends": "@jahia/eslint-config",
+  "parserOptions": {
+    "requireConfigFile": false,
+    "babelOptions": {
+      "presets": ["@babel/preset-react"]
+    }
+  },
+  "env": {
+    "browser": true,
+    "es2021": true,
+    "jest": true
+  }
+}
