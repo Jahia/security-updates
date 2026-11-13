@@ -361,6 +361,25 @@ class SecurityMatcherTest {
         }
 
         @Test
+        @DisplayName("the id of an owner report joining many long references is capped")
+        void ownerReportIdIsCapped() {
+            List<String> references = new java.util.ArrayList<>();
+            for (int i = 0; i < 100; i++) {
+                references.add("https://example.org/" + "r".repeat(2000) + i);
+            }
+            SecurityFeed feed = new SecurityFeed(List.of(),
+                    List.of(new FlaggedVersion(null, "my-module", "1.4.2", Severity.HIGH, references, null)), 0);
+
+            MatchResult result = new SecurityMatcher(JAHIA).match(
+                    List.of(new InstalledComponent("my-module", "org.jahia.community", "1.4.0")), List.of(feed),
+                    ModuleCatalog.empty());
+
+            AdvisoryRef ref = result.getFindings().get(0).getAdvisories().get(0);
+            assertThat(ref.getId()).hasSizeLessThanOrEqualTo(SecurityMatcher.MAX_OWNER_ID).startsWith("https://example.org/");
+            assertThat(ref.getUrl()).isEqualTo(references.get(0));
+        }
+
+        @Test
         @DisplayName("several flags: the smallest flagged version above the installed one")
         void severalFlags() {
             SecurityFeed feed = new SecurityFeed(Collections.emptyList(), List.of(
@@ -393,6 +412,26 @@ class SecurityMatcherTest {
                     ModuleCatalog.empty());
 
             assertThat(result.getFindings()).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("advisories published by several stores")
+    class SeveralStores {
+
+        @Test
+        @DisplayName("the first feed wins for an advisory id: the service puts the Jahia Store first")
+        void firstFeedWins() {
+            SecurityFeed official = feed(advisory("JSA-1", Severity.CRITICAL, fix("graphql-dxm-provider", GROUP, "3.10.0")));
+            SecurityFeed shadow = feed(advisory("JSA-1", Severity.LOW, fix("other-module", GROUP, "9.0.0")));
+
+            MatchResult result = new SecurityMatcher(JAHIA).match(List.of(module("graphql-dxm-provider", "3.4.0")),
+                    List.of(official, shadow), ModuleCatalog.empty());
+
+            assertThat(result.getFindings()).singleElement().satisfies(f -> {
+                assertThat(f.getComponent()).isEqualTo("graphql-dxm-provider");
+                assertThat(f.getSeverity()).isEqualTo(Severity.CRITICAL);
+            });
         }
     }
 

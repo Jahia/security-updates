@@ -48,6 +48,9 @@ public final class SecurityMatcher {
     /** A CVE, or a Jahia vulnerability identifier: JSA-YYYY-NNNN with an optional numeric suffix (JSA-2026-0036.1066). */
     private static final Pattern CVE = Pattern.compile("CVE-\\d{4}-\\d{4,}|JSA-\\d{4}-\\d{4}(\\.\\d+)?");
     private static final String HTTPS = "https://";
+    /** Longest id of an owner report, which joins its references. */
+    static final int MAX_OWNER_ID = 200;
+    private static final String ELLIPSIS = "...";
 
     private static final Comparator<Finding> FINDING_ORDER = Comparator
             .comparing((Finding f) -> f.getSeverity().ordinal()).reversed()
@@ -70,7 +73,8 @@ public final class SecurityMatcher {
 
     /**
      * @param modules the installed modules (the platform is added from the running Jahia version)
-     * @param feeds   the security feeds, in store priority order; an advisory id seen twice is used once
+     * @param feeds   the security feeds, in store priority order; an advisory id seen twice is used once, from the
+     *                first feed that has it (the service puts the Jahia Store first)
      * @param catalog the merged module catalogue of the stores, used for compatibility
      * @return the findings, most severe first, and the problems met
      */
@@ -240,7 +244,7 @@ public final class SecurityMatcher {
         List<String> references = flag.getReferences();
         String id = references.isEmpty()
                 ? "owner:" + flag.getName() + '@' + flag.getVersion()
-                : String.join(", ", references);
+                : capped(String.join(", ", references));
         List<String> cves = new ArrayList<>();
         String url = null;
         for (String reference : references) {
@@ -251,6 +255,10 @@ public final class SecurityMatcher {
             }
         }
         return new AdvisoryRef(id, flag.getNote(), url, cves, flag.getSeverity());
+    }
+
+    private static String capped(String id) {
+        return id.length() <= MAX_OWNER_ID ? id : id.substring(0, MAX_OWNER_ID - ELLIPSIS.length()) + ELLIPSIS;
     }
 
     private Optional<Finding> toFinding(InstalledComponent component, FindingSource source, List<Rule> rules,

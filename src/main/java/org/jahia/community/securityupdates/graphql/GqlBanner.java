@@ -42,14 +42,14 @@ public class GqlBanner {
 
     @GraphQLField
     @GraphQLName("visible")
-    @GraphQLDescription("True when the notice is enabled and at least one finding qualifies")
+    @GraphQLDescription("True when the banner is enabled and at least one finding qualifies")
     public boolean isVisible() {
         return decision.isVisible();
     }
 
     @GraphQLField
     @GraphQLName("count")
-    @GraphQLDescription("Number of finding rows at or above the minimum severity, from the counted sources")
+    @GraphQLDescription("Number of distinct components with a finding at or above the minimum severity, from the counted sources")
     public int getCount() {
         return decision.getCount();
     }
@@ -65,9 +65,18 @@ public class GqlBanner {
     @GraphQLField
     @GraphQLName("components")
     @GraphQLNonNull
-    @GraphQLDescription("Component of each counted row, sorted (one entry per row), used as the dismissal key")
+    @GraphQLDescription("The distinct components counted, sorted")
     public List<String> getComponents() {
         return decision.getComponents();
+    }
+
+    @GraphQLField
+    @GraphQLName("dismissalKeys")
+    @GraphQLNonNull
+    @GraphQLDescription("One key per counted advisory, <component>|<advisory id> (the owner report id for an owner report), "
+            + "distinct and sorted: a dismissed banner comes back when a key is not among the dismissed ones")
+    public List<String> getDismissalKeys() {
+        return decision.getDismissalKeys();
     }
 
     @GraphQLField

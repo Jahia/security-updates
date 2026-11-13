@@ -1,5 +1,6 @@
 package org.jahia.community.securityupdates.service;
 
+import org.jahia.community.securityupdates.model.BannerDecision;
 import org.jahia.community.securityupdates.model.DismissPolicy;
 import org.jahia.community.securityupdates.model.Severity;
 
@@ -14,12 +15,11 @@ import java.util.function.Consumer;
  */
 public final class BannerSettings {
 
-    static final Severity DEFAULT_MINIMUM_SEVERITY = Severity.HIGH;
-    /** Colours of the notice before they became configurable (17.2:1). */
-    static final String DEFAULT_BACKGROUND_COLOR = "#1B1B1B";
-    static final String DEFAULT_TEXT_COLOR = "#FFFFFF";
-    static final DismissPolicy DEFAULT_DISMISS_POLICY = DismissPolicy.SESSION;
-    static final int DEFAULT_DISMISS_HOURS = 24;
+    static final Severity DEFAULT_MINIMUM_SEVERITY = BannerDecision.DEFAULT_MINIMUM_SEVERITY;
+    static final String DEFAULT_BACKGROUND_COLOR = BannerDecision.DEFAULT_BACKGROUND_COLOR;
+    static final String DEFAULT_TEXT_COLOR = BannerDecision.DEFAULT_TEXT_COLOR;
+    static final DismissPolicy DEFAULT_DISMISS_POLICY = BannerDecision.DEFAULT_DISMISS_POLICY;
+    static final int DEFAULT_DISMISS_HOURS = BannerDecision.DEFAULT_DISMISS_HOURS;
     private static final int MAX_SHOWN_VALUE = 40;
 
     private final boolean enabled;

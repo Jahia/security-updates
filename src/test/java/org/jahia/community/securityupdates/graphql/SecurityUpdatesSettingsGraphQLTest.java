@@ -170,8 +170,9 @@ class SecurityUpdatesSettingsGraphQLTest {
     @Test
     @DisplayName("the banner exposes the validated colours and dismiss policy")
     void bannerPresentation() {
-        when(service.getBanner()).thenReturn(new org.jahia.community.securityupdates.model.BannerDecision(true, 1, Severity.HIGH,
-                java.util.List.of("jahia-core"), "#0B3D91", "#FFFFFF", DismissPolicy.UNTIL_CHANGE, 24));
+        when(service.getBanner()).thenReturn(new org.jahia.community.securityupdates.model.BannerDecision(true, Severity.HIGH,
+                java.util.List.of("jahia-core"), java.util.List.of("jahia-core|JSA-1"), "#0B3D91", "#FFFFFF",
+                DismissPolicy.UNTIL_CHANGE, 24));
 
         GqlBanner banner = new SecurityUpdatesQuery().getBanner();
 
@@ -184,8 +185,7 @@ class SecurityUpdatesSettingsGraphQLTest {
     @Test
     @DisplayName("the banner gives the current user name, for the per-user dismissal key")
     void bannerUsername() {
-        when(service.getBanner()).thenReturn(new org.jahia.community.securityupdates.model.BannerDecision(false, 0, Severity.HIGH,
-                java.util.List.of()));
+        when(service.getBanner()).thenReturn(org.jahia.community.securityupdates.model.BannerDecision.hidden());
         ServiceLocator.overrideUsername(() -> "jdoe");
 
         assertThat(new SecurityUpdatesQuery().getBanner().getUsername()).isEqualTo("jdoe");

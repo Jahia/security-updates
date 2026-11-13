@@ -100,15 +100,19 @@ class SecurityUpdatesGraphQLTest {
     void banner() throws NoSuchMethodException {
         SecurityUpdateService service = mock(SecurityUpdateService.class);
         when(service.getBanner()).thenReturn(new org.jahia.community.securityupdates.model.BannerDecision(
-                true, 3, Severity.HIGH, List.of("jahia-core", "security-updates", "security-updates")));
+                true, Severity.HIGH, List.of("jahia-core", "security-updates"),
+                List.of("jahia-core|JSA-1", "security-updates|JSA-2", "security-updates|https://example.org/r"),
+                "#1B1B1B", "#FFFFFF", org.jahia.community.securityupdates.model.DismissPolicy.SESSION, 24));
         ServiceLocator.override(() -> service);
 
         GqlBanner banner = new SecurityUpdatesQuery().getBanner();
 
         assertThat(banner.isVisible()).isTrue();
-        assertThat(banner.getCount()).isEqualTo(3);
+        assertThat(banner.getCount()).isEqualTo(2);
         assertThat(banner.getMinimumSeverity()).isEqualTo(Severity.HIGH);
-        assertThat(banner.getComponents()).containsExactly("jahia-core", "security-updates", "security-updates");
+        assertThat(banner.getComponents()).containsExactly("jahia-core", "security-updates");
+        assertThat(banner.getDismissalKeys()).containsExactly("jahia-core|JSA-1", "security-updates|JSA-2",
+                "security-updates|https://example.org/r");
         assertPermission(SecurityUpdatesQuery.class.getMethod("getBanner"));
         assertThat(GqlBanner.class.getAnnotation(GraphQLName.class).value()).isEqualTo("SecurityUpdatesBanner");
     }

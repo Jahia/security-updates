@@ -5,12 +5,10 @@ import graphql.annotations.annotationTypes.GraphQLField;
 import graphql.annotations.annotationTypes.GraphQLName;
 import graphql.annotations.annotationTypes.GraphQLNonNull;
 import org.jahia.community.securityupdates.model.BannerDecision;
-import org.jahia.community.securityupdates.model.Severity;
 import org.jahia.community.securityupdates.service.SecurityUpdateService;
 import org.jahia.community.securityupdates.service.Settings;
 import org.jahia.modules.graphql.provider.dxm.security.GraphQLRequiresPermission;
 
-import java.util.Collections;
 
 /**
  * Query namespace of the module.
@@ -37,7 +35,7 @@ public class SecurityUpdatesQuery {
     public GqlBanner getBanner() {
         SecurityUpdateService service = ServiceLocator.service();
         return new GqlBanner(service == null
-                ? new BannerDecision(false, 0, Severity.HIGH, Collections.emptyList())
+                ? BannerDecision.hidden()
                 : service.getBanner(), ServiceLocator.username());
     }
 

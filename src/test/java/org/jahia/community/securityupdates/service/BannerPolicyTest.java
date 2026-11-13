@@ -1,5 +1,6 @@
 package org.jahia.community.securityupdates.service;
 
+import org.jahia.community.securityupdates.model.AdvisoryRef;
 import org.jahia.community.securityupdates.model.BannerDecision;
 import org.jahia.community.securityupdates.model.Compatibility;
 import org.jahia.community.securityupdates.model.Finding;
@@ -32,8 +33,16 @@ class BannerPolicyTest {
     }
 
     private static Finding finding(String component, Severity severity, FindingSource source) {
-        return new Finding(component, "g", "1.0.0", "2.0.0", Compatibility.UNKNOWN, null, severity, source,
-                Collections.emptyList());
+        return finding(component, severity, source, List.of(new AdvisoryRef(component + "-" + source + "-" + severity, null,
+                null, List.of(), severity)));
+    }
+
+    private static Finding finding(String component, Severity severity, FindingSource source, List<AdvisoryRef> refs) {
+        return new Finding(component, "g", "1.0.0", "2.0.0", Compatibility.UNKNOWN, null, severity, source, refs);
+    }
+
+    private static AdvisoryRef ref(String id, Severity severity) {
+        return new AdvisoryRef(id, null, null, List.of(), severity);
     }
 
     @Test
@@ -42,32 +51,75 @@ class BannerPolicyTest {
         BannerDecision banner = BannerPolicy.decide(report(), BannerSettings.defaults());
 
         assertThat(banner.isVisible()).isTrue();
-        assertThat(banner.getCount()).isEqualTo(3);
+        assertThat(banner.getCount()).isEqualTo(2);
         assertThat(banner.getMinimumSeverity()).isEqualTo(Severity.HIGH);
-        assertThat(banner.getComponents()).containsExactly("jahia-core", "security-updates", "security-updates");
+        assertThat(banner.getComponents()).containsExactly("jahia-core", "security-updates");
+        assertThat(banner.getDismissalKeys()).containsExactly("jahia-core|jahia-core-ADVISORY-CRITICAL",
+                "security-updates|security-updates-ADVISORY-HIGH", "security-updates|security-updates-OWNER_REPORTED-HIGH");
     }
 
     @ParameterizedTest(name = "minimum {0}, owner reports {1} -> {2}")
     @CsvSource({
             "CRITICAL, true, 1",
-            "HIGH, true, 3",
+            "HIGH, true, 2",
             "HIGH, false, 2",
-            "MEDIUM, true, 3",
-            "LOW, true, 4",
+            "MEDIUM, true, 2",
+            "LOW, true, 3",
             "LOW, false, 2"
     })
     void thresholds(Severity minimum, boolean includeOwnerReports, int expected) {
         BannerDecision banner = BannerPolicy.decide(report(), new BannerSettings(true, minimum, includeOwnerReports));
 
         assertThat(banner.getCount()).isEqualTo(expected);
-        assertThat(banner.getComponents()).hasSize(expected).isSorted();
+        assertThat(banner.getComponents()).hasSize(expected).isSorted().doesNotHaveDuplicates();
+        assertThat(banner.getDismissalKeys()).isSorted().doesNotHaveDuplicates();
+    }
+
+    @Test
+    @DisplayName("a new advisory for an already counted component gives a new dismissal key, not a new component")
+    void newAdvisoryForACountedComponentGivesANewKey() {
+        SecurityReport before = new SecurityReport(ReportStatus.OK, Instant.EPOCH, Instant.EPOCH, "8.2.2.1", List.of(), List.of(
+                finding("jahia-core", Severity.CRITICAL, FindingSource.ADVISORY, List.of(ref("JSA-2026-0001", Severity.CRITICAL)))));
+        SecurityReport after = new SecurityReport(ReportStatus.OK, Instant.EPOCH, Instant.EPOCH, "8.2.2.1", List.of(), List.of(
+                finding("jahia-core", Severity.CRITICAL, FindingSource.ADVISORY, List.of(ref("JSA-2026-0001", Severity.CRITICAL),
+                        ref("JSA-2026-0002", Severity.CRITICAL)))));
+
+        BannerDecision first = BannerPolicy.decide(before, BannerSettings.defaults());
+        BannerDecision second = BannerPolicy.decide(after, BannerSettings.defaults());
+
+        assertThat(second.getComponents()).isEqualTo(first.getComponents());
+        assertThat(second.getCount()).isEqualTo(first.getCount());
+        assertThat(second.getDismissalKeys()).containsExactly("jahia-core|JSA-2026-0001", "jahia-core|JSA-2026-0002")
+                .containsAll(first.getDismissalKeys());
+    }
+
+    @Test
+    @DisplayName("an advisory below the minimum severity gives no dismissal key, even in a counted finding")
+    void advisoriesBelowTheMinimumGiveNoKey() {
+        SecurityReport report = new SecurityReport(ReportStatus.OK, Instant.EPOCH, Instant.EPOCH, "8.2.2.1", List.of(), List.of(
+                finding("jahia-core", Severity.CRITICAL, FindingSource.ADVISORY, List.of(ref("JSA-HIGH-ONE", Severity.CRITICAL),
+                        ref("JSA-LOW-ONE", Severity.LOW), ref("JSA-UNKNOWN", Severity.UNKNOWN)))));
+
+        BannerDecision banner = BannerPolicy.decide(report, BannerSettings.defaults());
+
+        assertThat(banner.getDismissalKeys()).containsExactly("jahia-core|JSA-HIGH-ONE");
+    }
+
+    @Test
+    @DisplayName("a counted finding without advisory reference still gives a key, per component and source")
+    void findingWithoutReference() {
+        SecurityReport report = new SecurityReport(ReportStatus.OK, Instant.EPOCH, Instant.EPOCH, "8.2.2.1", List.of(), List.of(
+                finding("jahia-core", Severity.CRITICAL, FindingSource.ADVISORY, List.of())));
+
+        assertThat(BannerPolicy.decide(report, BannerSettings.defaults()).getDismissalKeys())
+                .containsExactly("jahia-core|ADVISORY");
     }
 
     @Test
     @DisplayName("a finding of unknown severity never reaches a threshold")
     void unknownSeverity() {
         BannerDecision banner = BannerPolicy.decide(report(), new BannerSettings(true, Severity.LOW, true));
-        assertThat(banner.getComponents()).doesNotContain("b-module");
+        assertThat(banner.getComponents()).isNotEmpty().doesNotContain("b-module");
     }
 
     @Test
@@ -76,7 +128,7 @@ class BannerPolicyTest {
         BannerDecision banner = BannerPolicy.decide(report(), new BannerSettings(false, Severity.HIGH, true));
 
         assertThat(banner.isVisible()).isFalse();
-        assertThat(banner.getCount()).isEqualTo(3);
+        assertThat(banner.getCount()).isEqualTo(2);
     }
 
     @Test
@@ -89,6 +141,19 @@ class BannerPolicyTest {
         assertThat(banner.isVisible()).isFalse();
         assertThat(banner.getCount()).isZero();
         assertThat(banner.getComponents()).isEmpty();
+        assertThat(banner.getDismissalKeys()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("the hidden decision used when the service is not running has the default presentation")
+    void hidden() {
+        BannerDecision banner = BannerDecision.hidden();
+
+        assertThat(banner.isVisible()).isFalse();
+        assertThat(banner.getBackgroundColor()).isEqualTo(BannerDecision.DEFAULT_BACKGROUND_COLOR);
+        assertThat(banner.getTextColor()).isEqualTo(BannerDecision.DEFAULT_TEXT_COLOR);
+        assertThat(banner.getDismissHours()).isEqualTo(BannerDecision.DEFAULT_DISMISS_HOURS);
+        assertThat(BannerSettings.defaults().getBackgroundColor()).isEqualTo(BannerDecision.DEFAULT_BACKGROUND_COLOR);
     }
 
     @Test
