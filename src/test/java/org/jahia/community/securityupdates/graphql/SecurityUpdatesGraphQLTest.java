@@ -26,6 +26,7 @@ import java.lang.reflect.Modifier;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -209,17 +210,30 @@ class SecurityUpdatesGraphQLTest {
     }
 
     @Test
-    @DisplayName("every field of the module's Query and Mutation types requires a permission")
+    @DisplayName("every field of the module's Query and Mutation types requires exactly its permission")
     void everyFieldRequiresAPermission() {
+        // writes need admin (server administrators); reads, refresh and the namespace containers need adminTemplates
+        Map<String, String> expected = Map.of(
+                "SecurityUpdatesQueryExtension.securityUpdates", "adminTemplates",
+                "SecurityUpdatesMutationExtension.securityUpdates", "adminTemplates",
+                "SecurityUpdatesQuery.report", "adminTemplates",
+                "SecurityUpdatesQuery.banner", "adminTemplates",
+                "SecurityUpdatesQuery.settings", "adminTemplates",
+                "SecurityUpdatesMutation.refresh", "adminTemplates",
+                "SecurityUpdatesMutation.updateSettings", "admin",
+                "SecurityUpdatesMutation.resetSettings", "admin");
+        Map<String, String> actual = new java.util.HashMap<>();
         for (Class<?> type : List.of(SecurityUpdatesQuery.class, SecurityUpdatesMutation.class,
                 SecurityUpdatesQueryExtension.class, SecurityUpdatesMutationExtension.class)) {
-            List<Method> fields = java.util.Arrays.stream(type.getDeclaredMethods())
-                    .filter(m -> m.isAnnotationPresent(graphql.annotations.annotationTypes.GraphQLField.class))
-                    .collect(java.util.stream.Collectors.toList());
-            assertThat(fields).as(type.getSimpleName()).isNotEmpty();
-            assertThat(fields).as(type.getSimpleName())
-                    .allSatisfy(m -> assertThat(m.getAnnotation(GraphQLRequiresPermission.class)).as(m.getName()).isNotNull());
+            for (Method m : type.getDeclaredMethods()) {
+                if (m.isAnnotationPresent(GraphQLField.class)) {
+                    GraphQLRequiresPermission permission = m.getAnnotation(GraphQLRequiresPermission.class);
+                    actual.put(type.getSimpleName() + "." + m.getAnnotation(GraphQLName.class).value(),
+                            permission == null ? null : permission.value());
+                }
+            }
         }
+        assertThat(actual).isEqualTo(expected);
     }
 
     @Test
