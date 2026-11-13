@@ -705,7 +705,9 @@ describe('SecurityUpdates page', () => {
         window.removeEventListener(PAGE_EVENT, listener);
     });
 
-    test('is built from Moonstone components: LayoutContent, Header (h1 title, Check now), Table, Chip, RadioGroup', () => {
+    // Wiring tests: they read the data-moonstone markers of the Jest double, so they check which Moonstone components are
+    // used and with which props, not how the real ones render.
+    test('wiring: uses the Moonstone LayoutContent, Header (h1 title, Check now), Table, Chip and RadioGroup (double markers)', () => {
         mockReport(report({findings: [finding('m', 'CRITICAL'), finding('o', 'HIGH', 'OWNER_REPORTED')]}));
         const {container} = render(<SecurityUpdates/>);
         const used = name => container.querySelectorAll(`[data-moonstone="${name}"]`);
@@ -721,7 +723,7 @@ describe('SecurityUpdates page', () => {
         expect(used('RadioItem')).toHaveLength(2);
     });
 
-    test('severity and source are chips with a text label, in colours that reach 7:1, and rows are not tab stops', () => {
+    test('wiring: severity and source are Moonstone chips with a text label, given the colours chosen for 7:1; rows are not tab stops (double markers)', () => {
         mockReport(report({findings: [finding('m', 'CRITICAL'), finding('n', 'MEDIUM', 'OWNER_REPORTED')]}));
         const {container} = render(<SecurityUpdates/>);
         const chips = [...container.querySelectorAll('[data-moonstone="Chip"]')];
@@ -731,7 +733,7 @@ describe('SecurityUpdates page', () => {
         container.querySelectorAll('tbody tr').forEach(row => expect(row).toHaveAttribute('tabindex', '-1'));
     });
 
-    test('status messages carry a decorative Moonstone icon next to their text', () => {
+    test('wiring: status messages carry a decorative Moonstone icon next to their text (double markers)', () => {
         mockReport(report({status: 'UNAVAILABLE'}));
         render(<SecurityUpdates/>);
 
@@ -739,7 +741,8 @@ describe('SecurityUpdates page', () => {
         expect(within(message).getByTestId('icon-warning')).toHaveAttribute('aria-hidden', 'true');
     });
 
-    test('has no axe violation, with findings and store problems', async () => {
+    // jest-axe runs against the Jest double of Moonstone, not its real markup and CSS: the e2e axe runs (cypress-axe) are the authority.
+    test('jest-axe on the Moonstone double: no violation with findings and store problems (the e2e axe runs are the authority)', async () => {
         mockReport(report({
             status: 'PARTIAL',
             errors: [{storeUrl: 'https://a.example', kind: 'UNAVAILABLE', detail: 'TIMEOUT', message: 'x'}],

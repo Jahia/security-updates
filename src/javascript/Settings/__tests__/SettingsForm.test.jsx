@@ -58,7 +58,7 @@ describe('SettingsForm', () => {
             expect(screen.queryByRole('button', {name: 'settings.save'})).toBeNull();
         });
 
-        test('the error state has no axe violation', async () => {
+        test('jest-axe on the Moonstone double: no violation in the error state (the e2e axe runs are the authority)', async () => {
             useQuery.mockReturnValue({data: undefined, loading: false, error: new Error('boom')});
             const {container} = render(<SettingsForm/>);
             expect(await axe(container)).toHaveNoViolations();
@@ -475,7 +475,8 @@ describe('SettingsForm', () => {
         expect(document.getElementById('security-updates-setting-bannerDismissHours-note')).toBeNull();
     });
 
-    test('is built from Moonstone Switch, Input, Textarea and Button; selects are native', () => {
+    // Wiring test: it reads the data-moonstone markers of the Jest double (which components are used), not real Moonstone.
+    test('wiring: uses the Moonstone Switch, Input, Textarea and Button; selects are native (double markers)', () => {
         const {container} = render(<SettingsForm/>);
         const used = name => container.querySelectorAll(`[data-moonstone="${name}"]`).length;
 
@@ -487,7 +488,8 @@ describe('SettingsForm', () => {
         expect(screen.getByRole('combobox', {name: 'settings.fields.bannerDismissPolicy.label'})).toHaveValue('SESSION');
     });
 
-    test('has no axe violation', async () => {
+    // jest-axe runs against the Jest double of Moonstone, not its real markup and CSS: the e2e axe runs (cypress-axe) are the authority.
+    test('jest-axe on the Moonstone double: no violation (the e2e axe runs are the authority)', async () => {
         const {container} = render(<SettingsForm/>);
         expect(await axe(container)).toHaveNoViolations();
     });
