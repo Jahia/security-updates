@@ -1,26 +1,34 @@
 import {adminUrl, graphqlUrl} from '../SecurityUpdates/securityUpdatesUtils';
+import {normalizeHex} from '../Settings/colorUtils';
+import {isDismissed, recordDismissal, SESSION_KEY} from './bannerDismissal';
 
 export const BANNER_ID = 'security-updates-banner';
-export const DISMISS_KEY = 'security-updates-banner-dismissed';
+export const DISMISS_KEY = SESSION_KEY;
 const STYLE_ID = 'security-updates-banner-style';
+const DEFAULT_BACKGROUND = '#1B1B1B';
+const DEFAULT_TEXT = '#FFFFFF';
 
 const PERMISSION_QUERY = 'query SecurityUpdatesBannerPermission { jcr { nodeByPath(path: "/") { hasPermission(permissionName: "adminTemplates") } } }';
-// The server decides (settings bannerEnabled, bannerMinimumSeverity, bannerIncludeOwnerReports): the client only renders.
-const BANNER_QUERY = 'query SecurityUpdatesBanner { securityUpdates { banner { visible count minimumSeverity components } } }';
+// The server decides (settings banner*) and validates the presentation: the client only renders.
+const BANNER_QUERY = 'query SecurityUpdatesBanner { securityUpdates { banner { visible count minimumSeverity components ' +
+    'backgroundColor textColor dismissPolicy dismissHours username } } }';
 const SEVERITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
-// Colours: white on #1b1b1b is 17:1; the focus ring is #ffd400 on #1b1b1b (12:1). The banner never relies on
-// colour alone: the message states what it is about.
+// The colours come from the settings, validated server-side to a contrast of at least 7:1 (WCAG AAA). The text, the
+// link, the button border and the focus ring all use the text colour, so each of them keeps that contrast against
+// the background (the focus ring needs 3:1). The banner never relies on colour alone: the message says what it is.
 const CSS = `
 #${BANNER_ID} { position: fixed; right: 16px; bottom: 16px; z-index: 9999; max-width: 420px; display: flex;
   flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 12px 16px; border-radius: 4px;
-  background: #1b1b1b; color: #fff; font: 14px/1.5 'Nunito Sans', sans-serif;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, .35); }
+  background: var(--security-updates-banner-bg, ${DEFAULT_BACKGROUND}); color: var(--security-updates-banner-fg, ${DEFAULT_TEXT});
+  font: 14px/1.5 'Nunito Sans', sans-serif; box-shadow: 0 4px 16px rgba(0, 0, 0, .35); }
 #${BANNER_ID} p { margin: 0; flex: 1 1 100%; }
-#${BANNER_ID} a { color: #fff; font-weight: 700; text-decoration: underline; }
-#${BANNER_ID} button { background: transparent; color: #fff; border: 1px solid #fff; border-radius: 4px;
+#${BANNER_ID} a { color: var(--security-updates-banner-fg, ${DEFAULT_TEXT}); font-weight: 700; text-decoration: underline; }
+#${BANNER_ID} button { background: transparent; color: var(--security-updates-banner-fg, ${DEFAULT_TEXT});
+  border: 1px solid var(--security-updates-banner-fg, ${DEFAULT_TEXT}); border-radius: 4px;
   padding: 4px 12px; font: inherit; cursor: pointer; min-height: 32px; }
-#${BANNER_ID} a:focus-visible, #${BANNER_ID} button:focus-visible { outline: 3px solid #ffd400; outline-offset: 2px; }
+#${BANNER_ID} a:focus-visible, #${BANNER_ID} button:focus-visible {
+  outline: 3px solid var(--security-updates-banner-fg, ${DEFAULT_TEXT}); outline-offset: 2px; }
 `;
 
 const postGraphql = async (fetchImpl, query) => {
@@ -42,19 +50,12 @@ const postGraphql = async (fetchImpl, query) => {
     return payload.data;
 };
 
-const readDismissed = () => {
+// Reading window.localStorage itself throws when storage is blocked: such a storage is treated as absent.
+const storage = name => {
     try {
-        return window.sessionStorage.getItem(DISMISS_KEY);
+        return window[name];
     } catch {
         return null;
-    }
-};
-
-const writeDismissed = value => {
-    try {
-        window.sessionStorage.setItem(DISMISS_KEY, value);
-    } catch {
-        // Storage unavailable: the notice comes back on the next load, which is acceptable.
     }
 };
 
@@ -67,20 +68,29 @@ const ensureStyle = () => {
     }
 };
 
-const render = (t, {count, minimumSeverity}, key) => {
+const applyColors = (element, {backgroundColor, textColor}) => {
+    const background = normalizeHex(backgroundColor);
+    const text = normalizeHex(textColor);
+    const valid = background && text;
+    element.style.setProperty('--security-updates-banner-bg', valid ? background : DEFAULT_BACKGROUND);
+    element.style.setProperty('--security-updates-banner-fg', valid ? text : DEFAULT_TEXT);
+};
+
+const render = (t, banner, dismissal) => {
     ensureStyle();
-    const banner = document.createElement('div');
-    banner.id = BANNER_ID;
-    banner.setAttribute('role', 'region');
-    banner.setAttribute('aria-label', t('banner.label'));
-    banner.setAttribute('data-sel-role', 'security-updates-banner');
-    banner.setAttribute('data-count', String(count));
+    const element = document.createElement('div');
+    element.id = BANNER_ID;
+    element.setAttribute('role', 'region');
+    element.setAttribute('aria-label', t('banner.label'));
+    element.setAttribute('data-sel-role', 'security-updates-banner');
+    element.setAttribute('data-count', String(banner.count));
+    applyColors(element, banner);
 
     const message = document.createElement('p');
-    const severity = SEVERITIES.includes(minimumSeverity) ? minimumSeverity : 'HIGH';
+    const severity = SEVERITIES.includes(banner.minimumSeverity) ? banner.minimumSeverity : 'HIGH';
     // TextContent never interprets markup, so i18next's HTML escaping is not wanted here
     message.textContent = t('banner.message', {
-        count,
+        count: banner.count,
         threshold: t(`banner.threshold.${severity}`),
         interpolation: {escapeValue: false}
     });
@@ -89,36 +99,45 @@ const render = (t, {count, minimumSeverity}, key) => {
     link.href = adminUrl('securityUpdates');
     link.textContent = t('banner.link');
     link.setAttribute('data-sel-role', 'security-updates-banner-link');
+    element.append(message, link);
 
-    const dismiss = document.createElement('button');
-    dismiss.type = 'button';
-    dismiss.textContent = t('banner.dismiss');
-    dismiss.setAttribute('data-sel-role', 'security-updates-banner-dismiss');
+    if (dismissal.policy !== 'NEVER') {
+        const dismiss = document.createElement('button');
+        dismiss.type = 'button';
+        dismiss.textContent = t('banner.dismiss');
+        dismiss.setAttribute('data-sel-role', 'security-updates-banner-dismiss');
+        const close = () => {
+            recordDismissal({...dismissal, now: dismissal.clock()});
+            element.remove();
+        };
 
-    const close = () => {
-        writeDismissed(key);
-        banner.remove();
-    };
+        dismiss.addEventListener('click', close);
+        element.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                close();
+            }
+        });
+        element.append(dismiss);
+    }
 
-    dismiss.addEventListener('click', close);
-    banner.addEventListener('keydown', event => {
-        if (event.key === 'Escape') {
-            close();
-        }
-    });
-
-    banner.append(message, link, dismiss);
-    document.body.appendChild(banner);
+    document.body.appendChild(element);
 };
 
 /**
- * Shows a notice to users with adminTemplates when the server says so (Query.securityUpdates.banner).
- * Never throws: on any error it shows nothing.
+ * Shows a notice to users with adminTemplates when the server says so (Query.securityUpdates.banner), with the
+ * configured colours and dismissal policy. Never throws: on any error it shows nothing.
  *
- * @param {{t: function, fetchImpl?: function}} options translation function and fetch implementation
+ * @param {{t: function, fetchImpl?: function, now?: function, session?: Storage, local?: Storage}} options
+ *        translation function, fetch implementation, clock and storages (injectable for tests)
  * @returns {Promise<boolean>} whether the notice was shown
  */
-export const showSecurityBanner = async ({t, fetchImpl = window.fetch && window.fetch.bind(window)}) => {
+export const showSecurityBanner = async ({
+    t,
+    fetchImpl = window.fetch && window.fetch.bind(window),
+    now = Date.now,
+    session = storage('sessionStorage'),
+    local = storage('localStorage')
+}) => {
     try {
         if (!fetchImpl || document.getElementById(BANNER_ID)) {
             return false;
@@ -131,12 +150,20 @@ export const showSecurityBanner = async ({t, fetchImpl = window.fetch && window.
 
         const data = await postGraphql(fetchImpl, BANNER_QUERY);
         const banner = data.securityUpdates.banner;
-        const key = (banner.components || []).join('|');
-        if (!banner.visible || readDismissed() === key || document.getElementById(BANNER_ID)) {
+        const dismissal = {
+            policy: banner.dismissPolicy || 'SESSION',
+            hours: banner.dismissHours || 24,
+            key: (banner.components || []).join('|'),
+            username: banner.username || '',
+            session,
+            local,
+            clock: now
+        };
+        if (!banner.visible || isDismissed({...dismissal, now: now()}) || document.getElementById(BANNER_ID)) {
             return false;
         }
 
-        render(t, banner, key);
+        render(t, banner, dismissal);
         return true;
     } catch {
         return false;

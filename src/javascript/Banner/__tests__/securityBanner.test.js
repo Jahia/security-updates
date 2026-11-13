@@ -1,4 +1,5 @@
 import {BANNER_ID, DISMISS_KEY, showSecurityBanner} from '../securityBanner';
+import {localKey} from '../bannerDismissal';
 
 // Echoes the key and the interpolated values, so that assertions can check what was asked for.
 const t = (key, options) => (options && options.count !== undefined ? `${key}:${options.count}:${options.threshold}` : key);
@@ -132,5 +133,107 @@ describe('showSecurityBanner', () => {
         await showSecurityBanner({t, fetchImpl});
 
         expect(document.querySelectorAll(`#${BANNER_ID}`)).toHaveLength(1);
+    });
+
+    test('asks for the presentation and the user name with the decision', async () => {
+        const fetchImpl = fetchAnswering(permission(true), banner());
+
+        await showSecurityBanner({t, fetchImpl});
+
+        ['backgroundColor', 'textColor', 'dismissPolicy', 'dismissHours', 'username'].forEach(field => {
+            expect(queryOf(fetchImpl, 1)).toContain(field);
+        });
+    });
+
+    test('applies the configured colours, used by the text, the link, the button and the focus ring', async () => {
+        await showSecurityBanner({
+            t,
+            fetchImpl: fetchAnswering(permission(true), banner({backgroundColor: '#0B3D91', textColor: '#FFFFFF'}))
+        });
+
+        const element = document.getElementById(BANNER_ID);
+        expect(element.style.getPropertyValue('--security-updates-banner-bg')).toBe('#0B3D91');
+        expect(element.style.getPropertyValue('--security-updates-banner-fg')).toBe('#FFFFFF');
+        const css = document.getElementById('security-updates-banner-style').textContent;
+        expect(css).toContain('background: var(--security-updates-banner-bg');
+        expect(css).toMatch(/a \{[^}]*color: var\(--security-updates-banner-fg/);
+        expect(css).toMatch(/button \{[^}]*color: var\(--security-updates-banner-fg/);
+        expect(css).toMatch(/focus-visible[^{]*\{[^}]*outline: 3px solid var\(--security-updates-banner-fg/);
+    });
+
+    test('ignores colours that are not #RRGGBB and keeps the defaults', async () => {
+        await showSecurityBanner({
+            t,
+            fetchImpl: fetchAnswering(permission(true), banner({backgroundColor: 'red;background:url(x)', textColor: '#FFFFFF'}))
+        });
+
+        const element = document.getElementById(BANNER_ID);
+        expect(element.style.getPropertyValue('--security-updates-banner-bg')).toBe('#1B1B1B');
+        expect(element.style.getPropertyValue('--security-updates-banner-fg')).toBe('#FFFFFF');
+    });
+
+    test('NEVER: no Dismiss button, Escape does nothing, a stored dismissal is ignored', async () => {
+        window.sessionStorage.setItem(DISMISS_KEY, 'jahia-core|security-updates|security-updates');
+
+        await showSecurityBanner({t, fetchImpl: fetchAnswering(permission(true), banner({dismissPolicy: 'NEVER'}))});
+
+        const element = document.getElementById(BANNER_ID);
+        expect(element).not.toBeNull();
+        expect(element.querySelector('[data-sel-role="security-updates-banner-dismiss"]')).toBeNull();
+        element.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+        expect(document.getElementById(BANNER_ID)).not.toBeNull();
+    });
+
+    test('HOURS: the dismissal is stored per user with its time, and expires', async () => {
+        const local = window.localStorage;
+        local.clear();
+        let now = 1_000_000;
+        const hoursBanner = () => banner({dismissPolicy: 'HOURS', dismissHours: 2, username: 'jdoe'});
+
+        await showSecurityBanner({t, now: () => now, fetchImpl: fetchAnswering(permission(true), hoursBanner())});
+        document.querySelector('[data-sel-role="security-updates-banner-dismiss"]').click();
+
+        expect(JSON.parse(local.getItem(localKey('jdoe')))).toEqual({key: 'jahia-core|security-updates|security-updates', at: 1_000_000});
+        now += 3600 * 1000;
+        expect(await showSecurityBanner({t, now: () => now, fetchImpl: fetchAnswering(permission(true), hoursBanner())})).toBe(false);
+        now += 3600 * 1000;
+        expect(await showSecurityBanner({t, now: () => now, fetchImpl: fetchAnswering(permission(true), hoursBanner())})).toBe(true);
+    });
+
+    test('UNTIL_CHANGE: still dismissed in a new session, back when the components change', async () => {
+        window.localStorage.clear();
+        const untilChange = overrides => banner({dismissPolicy: 'UNTIL_CHANGE', username: 'jdoe', ...overrides});
+
+        await showSecurityBanner({t, fetchImpl: fetchAnswering(permission(true), untilChange())});
+        document.querySelector('[data-sel-role="security-updates-banner-dismiss"]').click();
+        window.sessionStorage.clear();
+
+        expect(await showSecurityBanner({t, fetchImpl: fetchAnswering(permission(true), untilChange())})).toBe(false);
+        expect(await showSecurityBanner({
+            t,
+            fetchImpl: fetchAnswering(permission(true), untilChange({count: 2, components: ['jahia-core', 'security-updates']}))
+        })).toBe(true);
+    });
+
+    test('an unusable storage fails open: the banner is shown and dismissing does not throw', async () => {
+        const broken = {
+            getItem: () => {
+                throw new Error('SecurityError');
+            },
+            setItem: () => {
+                throw new Error('SecurityError');
+            }
+        };
+
+        const shown = await showSecurityBanner({
+            t,
+            session: broken,
+            local: broken,
+            fetchImpl: fetchAnswering(permission(true), banner({dismissPolicy: 'HOURS'}))
+        });
+
+        expect(shown).toBe(true);
+        expect(() => document.querySelector('[data-sel-role="security-updates-banner-dismiss"]').click()).not.toThrow();
+        expect(document.getElementById(BANNER_ID)).toBeNull();
     });
 });
