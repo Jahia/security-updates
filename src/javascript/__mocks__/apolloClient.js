@@ -1,5 +1,4 @@
 // Mock @apollo/client so the config panel can be unit-tested without a network.
-import React from 'react';
 
 export class InMemoryCache {}
 

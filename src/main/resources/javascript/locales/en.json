@@ -1,56 +1,111 @@
 {
   "label": "Security updates",
   "page": {
-    "intro": "Installed components (Jahia and modules) for which the Jahia Store publishes updates that fix security issues.",
-    "loading": "Loading the security report...",
-    "error": "The security report could not be loaded.",
+    "documentTitle": "{{title}} – Jahia administration",
+    "intro": "This page lists the installed components (Jahia and its modules) that have an update fixing a security problem, from the security data that the stores publish.",
+    "loading": "Loading the security report…",
+    "error": "The security report could not be loaded. Reload the page to try again.",
     "refresh": "Check now",
-    "refreshing": "Checking the stores...",
-    "refreshed": "Check completed.",
-    "notRefreshed": "A check ran less than 30 seconds ago: the report is unchanged.",
-    "refreshError": "The check could not be run.",
+    "checking": "Checking…",
+    "refreshing": "Checking the stores… This can take a few minutes.",
+    "running": "A check is running. This page updates when it ends.",
+    "refreshed": "Check completed. The page shows the new results.",
+    "notRefreshed": "A check ran a moment ago, so no new check was started. Try again in a minute.",
+    "refreshError": "The check could not be started. Try again, or see the Jahia log.",
+    "refreshSlow": "The check is still running. Reload this page in a few minutes to see the results.",
     "jahiaVersion": "Jahia version",
     "checkedAt": "Last check",
-    "lastSuccess": "Last complete check",
+    "lastSuccess": "Last check that reached every store",
+    "nextCheckAt": "Next check",
+    "notScheduled": "Not planned",
     "never": "Never",
     "unknown": "Unknown",
     "manageModules": "Open Manage modules",
     "empty": "No known security update for this Jahia.",
-    "filteredEmpty": "No Jahia advisory concerns this Jahia. Select \"All\" to see the reports of module owners.",
+    "findingsTitle": "Components to update",
+    "summary": {
+      "one": "{{n}} component needs a security update.",
+      "other": "{{n}} components need a security update.",
+      "bySeverity": "By highest severity: {{list}}.",
+      "severityCount": "{{severity}}: {{n}}"
+    },
+    "filteredEmpty": "No Jahia advisory concerns this Jahia, but module owners have reported problems. Select \"All, including reports by module owners\" to see them.",
     "newTab": "(opens in a new tab)",
-    "requires": "Requires Jahia {{version}}",
+    "requires": "Minimum Jahia: {{version}}",
+    "advisoryFallback": "Advisory {{id}}",
+    "ownerReport": "Report by the module owner",
+    "ownerLink": "Owner report on {{host}}",
+    "cveLink": "{{id}} on cve.org",
+    "afterTable": "To update a module, open Manage modules and install the recommended version. To update Jahia itself, follow the Jahia upgrade documentation.",
+    "action": {
+      "module": "Update {{component}} in Manage modules",
+      "core": "Jahia upgrade documentation"
+    },
     "status": {
-      "NOT_CHECKED": "No check has run yet. The first check runs about one minute after startup; use \"Check now\" to run it immediately.",
-      "DISABLED": "The security updates check is disabled by configuration.",
+      "NOT_CHECKED": "No check has run yet. The first check runs about one minute after startup. Use \"Check now\" to run it at once.",
+      "DISABLED": "Checks are turned off, so this page shows no results and no banner is shown. A server administrator can turn them on in the settings below.",
       "PARTIAL": "Some stores could not be checked: this list may be incomplete.",
-      "UNAVAILABLE": "Security feed unavailable: it cannot be said whether this Jahia needs security updates."
+      "PARTIAL_EMPTY": "Some stores could not be checked. The stores that answered report no security update for this Jahia, but the others might.",
+      "UNAVAILABLE": "No security data could be read, so this page cannot tell whether this Jahia needs security updates.",
+      "NOT_PUBLISHED": "The Jahia Store does not publish security data yet. There is nothing to configure: this page will show results once the data is published.",
+      "STALE": "The results may be out of date: no check has reached every store since {{date}}."
     },
     "errors": {
-      "title": "Problems met during the last check"
+      "title": "Problems found during the last check",
+      "store": "Store: {{url}}",
+      "technical": "Technical details: {{message}}"
     },
     "errorKind": {
-      "NOT_PUBLISHED": "Store does not publish security data",
+      "NOT_PUBLISHED": "No security data published yet",
       "UNAVAILABLE": "Store unavailable",
-      "NOT_UNDERSTOOD": "Feed not understood",
-      "INVALID_URL": "Invalid store URL",
-      "CATALOGUE_UNAVAILABLE": "Module list unavailable (compatibility unknown)",
-      "MALFORMED_VERSION": "Version not comparable",
-      "NO_STORE": "No store configured"
+      "NOT_UNDERSTOOD": "Security data in an unsupported format",
+      "INVALID_URL": "Store address refused",
+      "CATALOGUE_UNAVAILABLE": "Module list unavailable, so compatibility is unknown",
+      "MALFORMED_VERSION": "Version that cannot be compared",
+      "NO_STORE": "No store to check",
+      "STALE": "Results out of date"
+    },
+    "errorHelp": {
+      "NOT_PUBLISHED": "There is nothing to configure: results will appear once the data is published.",
+      "UNAVAILABLE": "Try again later.",
+      "NOT_UNDERSTOOD": "The store sent data that this module cannot read.",
+      "INVALID_URL": "Check the address of this store.",
+      "CATALOGUE_UNAVAILABLE": "Findings are still listed, without their compatibility.",
+      "MALFORMED_VERSION": "The version of this component cannot be compared with the security data.",
+      "NO_STORE": "Add a store in Manage modules, or enter a default store address in the settings below.",
+      "STALE": "Run a check, or see the other problems listed here."
+    },
+    "errorDetail": {
+      "NOT_HTTPS": "The address does not use https. Only https addresses are accepted: change it in the settings below or in Manage modules.",
+      "SSRF_BLOCKED": "Jahia blocked this address because it points to an internal network. If this store is internal on purpose, a system administrator can allow its host with the jahia.httpClient.allowedInternalHosts property.",
+      "TIMEOUT": "The store did not answer in time. Try again later.",
+      "CONNECTION": "Jahia could not connect to the store. Check the address, and the network and proxy settings of the server.",
+      "REDIRECT": "The store answered with a redirection, which is not followed. Use the final address of the store.",
+      "AUTH": "The store refused the user name or password. Check them in Manage modules.",
+      "HTTP_STATUS": "The store answered with an error. Try again later.",
+      "TOO_LARGE": "The store sent more data than allowed.",
+      "INVALID_JSON": "The store sent data that could not be read.",
+      "SCHEMA_UNSUPPORTED": "The store uses a newer data format. Update the security-updates module to read it.",
+      "ENTRIES_SKIPPED": "Some entries could not be read and were skipped.",
+      "FORGE_SETTINGS_UNREADABLE": "The stores configured in Manage modules could not be read. See the Jahia log.",
+      "CHECK_FAILED": "The check failed. See the Jahia log."
     },
     "filter": {
       "legend": "Show",
-      "advisories": "Jahia advisories only",
-      "all": "All, including reports by module owners"
+      "hint": "Jahia advisories are published by Jahia. Module owners can also report that a version of their module fixes a security problem: Jahia has not reviewed those reports.",
+      "advisories": "Jahia advisories only ({{n}})",
+      "all": "All, including reports by module owners ({{n}})"
     },
     "table": {
       "caption": "Components with security updates, most severe first",
       "component": "Component",
+      "severity": "Severity",
       "installed": "Installed version",
       "recommended": "Recommended version",
       "compatibility": "Compatibility",
-      "severity": "Severity",
       "source": "Source",
-      "advisories": "Advisories"
+      "advisories": "Advisories",
+      "action": "What to do"
     },
     "severity": {
       "CRITICAL": "Critical",
@@ -61,8 +116,8 @@
     },
     "compatibility": {
       "COMPATIBLE": "Compatible with this Jahia",
-      "INCOMPATIBLE": "Needs another Jahia version",
-      "UNKNOWN": "Unknown (not in the store catalogue)",
+      "INCOMPATIBLE": "Needs a newer Jahia",
+      "UNKNOWN": "Not known: the module is not in the store's module list",
       "JAHIA_UPGRADE": "Jahia upgrade required"
     },
     "source": {
@@ -71,15 +126,20 @@
     },
     "statusLabel": {
       "NOT_CHECKED": "Not checked yet",
-      "DISABLED": "Disabled",
-      "OK": "All stores checked",
+      "DISABLED": "Turned off",
+      "UP_TO_DATE": "Up to date",
+      "UPDATES_NEEDED": "Updates needed",
       "PARTIAL": "Partly checked",
-      "UNAVAILABLE": "Feed unavailable"
+      "NO_DATA": "No security data",
+      "NOT_AVAILABLE_YET": "Not available yet"
     }
   },
   "banner": {
     "label": "Security updates",
-    "message": "Security updates of {{threshold}} concern this Jahia: {{count}}.",
+    "message": {
+      "one": "{{n}} component needs a security update ({{threshold}}).",
+      "other": "{{n}} components need a security update ({{threshold}})."
+    },
     "threshold": {
       "LOW": "low severity or above",
       "MEDIUM": "medium severity or above",
@@ -87,96 +147,112 @@
       "CRITICAL": "critical severity"
     },
     "link": "View security updates",
-    "dismiss": "Dismiss"
+    "dismiss": "Hide this banner"
   },
   "settings": {
     "title": "Settings",
-    "intro": "Changes are saved in the configuration org.jahia.community.securityupdates (karaf/etc) and apply at once.",
+    "intro": "Changes are saved in the Jahia configuration and apply at once, on every server of the cluster.",
+    "loading": "Loading the settings…",
+    "loadError": "The settings could not be loaded. Reload the page to try again.",
+    "readOnly": "Only server administrators can change these settings. They are shown here for information.",
     "groups": {
       "checks": "Checks",
-      "banner": "Notice in the Jahia UI"
+      "banner": "Banner in the Jahia interface"
     },
     "fields": {
       "enabled": {
         "label": "Check the stores for security updates",
-        "help": "When unchecked, no store is checked and this page says the check is disabled."
+        "help": "When turned off, no store is checked: this page shows no results, and no banner is shown."
       },
       "refreshIntervalHours": {
         "label": "Hours between two checks",
-        "help": "A whole number from 1 to 720. The first check runs about one minute after a change."
+        "help": "A whole number of hours, from 1 to 720 (30 days). After a change, the next check runs about one minute later."
       },
       "useForgeSettings": {
-        "label": "Use the stores of the module manager",
-        "help": "Checks the stores configured in Manage modules, with their credentials."
+        "label": "Use the stores of Manage modules",
+        "help": "Checks the stores configured in Manage modules, with their user names and passwords."
       },
       "defaultStoreUrl": {
-        "label": "Default store URL",
-        "help": "Used when no store is configured in the module manager. An absolute http or https URL, or empty for none."
+        "label": "Default store address",
+        "help": "Checked when no store comes from Manage modules. An https address, for example https://store.jahia.com. Leave it empty to check no default store."
       },
       "extraFeedUrls": {
-        "label": "Additional security feed URLs",
-        "help": "Full URLs of security feeds, separated by commas. Absolute http or https URLs, without credentials."
+        "label": "Other security data addresses",
+        "help": "Addresses of other security data files to check, for example from a partner. Separate them with commas, spaces or new lines. At most 10 https addresses, without user name or password."
       },
       "bannerEnabled": {
-        "label": "Show the notice",
-        "help": "Shows a notice on every page of the Jahia UI to users who can manage modules."
+        "label": "Show the banner",
+        "help": "Shows a banner on every page of the Jahia interface to the users who can open this page."
       },
       "bannerMinimumSeverity": {
-        "label": "Lowest severity counted by the notice",
-        "help": "Findings below this severity do not count."
+        "label": "Lowest severity counted by the banner",
+        "help": "Components whose updates are less severe are not counted."
       },
       "bannerIncludeOwnerReports": {
         "label": "Count the reports of module owners",
-        "help": "When unchecked, only Jahia advisories count."
+        "help": "When turned off, only Jahia advisories are counted."
       },
       "bannerBackgroundColor": {
-        "label": "Notice background colour (hex)",
-        "picker": "Pick the notice background colour",
-        "help": "#RRGGBB. The contrast ratio with the text colour must be at least 7:1."
+        "label": "Banner background colour",
+        "picker": "Pick the banner background colour",
+        "help": "A colour code such as #1B1B1B. The text must stand out against it with a contrast of at least 7 to 1, the highest level of the accessibility guidelines (WCAG AAA)."
       },
       "bannerTextColor": {
-        "label": "Notice text colour (hex)",
-        "picker": "Pick the notice text colour",
-        "help": "#RRGGBB. Also used for the link, the button and the focus ring."
+        "label": "Banner text colour",
+        "picker": "Pick the banner text colour",
+        "help": "A colour code such as #FFFFFF. Also used for the link, the button and the focus outline."
       },
       "bannerDismissPolicy": {
-        "label": "After the notice is dismissed",
-        "help": "Except with \"Cannot be dismissed\", the notice comes back when other components are concerned."
+        "label": "After a user hides the banner",
+        "help": "Except with \"Cannot be hidden\", the banner comes back as soon as a component that was not listed before needs an update."
       },
       "bannerDismissHours": {
-        "label": "Hours the notice stays hidden",
-        "help": "A whole number from 1 to 720, used by \"For a number of hours\"."
+        "label": "Hours the banner stays hidden",
+        "help": "A whole number from 1 to 720, used only with \"Hidden for a number of hours\"."
       }
     },
     "dismiss": {
-      "SESSION": "Hidden until the browser session ends",
+      "SESSION": "Hidden until the browser tab is closed",
       "HOURS": "Hidden for a number of hours",
-      "UNTIL_CHANGE": "Hidden until other components are concerned",
-      "NEVER": "Cannot be dismissed"
+      "UNTIL_CHANGE": "Hidden until a new component needs an update",
+      "NEVER": "Cannot be hidden"
     },
     "preview": {
       "title": "Preview",
       "ratio": "Contrast ratio:",
       "pass": "Meets the 7:1 minimum (WCAG AAA).",
-      "fail": "Below the 7:1 minimum: this pair cannot be saved.",
-      "invalid": "Enter two #RRGGBB colours to see the contrast ratio."
+      "fail": "Below the 7:1 minimum: these colours cannot be saved.",
+      "failLabel": "These colours cannot be saved",
+      "invalid": "Enter two colour codes such as #1B1B1B to see the contrast.",
+      "announcePass": "The banner colours now meet the 7:1 minimum.",
+      "announceFail": "The banner colours are now below the 7:1 minimum."
     },
     "save": "Save settings",
     "reset": "Reset to defaults",
-    "saving": "Saving...",
-    "saved": "Settings saved.",
-    "resetDone": "Default settings restored.",
+    "saving": "Saving…",
+    "saved": "Settings saved. The next check runs in about one minute.",
+    "resetDone": "Default settings restored. The next check runs in about one minute.",
     "invalid": "Some settings are not valid: nothing was saved. See the fields marked with an error.",
+    "resetConfirm": {
+      "title": "Reset every setting to its default value?",
+      "body": "Your current settings, including the store addresses and the banner colours, will be replaced by the default values. This cannot be undone.",
+      "confirm": "Reset to defaults",
+      "cancel": "Cancel"
+    },
     "errors": {
       "MISSING": "A value is required.",
-      "INVALID_BOOLEAN": "Must be checked or unchecked.",
+      "INVALID_BOOLEAN": "Must be turned on or off.",
       "INVALID_NUMBER": "Enter a whole number.",
-      "OUT_OF_RANGE": "Enter a number from 1 to 720.",
-      "INVALID_URL": "Enter absolute http or https URLs, without credentials, query or fragment.",
+      "OUT_OF_RANGE": "Enter a whole number from 1 to 720.",
+      "INVALID_URL": "Enter complete https addresses, without user name, password, query or fragment.",
+      "NOT_HTTPS": "Enter https addresses only: http addresses are refused.",
+      "TOO_MANY": "Enter at most 10 addresses.",
       "INVALID_VALUE": "Choose one of the proposed values.",
-      "INVALID_COLOR": "Enter a colour as #RRGGBB, for example #0B3D91.",
-      "LOW_CONTRAST": "The contrast ratio of the two colours is {{ratio}}:1; at least 7:1 is required.",
-      "WRITE_FAILED": "The settings could not be saved. See the Jahia log."
+      "INVALID_COLOR": "Enter a colour code such as #0B3D91.",
+      "LOW_CONTRAST": "The contrast ratio of the two colours is {{ratio}}:1, but at least 7:1 is required.",
+      "WRITE_FAILED": "The settings could not be saved. See the Jahia log.",
+      "DENIED": "You are not allowed to change these settings.",
+      "REQUEST_FAILED": "The settings could not be sent to the server. Check your connection and try again."
     },
     "suggest": {
       "intro": "Colours that reach 7:1:",
@@ -185,7 +261,7 @@
       "use_text": "Use this text colour {{value}}",
       "use_background": "Use this background colour {{value}}",
       "none": "No single colour change reaches 7:1 with these colours. The default colours do.",
-      "useDefaults": "Use the default colours {{background}} / {{text}}",
+      "useDefaults": "Use the default colours {{background}} and {{text}}",
       "appliedText": "Text colour {{value}} applied. Save the settings to keep it.",
       "appliedBackground": "Background colour {{value}} applied. Save the settings to keep it.",
       "appliedDefaults": "Default colours applied. Save the settings to keep them."

@@ -1,13 +1,15 @@
 // Test doubles for the @jahia/moonstone components used by the module. They mirror the markup the real components
-// render (checked by rendering Moonstone 2.21.1 in jsdom): Field puts its id on the wrapper and renders an
-// unassociated <label>; Input, Switch and Textarea put id and aria-* on the control; Header renders an h1; Table
-// cells take `component`. Each double carries data-moonstone="<Name>" so that tests can check what is used.
+// render (checked against Moonstone 2.21.1): Input, Switch and Textarea put id and aria-* on the control; Button is
+// type="button" unless told otherwise and calls onClick unconditionally; Header renders an h1; Table cells take
+// `component`; Modal renders nothing when closed, an aria-modal dialog when open (closed by Escape through
+// onOpenChange), and ModalHeader its title as an h4. Each double carries data-moonstone="<Name>" so that tests can
+// check what is used.
 import React from 'react';
 
 const mark = name => ({'data-moonstone': name});
 
-export const Button = ({label, onClick, isDisabled, variant, size, icon, ...rest}) => (
-    <button type="button" disabled={isDisabled} data-variant={variant} data-size={size} onClick={onClick} {...mark('Button')} {...rest}>
+export const Button = ({label, onClick, isDisabled, variant, size, color, icon, ...rest}) => (
+    <button type="button" disabled={isDisabled} data-variant={variant} data-size={size} data-color={color} onClick={event => onClick(event)} {...mark('Button')} {...rest}>
         {icon}{label}
     </button>
 );
@@ -48,12 +50,26 @@ export const TableBodyCell = ({children, component: Component = 'td', verticalAl
     <Component {...mark('TableBodyCell')} {...rest}>{children}</Component>
 );
 
-export const Field = ({id, label, children, hasError, helper, ...rest}) => (
-    <div id={id} data-has-error={hasError ? 'true' : undefined} {...mark('Field')} {...rest}>
-        <label>{label}</label>
+export const Modal = ({isOpen, onOpenChange, size, children, ...rest}) => (isOpen ? (
+    <div
+        role="dialog"
+        aria-modal="true"
+        data-size={size}
+        onKeyDown={event => event.key === 'Escape' && onOpenChange && onOpenChange(false)}
+        {...mark('Modal')}
+        {...rest}
+    >
         {children}
     </div>
+) : null);
+
+export const ModalHeader = ({title, children, ...rest}) => (
+    <header {...mark('ModalHeader')} {...rest}><h4>{title}</h4>{children}</header>
 );
+
+export const ModalBody = ({children, ...rest}) => <div {...mark('ModalBody')} {...rest}>{children}</div>;
+
+export const ModalFooter = ({children, ...rest}) => <footer {...mark('ModalFooter')} {...rest}>{children}</footer>;
 
 export const Input = ({isDisabled, onChange, value, ...rest}) => (
     <div><input disabled={isDisabled} value={value} onChange={onChange} {...mark('Input')} {...rest}/></div>
