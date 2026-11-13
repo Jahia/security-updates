@@ -7,7 +7,7 @@ import { DocumentNode } from 'graphql'
  *   - JSA-2099-0002: security-updates fixed in 99.0.0            -> affected, 99.0.0 is compatible
  *   - JSA-2099-0003: security-updates fixed in 0.1.0             -> not affected (installed is newer)
  *   - JSA-2099-0004: a module that is not installed              -> no row
- *   - an owner flag on security-updates 1.0.1 (same major)       -> affected, 1.0.1 requires Jahia 8.99
+ *   - an owner flag (high) on security-updates 1.0.1 (same major) -> affected, 1.0.1 requires Jahia 8.99
  * The module under test is installed as 1.0.0-SNAPSHOT on a Jahia 8.2.
  */
 type Finding = {
@@ -103,7 +103,7 @@ describe('Security updates findings from a known store', () => {
             expect(owner!.recommendedVersion).to.equal('1.0.1')
             expect(owner!.compatibility).to.equal('INCOMPATIBLE')
             expect(owner!.requiredJahiaVersion).to.equal('8.99.0.0')
-            expect(owner!.severity).to.equal('MEDIUM')
+            expect(owner!.severity).to.equal('HIGH')
         })
     })
 

@@ -11,6 +11,6 @@
     "fixes": [{"component": "not-installed-module", "fixedVersions": ["9.9.9"]}]}
  ],
  "flaggedVersions": [
-   {"groupId": "org.jahia.community", "name": "security-updates", "version": "1.0.1", "severity": "medium",
+   {"groupId": "org.jahia.community", "name": "security-updates", "version": "1.0.1", "severity": "high",
     "references": ["GHSA-2c2c-3f3f-4g4g"], "note": "Fixture owner note"}
  ]}

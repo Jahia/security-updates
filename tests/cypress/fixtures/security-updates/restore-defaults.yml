@@ -1,0 +1,7 @@
+- editConfiguration: "org.jahia.community.securityupdates"
+  properties:
+    useForgeSettings: "true"
+    defaultStoreUrl: "https://store.jahia.com"
+    bannerEnabled: "true"
+    bannerMinimumSeverity: "HIGH"
+    bannerIncludeOwnerReports: "true"

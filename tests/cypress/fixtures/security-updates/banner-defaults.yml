@@ -1,0 +1,7 @@
+- editConfiguration: "org.jahia.community.securityupdates"
+  properties:
+    useForgeSettings: "false"
+    defaultStoreUrl: "http://storefixture"
+    bannerEnabled: "true"
+    bannerMinimumSeverity: "HIGH"
+    bannerIncludeOwnerReports: "true"

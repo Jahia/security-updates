@@ -1,0 +1,10 @@
+query getSecurityUpdatesBanner {
+    securityUpdates {
+        banner {
+            visible
+            count
+            minimumSeverity
+            components
+        }
+    }
+}
