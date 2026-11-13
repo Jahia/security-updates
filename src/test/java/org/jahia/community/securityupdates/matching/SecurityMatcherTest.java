@@ -466,6 +466,44 @@ class SecurityMatcherTest {
     }
 
     @Nested
+    @DisplayName("bounded matching work")
+    class BoundedWork {
+
+        @Test
+        @DisplayName("a crafted feed with thousands of climbing fixed versions for one component matches within a second")
+        void craftedFeedMatchesQuickly() {
+            int advisories = 5_000;
+            Advisory[] crafted = new Advisory[advisories];
+            for (int i = 0; i < advisories; i++) {
+                String[] versions = new String[20];
+                for (int j = 0; j < versions.length; j++) {
+                    versions[j] = "1." + (i * versions.length + j + 1) + ".0";
+                }
+                crafted[i] = advisory("JSA-C" + i, Severity.HIGH, fix("m", GROUP, versions));
+            }
+            SecurityFeed feed = feed(crafted);
+
+            MatchResult result = org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(1),
+                    () -> new SecurityMatcher(JAHIA).match(List.of(module("m", "1.0.0")), List.of(feed), ModuleCatalog.empty()));
+
+            assertThat(result.getFindings()).singleElement().satisfies(f -> assertThat(f.getComponent()).isEqualTo("m"));
+            assertThat(result.getProblems()).anySatisfy(p -> assertThat(p.getMessage()).contains("fixed versions"));
+        }
+
+        @Test
+        @DisplayName("fixed versions up to the limit are all used, without problem")
+        void underTheLimit() {
+            SecurityFeed feed = feed(advisory("JSA-1", Severity.HIGH, fix("m", GROUP, "1.5.0")),
+                    advisory("JSA-2", Severity.HIGH, fix("m", GROUP, "1.6.0")));
+
+            MatchResult result = new SecurityMatcher(JAHIA).match(List.of(module("m", "1.0.0")), List.of(feed), ModuleCatalog.empty());
+
+            assertThat(result.getProblems()).isEmpty();
+            assertThat(result.getFindings().get(0).getRecommendedVersion()).isEqualTo("1.6.0");
+        }
+    }
+
+    @Nested
     @DisplayName("advisories published by several stores")
     class SeveralStores {
 

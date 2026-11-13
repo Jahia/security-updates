@@ -53,6 +53,12 @@ public final class SecurityMatcher {
     static final int MAX_REFS_PER_FINDING = 50;
     /** Most advisory references listed in a whole report, beyond the first one of each finding. */
     static final int MAX_REPORT_REFS = 2_000;
+    /**
+     * Most fixed versions taken into account for one component. The recommendation is refined in rounds, each
+     * going over every rule of the component; this bounds that work (rules x fixed versions x rounds) whatever the
+     * feeds hold.
+     */
+    static final int MAX_FIXED_VERSIONS_PER_COMPONENT = 500;
     /** Longest id of an owner report, which joins its references. */
     static final int MAX_OWNER_ID = 200;
     private static final String ELLIPSIS = "...";
@@ -92,7 +98,7 @@ public final class SecurityMatcher {
 
         List<Finding> findings = new ArrayList<>();
         for (InstalledComponent component : components) {
-            List<Rule> advisoryRules = advisoryRules(component, advisories);
+            List<Rule> advisoryRules = advisoryRules(component, advisories, problems);
             toFinding(component, FindingSource.ADVISORY, advisoryRules, catalog).ifPresent(findings::add);
             if (!component.isCore()) {
                 List<Rule> flagRules = flagRules(component, flags);
@@ -231,12 +237,20 @@ public final class SecurityMatcher {
         return new ArrayList<>(byKey.values());
     }
 
-    private static List<Rule> advisoryRules(InstalledComponent component, List<Advisory> advisories) {
+    private static List<Rule> advisoryRules(InstalledComponent component, List<Advisory> advisories, List<StoreError> problems) {
         List<Rule> rules = new ArrayList<>();
+        int versions = 0;
         for (Advisory advisory : advisories) {
             for (AdvisoryFix fix : advisory.getFixes()) {
                 if (concerns(fix, component)) {
                     List<String> fixed = fix.getFixedVersions();
+                    versions += fixed.size();
+                    if (versions > MAX_FIXED_VERSIONS_PER_COMPONENT) {
+                        problems.add(new StoreError(null, StoreErrorKind.NOT_UNDERSTOOD, StoreErrorDetail.ENTRIES_SKIPPED,
+                                "The feeds list more than " + MAX_FIXED_VERSIONS_PER_COMPONENT + " fixed versions for "
+                                        + component.getName() + ": the advisories beyond them are not checked"));
+                        return rules;
+                    }
                     boolean core = component.isCore();
                     AdvisoryRef ref = new AdvisoryRef(advisory.getId(), advisory.getTitle(), advisory.getUrl(),
                             advisory.getCves(), advisory.getSeverity());
