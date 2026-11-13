@@ -6,6 +6,11 @@ mutation updateSecurityUpdatesSettings($input: InputSecurityUpdatesSettingsValue
                 field
                 code
                 message
+                suggestions {
+                    field
+                    value
+                    ratio
+                }
             }
             settings {
                 refreshIntervalHours

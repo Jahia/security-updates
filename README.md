@@ -19,14 +19,19 @@ once every 30 seconds).
 
 ## What the page shows
 
+The page is built from Jahia's design system, Moonstone (the version the Jahia UI provides, shared through
+module federation like the other administration modules), so it looks like the other administration
+pages: a `LayoutContent` with a `Header` (title, **Check now** as the main action, the report status as a
+chip), status lines with Moonstone icons, a Moonstone `Table`, and Moonstone form fields.
+
 - A table of components with security updates, most severe first. Severity is written out, not only
   coloured. Each row gives the installed version, the recommended version, its compatibility with
   this Jahia (`Compatible`, `Needs another Jahia version`, `Unknown`, or `Jahia upgrade required` for
   the platform), the source and the advisories. Advisory links open in a new tab and are only
   rendered for `https://` URLs.
 - A filter: **Jahia advisories only** (default) or **All, including reports by module owners**.
-  Owner reports are versions that a module developer flagged on the store; Jahia does not review
-  them, and they are labelled "Reported by the module owner".
+  Owner reports are versions that a module developer flagged on the store, labelled "Reported by the
+  module owner". Severity and source are chips with a text label.
 - The time of the last check and of the last complete check, the store errors, a link to **Manage
   modules**, and a **Check now** button.
 - An explicit state: "No known security update for this Jahia" only when every store returned a
@@ -164,13 +169,28 @@ or in the OSGi configuration UI (labels in English and French). The shipped file
 
 ### Settings UI
 
-The Security updates page has a **Settings** section that edits every key above: checkboxes, number
-inputs, selects, colour pickers paired with hex fields, a help text per field, and a live preview of the
-notice with the computed contrast ratio. **Save settings** sends the whole set; **Reset to defaults**
+The Security updates page has a **Settings** section that edits every key above with Moonstone fields:
+switches, number and text inputs, native selects for the severity and the dismissal (Moonstone's Dropdown
+names its list after the selected value rather than after the field), native colour pickers paired with
+Moonstone hex inputs, a help text per field, and a live preview of the notice with the computed contrast
+ratio. **Save settings** sends the whole set; **Reset to defaults**
 writes the default values. Every rule is checked server-side (the configuration fallbacks above, plus the
 store URL rules, the 1-720 ranges and the 7:1 contrast): an invalid set is refused with an error per
 field, and nothing is written. Errors are shown next to each field (`aria-invalid`, `aria-describedby`),
 summarised in an alert, and the first invalid field gets the focus.
+
+**Contrast suggestions.** When the two colours are below 7:1, the form proposes, live, a text colour
+that keeps the background and a background colour that keeps the text, each with a swatch, its value,
+its ratio and a **Use this text colour #xxxxxx** / **Use this background colour #xxxxxx** button that
+fills the field (announced in the status region; save to keep it). A suggestion keeps the hue and
+saturation of the colour it changes and moves its HSL lightness towards black or white by the smallest
+step (in thousandths) that reaches 7:1, checked after rounding to `#RRGGBB`. HSL lightness 0 and 1 are
+black and white whatever the hue, so when no lightness passes there is no suggestion for that side: a mid
+grey such as `#777777` has no colour reaching 7:1 against it. When neither side has one, the form offers
+the default colours (`#1B1B1B` / `#FFFFFF`). The server computes the same suggestions (one algorithm in
+Java and JavaScript, pinned by a shared table of cases): a `LOW_CONTRAST` error of `updateSettings`
+carries `suggestions { field value ratio }` and its message ends with, for example, "Suggested: text
+#A6A6A6 (7.07:1) or background #C1C1C1 (7.01:1)."
 
 The settings are written through `ConfigurationAdmin` (configuration `org.jahia.community.securityupdates`,
 location `?`, every key at once, keeping `felix.fileinstall.filename`). How it persists, from the Jahia
@@ -241,7 +261,7 @@ mutation {
 }
 ```
 
-`updateSettings` error codes: `MISSING`, `INVALID_BOOLEAN`, `INVALID_NUMBER`, `OUT_OF_RANGE`, `INVALID_URL`,
+`updateSettings` errors are `{ field code message suggestions { field value ratio } }`; codes: `MISSING`, `INVALID_BOOLEAN`, `INVALID_NUMBER`, `OUT_OF_RANGE`, `INVALID_URL`,
 `INVALID_VALUE`, `INVALID_COLOR`, `LOW_CONTRAST`, and `WRITE_FAILED` (field null) when the configuration
 cannot be written.
 

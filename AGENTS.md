@@ -30,6 +30,7 @@ fix security issues, from the Jahia Store security feed. Admin UI at
 | `service.JahiaInstalledComponentsProvider` (DS) | Started modules from `JahiaTemplateManagerService.getTemplatePackageRegistry().getRegisteredModules()` |
 | `service.BannerPolicy` / `service.BannerSettings` | Pure banner decision from the current report and the `banner*` settings (lenient: invalid severity -> HIGH, colours -> default pair, policy -> SESSION, each with one WARN) |
 | `service.Colors` | `#RRGGBB` parsing, WCAG contrast ratio (7:1 minimum) |
+| `service.ContrastSuggestions` | Colour reaching 7:1 by moving the HSL lightness of one colour (smallest step, checked after rounding); same algorithm as `Settings/contrastSuggestions.js`, both pinned by `src/test/resources/contrast-suggestions.json` |
 | `service.SettingsValidator` | Strict validation of a full settings set (UI): per-field errors, nothing returned on error |
 | `service.SettingsStore` (DS) | Writes every key through `ConfigurationAdmin.getConfiguration(PID, "?").update(...)`, keeping `felix.fileinstall.filename` |
 | `graphql.*` | One namespace: `Query.securityUpdates { report banner settings }`, `Mutation.securityUpdates { refresh updateSettings(input) resetSettings }`; input type `InputSecurityUpdatesSettingsValues` |
@@ -56,9 +57,20 @@ update" only for `OK` with no finding.
   `components.join('|')`; SESSION in sessionStorage `security-updates-banner-dismissed`; HOURS and
   UNTIL_CHANGE in localStorage `security-updates-banner-dismissed:<username>` as `{key, at}`; NEVER has no
   button; storage failures fail open.
+- UI built from Moonstone (`@jahia/moonstone` ^2.21.1, shared by module federation with `import: false`,
+  so the Jahia UI's own copy runs): `LayoutContent` + `Header` (h1 title, Check now, status Chip),
+  `Table`/`TableRow` (rows `tabIndex={-1}`), `Chip`, `RadioGroup`/`RadioItem`, `Field`, `Switch`, `Input`,
+  `Textarea`, `Button` (`color="accent"` for the main action, `variant="ghost"`/`"outlined"`; there is no
+  `primary` variant), `Typography`, `Information`/`Warning`, `Separator`. Moonstone's `Field` puts its id on
+  its wrapper and does not associate its label: controls carry `aria-label` and our own help/error
+  Typography with ids. Severity and dismiss policy are native selects (Moonstone's Dropdown names its
+  listbox after the selected value). SCSS is layout only, on Moonstone CSS variables (`--spacing-*`,
+  `--color-*`, `--moon-font-family`). The Jest double `__mocks__/jahiaMoonstone.js` mirrors the real markup
+  and marks each component with `data-moonstone`.
 - `src/javascript/Settings/`: the settings section (`SettingsForm.jsx`, field ids
-  `security-updates-setting-<key>`, errors `<id>-error`, help `<id>-help`), colour helpers
-  (`colorUtils.js`, same formula as `Colors.java`), form/input conversion (`settingsValues.js`).
+  `security-updates-setting-<key>`, errors `<id>-error`, help `<id>-help`, suggestions
+  `security-updates-suggestion-text|background`), colour helpers (`colorUtils.js`, same formula as
+  `Colors.java`), suggestions (`contrastSuggestions.js`), form/input conversion (`settingsValues.js`).
 - `src/javascript/SecurityUpdates/`: page (`SecurityUpdates.jsx`), GraphQL documents, pure helpers
   (`securityUpdatesUtils.js`).
 - Locales: `src/main/resources/javascript/locales/{en,fr}.json` (same keys, checked by a test).

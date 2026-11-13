@@ -23,6 +23,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Settings section on the Security updates page, backed by `Query.securityUpdates.settings`,
   `Mutation.securityUpdates.updateSettings` (full server-side validation, nothing written on error) and
   `resetSettings`; saved through ConfigurationAdmin into the `karaf/etc` file.
+- Contrast suggestions for the notice colours, in the settings form (one click applies them) and in the
+  `LOW_CONTRAST` errors of `updateSettings` (`suggestions { field value ratio }`).
+- The page is built from Moonstone components, like the other Jahia administration pages.
 - OSGi configuration `org.jahia.community.securityupdates` (`enabled`, `refreshIntervalHours`,
   `useForgeSettings`, `extraFeedUrls`, `defaultStoreUrl`, `bannerEnabled`, `bannerMinimumSeverity`,
   `bannerIncludeOwnerReports`, `bannerBackgroundColor`, `bannerTextColor`, `bannerDismissPolicy`,

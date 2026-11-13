@@ -34,7 +34,8 @@ type Banner = {
     dismissPolicy: string
     username: string
 }
-type FieldError = { field: string | null; code: string; message: string }
+type Suggestion = { field: string; value: string; ratio: string }
+type FieldError = { field: string | null; code: string; message: string; suggestions: Suggestion[] }
 type UpdateResult = { ok: boolean; errors: FieldError[] }
 type Report = { findings: Array<{ component: string; source: string }> }
 
@@ -195,7 +196,7 @@ describe('Security updates settings', () => {
     it('the form shows the current values', () => {
         cy.login()
         cy.visit(ADMIN_PATH)
-        cy.contains('h3', 'Settings').should('be.visible')
+        cy.contains('h2', 'Settings').should('be.visible')
         cy.get(field('enabled')).should('be.checked')
         cy.get(field('refreshIntervalHours')).should('have.value', '24')
         cy.get(field('useForgeSettings')).should('not.be.checked')
@@ -274,6 +275,37 @@ describe('Security updates settings', () => {
             expect(settings.bannerBackgroundColor).to.equal('#1B1B1B')
             expect(settings.refreshIntervalHours).to.equal(24)
         })
+    })
+
+    it('a low contrast suggests colours: through GraphQL, and in the form where one click applies them', () => {
+        save({ bannerBackgroundColor: '#1B1B1B', bannerTextColor: '#333333' }).then((result) => {
+            expect(result.ok).to.equal(false)
+            const error = result.errors.find((e) => e.field === 'bannerTextColor') as FieldError
+            expect(error.code).to.equal('LOW_CONTRAST')
+            expect(error.suggestions.map((s) => `${s.field}=${s.value}@${s.ratio}`)).to.deep.equal([
+                'bannerTextColor=#A6A6A6@7.07',
+                'bannerBackgroundColor=#C1C1C1@7.01',
+            ])
+            expect(error.message).to.contain('Suggested: text #A6A6A6 (7.07:1) or background #C1C1C1 (7.01:1).')
+        })
+
+        cy.login()
+        cy.visit(ADMIN_PATH)
+        cy.get(field('bannerTextColor')).clear().type('#333333')
+        cy.get('[data-testid="security-updates-contrast"]').should('contain', 'Below the 7:1 minimum')
+        cy.get('[data-testid="security-updates-suggestion-text"]').should('contain', '#A6A6A6').and('contain', '7.07:1')
+        cy.get('[data-testid="security-updates-suggestion-background"]').should('contain', '#C1C1C1')
+        cy.contains('button', 'Use this text colour #A6A6A6').click()
+        cy.get(field('bannerTextColor')).should('have.value', '#A6A6A6')
+        cy.get('[data-testid="security-updates-contrast"]').should('contain', 'Meets the 7:1 minimum')
+        cy.get('[data-testid="security-updates-settings-status"]').should('contain', 'Text colour #A6A6A6 applied')
+        cy.contains('button', 'Save settings').click()
+        cy.get('[data-testid="security-updates-settings-status"]').should('contain', 'Settings saved.')
+
+        untilMatches(readBanner, { backgroundColor: '#1B1B1B', textColor: '#A6A6A6' })
+        openApp()
+        cy.get(BANNER, { timeout: 30000 }).should('have.css', 'background-color', 'rgb(27, 27, 27)')
+        cy.get(BANNER).should('have.css', 'color', 'rgb(166, 166, 166)')
     })
 
     it('the banner uses the configured colours', () => {

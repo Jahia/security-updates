@@ -61,7 +61,7 @@ describe('Security updates', () => {
     it('renders the admin page with its controls and an honest status', () => {
         cy.login()
         cy.visit(ADMIN_PATH)
-        cy.get('h2').contains('Security updates').should('be.visible')
+        cy.get('h1').contains('Security updates').should('be.visible')
         cy.contains('button', 'Check now').should('be.visible')
         cy.get('[role="status"]').should('exist')
         cy.contains('a', 'Open Manage modules').should('have.attr', 'href').and('contain', '/jahia/administration/manageModules')
