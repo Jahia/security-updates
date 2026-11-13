@@ -15,6 +15,7 @@ const SETTINGS_FIELDS = gql`
         bannerDismissPolicy
         bannerDismissHours
         contrastRatio
+        canEdit
     }
 `;
 

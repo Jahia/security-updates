@@ -1,9 +1,12 @@
-import React from 'react';
-import {fireEvent, render, screen, waitFor, within} from '@testing-library/react';
+import {act, fireEvent, render, screen, within} from '@testing-library/react';
+import {axe} from 'jest-axe';
 import {useMutation, useQuery} from '@apollo/client';
 import {SecurityUpdates} from '../SecurityUpdates';
+import {CHANGED_EVENT, JAHIA_UPGRADE_URL, PAGE_EVENT} from '../../common/constants';
 
-const advisory = (id, url, severity = 'HIGH') => ({id, title: `Title ${id}`, url, cves: ['CVE-2026-1234'], severity});
+jest.mock('../../Settings/SettingsForm', () => ({SettingsForm: () => <section aria-label="settings"/>}));
+
+const advisory = (id, url, extra = {}) => ({id, title: `Title ${id}`, url, cves: ['CVE-2026-1234'], severity: 'HIGH', ...extra});
 
 const finding = (component, severity, source = 'ADVISORY', extra = {}) => ({
     component,
@@ -14,112 +17,262 @@ const finding = (component, severity, source = 'ADVISORY', extra = {}) => ({
     requiredJahiaVersion: '8.2.0.0',
     severity,
     source,
-    advisories: [advisory(`JSA-${component}`, 'https://academy.jahia.com/jsa')],
+    advisories: [advisory(`JSA-${component}-${source}`, 'https://academy.jahia.com/jsa')],
     ...extra
 });
 
 const report = (overrides = {}) => ({
     status: 'OK',
+    inProgress: false,
+    stale: false,
     checkedAt: '2026-11-13T10:00:00Z',
     lastSuccess: '2026-11-13T10:00:00Z',
-    jahiaVersion: '8.2.2.1',
+    nextCheckAt: '2026-11-14T10:00:00Z',
+    jahiaVersion: '8.2.3.7',
     errors: [],
     findings: [],
     ...overrides
 });
 
-const mockReport = r => useQuery.mockReturnValue({data: {securityUpdates: {report: r}}, loading: false, error: undefined});
+const answer = r => ({data: {securityUpdates: {report: r}}});
 
 describe('SecurityUpdates page', () => {
     let refresh;
+    let refetch;
+
+    const mockReport = r => useQuery.mockReturnValue({...answer(r), loading: false, error: undefined, refetch});
 
     beforeEach(() => {
-        refresh = jest.fn(() => Promise.resolve({data: {securityUpdates: {refresh: report({checkedAt: '2026-11-13T11:00:00Z'})}}}));
+        refetch = jest.fn(() => Promise.resolve(answer(report())));
+        refresh = jest.fn(() => Promise.resolve({data: {securityUpdates: {refresh: report({inProgress: true})}}}));
         useMutation.mockReturnValue([refresh, {loading: false}]);
         window.contextJsParameters = {contextPath: ''};
+        window.history.replaceState(null, '', '/');
     });
 
-    test('shows a loader while loading', () => {
-        useQuery.mockReturnValue({data: undefined, loading: true, error: undefined});
-        render(<SecurityUpdates/>);
-        expect(screen.getByTestId('loader')).toBeInTheDocument();
-        expect(screen.getByRole('status')).toHaveTextContent('page.loading');
+    afterEach(() => {
+        jest.useRealTimers();
     });
 
-    test('reports a query error', () => {
-        useQuery.mockReturnValue({data: undefined, loading: false, error: new Error('denied')});
-        render(<SecurityUpdates/>);
-        expect(screen.getByRole('alert')).toHaveTextContent('page.error');
+    const status = () => screen.getByTestId('security-updates-status');
+
+    describe('loading and errors', () => {
+        test('shows a loader while loading, and says so in the status region', () => {
+            useQuery.mockReturnValue({data: undefined, loading: true, error: undefined, refetch});
+            render(<SecurityUpdates/>);
+            expect(screen.getByTestId('loader')).toBeInTheDocument();
+            expect(status()).toHaveTextContent('page.loading');
+            expect(status()).toHaveAttribute('role', 'status');
+        });
+
+        test('reports a query error', () => {
+            useQuery.mockReturnValue({data: undefined, loading: false, error: new Error('denied'), refetch});
+            render(<SecurityUpdates/>);
+            expect(screen.getByRole('alert')).toHaveTextContent('page.error');
+        });
+
+        test('the status region exists before any announcement', () => {
+            mockReport(report());
+            render(<SecurityUpdates/>);
+            expect(status()).toBeEmptyDOMElement();
+        });
     });
 
-    test('an OK report without findings shows the explicit empty state', () => {
-        mockReport(report());
-        render(<SecurityUpdates/>);
-        expect(screen.getByText('page.empty')).toBeInTheDocument();
-        expect(screen.queryByRole('table')).toBeNull();
+    describe('status', () => {
+        test('an OK report without findings is up to date and says so', () => {
+            mockReport(report());
+            render(<SecurityUpdates/>);
+            expect(screen.getByText('page.empty')).toBeInTheDocument();
+            expect(screen.getByText('page.statusLabel.UP_TO_DATE')).toBeInTheDocument();
+            expect(screen.queryByRole('table')).toBeNull();
+        });
+
+        test('findings are "Updates needed", in a danger chip, not "all stores checked"', () => {
+            mockReport(report({findings: [finding('m', 'CRITICAL')]}));
+            render(<SecurityUpdates/>);
+            const chip = screen.getByText('page.statusLabel.UPDATES_NEEDED').closest('[data-moonstone="Chip"]');
+            expect(chip).toHaveAttribute('data-color', 'danger');
+        });
+
+        test('a store that does not publish yet is neutral information, without the technical text', () => {
+            mockReport(report({status: 'UNAVAILABLE', errors: [{storeUrl: 'https://store.jahia.com', kind: 'NOT_PUBLISHED', detail: null, message: 'HTTP 404'}]}));
+            render(<SecurityUpdates/>);
+            const chip = screen.getByText('page.statusLabel.NOT_AVAILABLE_YET').closest('[data-moonstone="Chip"]');
+            expect(chip).toHaveAttribute('data-color', 'default');
+            expect(screen.getByText('page.status.NOT_PUBLISHED').closest('[data-tone]')).toHaveAttribute('data-tone', 'info');
+            expect(screen.queryByText(/HTTP 404/)).toBeNull();
+            expect(screen.queryByText('page.empty')).toBeNull();
+        });
+
+        test.each(['UNAVAILABLE', 'NOT_CHECKED'])('a %s report is not shown as up to date', s => {
+            mockReport(report({status: s, errors: [{storeUrl: 'https://store.jahia.com', kind: 'UNAVAILABLE', detail: 'TIMEOUT', message: 'Read timed out'}]}));
+            render(<SecurityUpdates/>);
+            expect(screen.queryByText('page.empty')).toBeNull();
+            expect(screen.getByText(`page.status.${s}`)).toBeInTheDocument();
+        });
+
+        test('a partial check without findings does not speak of a list', () => {
+            mockReport(report({status: 'PARTIAL', errors: [{storeUrl: 'https://a.example', kind: 'UNAVAILABLE', detail: 'TIMEOUT', message: 'x'}]}));
+            render(<SecurityUpdates/>);
+            expect(screen.getByText('page.status.PARTIAL_EMPTY')).toBeInTheDocument();
+        });
+
+        test('a stale report says since when, and the next check is shown', () => {
+            mockReport(report({status: 'PARTIAL', stale: true, lastSuccess: '2026-10-01T10:00:00Z'}));
+            render(<SecurityUpdates/>);
+            expect(screen.getByText(/^page\.status\.STALE \{date=.*2026/)).toBeInTheDocument();
+            expect(screen.getByText('page.nextCheckAt')).toBeInTheDocument();
+        });
+
+        test('no next check planned is said in words', () => {
+            mockReport(report({nextCheckAt: null}));
+            render(<SecurityUpdates/>);
+            expect(screen.getByText('page.notScheduled')).toBeInTheDocument();
+        });
+
+        test('DISABLED: no Check now button, and the message points to the settings', () => {
+            mockReport(report({status: 'DISABLED', nextCheckAt: null}));
+            render(<SecurityUpdates/>);
+            expect(screen.queryByRole('button', {name: 'page.refresh'})).toBeNull();
+            expect(screen.getByText('page.status.DISABLED')).toBeInTheDocument();
+            expect(screen.getByText('page.statusLabel.DISABLED')).toBeInTheDocument();
+        });
     });
 
-    test.each(['UNAVAILABLE', 'NOT_CHECKED', 'DISABLED'])('a %s report is not shown as up to date', status => {
-        mockReport(report({status, errors: [{storeUrl: 'https://store.jahia.com', kind: 'NOT_PUBLISHED', message: 'HTTP 404'}]}));
-        render(<SecurityUpdates/>);
-        expect(screen.queryByText('page.empty')).toBeNull();
-        expect(screen.getByText(`page.status.${status}`)).toBeInTheDocument();
+    describe('store problems', () => {
+        test('are localised from the kind and the detail, with the store and the technical text in English', () => {
+            mockReport(report({status: 'UNAVAILABLE', errors: [{storeUrl: 'https://internal.example', kind: 'UNAVAILABLE', detail: 'SSRF_BLOCKED', message: 'Address blocked'}]}));
+            render(<SecurityUpdates/>);
+            const errors = screen.getByRole('list', {name: 'page.errors.title'});
+            expect(within(errors).getByText('page.errorKind.UNAVAILABLE')).toBeInTheDocument();
+            expect(within(errors).getByText('page.errorDetail.SSRF_BLOCKED')).toBeInTheDocument();
+            expect(within(errors).getByText('page.errors.store {url=https://internal.example}')).toBeInTheDocument();
+            expect(within(errors).getByText('page.errors.technical {message=Address blocked}')).toHaveAttribute('lang', 'en');
+        });
+
+        test('the same problem twice is listed twice without key clashes', () => {
+            const error = {storeUrl: 'https://a.example', kind: 'UNAVAILABLE', detail: 'TIMEOUT', message: 'x'};
+            const spy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+            mockReport(report({status: 'UNAVAILABLE', errors: [error, error]}));
+            render(<SecurityUpdates/>);
+            expect(within(screen.getByRole('list', {name: 'page.errors.title'})).getAllByRole('listitem')).toHaveLength(2);
+            expect(spy).not.toHaveBeenCalled();
+            spy.mockRestore();
+        });
     });
 
-    test('lists store errors with their kind and message', () => {
-        mockReport(report({status: 'UNAVAILABLE', errors: [{storeUrl: 'https://store.jahia.com', kind: 'NOT_PUBLISHED', message: 'HTTP 404'}]}));
-        render(<SecurityUpdates/>);
-        const errors = screen.getByRole('list', {name: 'page.errors.title'});
-        expect(within(errors).getByText('page.errorKind.NOT_PUBLISHED')).toBeInTheDocument();
-        expect(within(errors).getByText(/HTTP 404/)).toBeInTheDocument();
-        expect(within(errors).getByText(/store\.jahia\.com/)).toBeInTheDocument();
+    describe('findings', () => {
+        test('are under a "Components to update" heading, with a summary by severity', () => {
+            mockReport(report({findings: [finding('a', 'CRITICAL'), finding('b', 'HIGH'), finding('a', 'LOW', 'OWNER_REPORTED')]}));
+            render(<SecurityUpdates/>);
+            expect(screen.getByRole('heading', {level: 2, name: 'page.findingsTitle'})).toBeInTheDocument();
+            expect(screen.getByText('page.summary.other {n=2}')).toBeInTheDocument();
+            expect(screen.getByText(/^page\.summary\.bySeverity \{list=page\.summary\.severityCount/)).toBeInTheDocument();
+        });
+
+        test('are in a real table, severity next to the component, most severe first', () => {
+            mockReport(report({findings: [finding('low-module', 'LOW'), finding('critical-module', 'CRITICAL'), finding('jahia-core', 'HIGH', 'ADVISORY', {compatibility: 'JAHIA_UPGRADE', groupId: null})]}));
+            render(<SecurityUpdates/>);
+
+            const table = screen.getByRole('table');
+            expect(within(table).getByText('page.table.caption')).toBeInTheDocument();
+            const headers = within(table).getAllByRole('columnheader').map(header => header.textContent);
+            expect(headers).toEqual(['component', 'severity', 'installed', 'recommended', 'compatibility', 'source', 'advisories', 'action']
+                .map(column => `page.table.${column}`));
+            const rows = within(table).getAllByRole('row').slice(1);
+            expect(within(rows[0]).getByRole('rowheader')).toHaveTextContent('critical-module');
+            expect(within(rows[0]).getByText('page.severity.CRITICAL')).toBeInTheDocument();
+            expect(within(rows[1]).getByRole('rowheader')).toHaveTextContent('jahia-core');
+            expect(within(rows[1]).getByText('page.compatibility.JAHIA_UPGRADE')).toBeInTheDocument();
+            expect(within(rows[2]).getByRole('rowheader')).toHaveTextContent('low-module');
+        });
+
+        test('the table scrolls in a named, keyboard-focusable region', () => {
+            mockReport(report({findings: [finding('m', 'HIGH')]}));
+            render(<SecurityUpdates/>);
+            const region = screen.getByRole('region', {name: 'page.findingsTitle'});
+            expect(region).toHaveAttribute('tabindex', '0');
+            expect(within(region).getByRole('table')).toBeInTheDocument();
+        });
+
+        test('each row says what to do: a module is updated in Manage modules, Jahia follows the upgrade documentation', () => {
+            mockReport(report({findings: [finding('jcontent', 'HIGH'), finding('jahia-core', 'CRITICAL', 'ADVISORY', {groupId: null})]}));
+            render(<SecurityUpdates/>);
+            expect(screen.getByRole('link', {name: 'page.action.module {component=jcontent}'}))
+                .toHaveAttribute('href', '/jahia/administration/manageModules');
+            const docs = screen.getByRole('link', {name: /page\.action\.core/});
+            expect(docs).toHaveAttribute('href', JAHIA_UPGRADE_URL);
+            expect(docs).toHaveAttribute('target', '_blank');
+            expect(screen.getByText('page.afterTable')).toBeInTheDocument();
+        });
+
+        test('advisory links open in a new tab without opener; non-https links are plain text', () => {
+            mockReport(report({findings: [finding('m', 'HIGH', 'ADVISORY', {advisories: [
+                advisory('JSA-SAFE', 'https://academy.jahia.com/jsa-safe'),
+                advisory('JSA-UNSAFE', ['java', 'script:alert(1)'].join(''))
+            ]})]}));
+            render(<SecurityUpdates/>);
+
+            const link = screen.getByRole('link', {name: /JSA-SAFE/});
+            expect(link).toHaveAttribute('href', 'https://academy.jahia.com/jsa-safe');
+            expect(link).toHaveAttribute('target', '_blank');
+            expect(link.getAttribute('rel')).toContain('noopener');
+            expect(screen.queryByRole('link', {name: /JSA-UNSAFE/})).toBeNull();
+            expect(screen.getByText(/^JSA-UNSAFE/)).toBeInTheDocument();
+        });
+
+        test('an advisory without title is never named by its id alone', () => {
+            mockReport(report({findings: [finding('m', 'HIGH', 'ADVISORY', {advisories: [advisory('JSA-1', 'https://academy.jahia.com/1', {title: null})]})]}));
+            render(<SecurityUpdates/>);
+            expect(screen.getByRole('link', {name: /page\.advisoryFallback \{id=JSA-1\}/})).toBeInTheDocument();
+        });
+
+        test('CVEs link to cve.org', () => {
+            mockReport(report({findings: [finding('m', 'HIGH')]}));
+            render(<SecurityUpdates/>);
+            expect(screen.getByRole('link', {name: /page\.cveLink \{id=CVE-2026-1234\}/}))
+                .toHaveAttribute('href', 'https://www.cve.org/CVERecord?id=CVE-2026-1234');
+        });
+
+        test('an owner report reads as text, and its link names the host', () => {
+            mockReport(report({findings: [finding('owned', 'HIGH', 'OWNER_REPORTED', {advisories: [
+                advisory('owner:owned@1.0.0', null, {title: 'Upgrade please', cves: []}),
+                advisory('GHSA-1', 'https://github.com/owner/repo/security', {title: null, cves: []})
+            ]})]}));
+            render(<SecurityUpdates/>);
+            expect(screen.queryByText(/owner:owned/)).toBeNull();
+            expect(screen.getByText(/page\.ownerReport/)).toBeInTheDocument();
+            expect(screen.getByText('Upgrade please')).toHaveAttribute('lang', 'en');
+            expect(screen.getByRole('link', {name: /page\.ownerLink \{host=github\.com\}/})).toHaveAttribute('href', 'https://github.com/owner/repo/security');
+        });
     });
 
-    test('renders findings in a real table, most severe first, severity as text', () => {
-        mockReport(report({findings: [finding('low-module', 'LOW'), finding('critical-module', 'CRITICAL'), finding('jahia-core', 'HIGH', 'ADVISORY', {compatibility: 'JAHIA_UPGRADE', groupId: null})]}));
-        render(<SecurityUpdates/>);
+    describe('filter', () => {
+        test('defaults to all when module owners report something, with counts and a hint', () => {
+            mockReport(report({findings: [finding('advised', 'HIGH'), finding('owner-module', 'CRITICAL', 'OWNER_REPORTED')]}));
+            render(<SecurityUpdates/>);
 
-        const table = screen.getByRole('table');
-        expect(within(table).getByText('page.table.caption')).toBeInTheDocument();
-        expect(within(table).getAllByRole('columnheader')).toHaveLength(7);
-        const rows = within(table).getAllByRole('row').slice(1);
-        expect(within(rows[0]).getByRole('rowheader')).toHaveTextContent('critical-module');
-        expect(within(rows[0]).getByText('page.severity.CRITICAL')).toBeInTheDocument();
-        expect(within(rows[1]).getByRole('rowheader')).toHaveTextContent('jahia-core');
-        expect(within(rows[1]).getByText('page.compatibility.JAHIA_UPGRADE')).toBeInTheDocument();
-        expect(within(rows[2]).getByRole('rowheader')).toHaveTextContent('low-module');
-    });
+            expect(screen.getByText('owner-module')).toBeInTheDocument();
+            expect(screen.getByLabelText('page.filter.all {n=2}')).toBeChecked();
+            expect(screen.getByLabelText('page.filter.advisories {n=1}')).not.toBeChecked();
+            expect(screen.getByRole('group', {name: 'page.filter.legend'})).toHaveAccessibleDescription('page.filter.hint');
 
-    test('advisory links open in a new tab without opener; non-https links are plain text', () => {
-        mockReport(report({findings: [finding('m', 'HIGH', 'ADVISORY', {advisories: [
-            advisory('JSA-SAFE', 'https://academy.jahia.com/jsa-safe'),
-            advisory('JSA-UNSAFE', ['java', 'script:alert(1)'].join(''))
-        ]})]}));
-        render(<SecurityUpdates/>);
+            fireEvent.click(screen.getByLabelText('page.filter.advisories {n=1}'));
+            expect(screen.queryByText('owner-module')).toBeNull();
+        });
 
-        const link = screen.getByRole('link', {name: /JSA-SAFE/});
-        expect(link).toHaveAttribute('href', 'https://academy.jahia.com/jsa-safe');
-        expect(link).toHaveAttribute('target', '_blank');
-        expect(link.getAttribute('rel')).toContain('noopener');
-        expect(screen.queryByRole('link', {name: /JSA-UNSAFE/})).toBeNull();
-        expect(screen.getByText(/JSA-UNSAFE/)).toBeInTheDocument();
-    });
+        test('shows Jahia advisories only when there is no owner report', () => {
+            mockReport(report({findings: [finding('advised', 'HIGH')]}));
+            render(<SecurityUpdates/>);
+            expect(screen.getByLabelText('page.filter.advisories {n=1}')).toBeChecked();
+        });
 
-    test('owner reports are hidden by default and labelled when shown', () => {
-        mockReport(report({findings: [finding('advised', 'HIGH'), finding('owner-module', 'CRITICAL', 'OWNER_REPORTED')]}));
-        render(<SecurityUpdates/>);
-
-        expect(screen.queryByText('owner-module')).toBeNull();
-        fireEvent.click(screen.getByLabelText('page.filter.all'));
-
-        expect(screen.getByText('owner-module')).toBeInTheDocument();
-        expect(screen.getAllByText('page.source.OWNER_REPORTED').length).toBeGreaterThan(0);
-    });
-
-    test('says when the filter hides every finding', () => {
-        mockReport(report({findings: [finding('owner-module', 'CRITICAL', 'OWNER_REPORTED')]}));
-        render(<SecurityUpdates/>);
-        expect(screen.getByText('page.filteredEmpty')).toBeInTheDocument();
+        test('?filter=advisories in the address is followed, and says when it hides every finding', () => {
+            window.history.replaceState(null, '', '/?filter=advisories');
+            mockReport(report({findings: [finding('owner-module', 'CRITICAL', 'OWNER_REPORTED')]}));
+            render(<SecurityUpdates/>);
+            expect(screen.getByText('page.filteredEmpty')).toBeInTheDocument();
+        });
     });
 
     test('links to Manage modules', () => {
@@ -128,58 +281,191 @@ describe('SecurityUpdates page', () => {
         expect(screen.getByRole('link', {name: 'page.manageModules'})).toHaveAttribute('href', '/jahia/administration/manageModules');
     });
 
-    test('the Refresh button runs the refresh mutation and shows its report', async () => {
-        mockReport(report());
-        render(<SecurityUpdates/>);
+    describe('Check now', () => {
+        const button = () => screen.getByRole('button', {name: /page\.(refresh|checking)/});
 
-        fireEvent.click(screen.getByRole('button', {name: 'page.refresh'}));
+        test('starts a check, shows it is busy, polls the report until the check ends, then announces it', async () => {
+            jest.useFakeTimers();
+            const changed = jest.fn();
+            window.addEventListener(CHANGED_EVENT, changed);
+            refetch
+                .mockImplementationOnce(() => Promise.resolve(answer(report({inProgress: true}))))
+                .mockImplementationOnce(() => Promise.resolve(answer(report({checkedAt: '2026-11-13T11:00:00Z'}))));
+            mockReport(report());
+            render(<SecurityUpdates/>);
 
-        expect(refresh).toHaveBeenCalled();
-        expect(await screen.findByText('page.refreshed')).toBeInTheDocument();
+            await act(async () => {
+                fireEvent.click(button());
+            });
+
+            expect(refresh).toHaveBeenCalledTimes(1);
+            expect(button()).toHaveTextContent('page.checking');
+            expect(button()).toHaveAttribute('aria-busy', 'true');
+            expect(button()).not.toBeDisabled();
+            expect(status()).toHaveTextContent('page.refreshing');
+            expect(screen.getByTestId('security-updates-checking')).toBeInTheDocument();
+
+            await act(() => jest.advanceTimersByTimeAsync(2000));
+            expect(refetch).toHaveBeenCalledTimes(1);
+            expect(status()).toHaveTextContent('page.refreshing');
+
+            await act(() => jest.advanceTimersByTimeAsync(2000));
+            expect(refetch).toHaveBeenCalledTimes(2);
+            expect(status()).toHaveTextContent('page.refreshed');
+            expect(button()).toHaveTextContent('page.refresh');
+            expect(button()).not.toHaveAttribute('aria-busy');
+            expect(changed).toHaveBeenCalledTimes(1);
+            window.removeEventListener(CHANGED_EVENT, changed);
+        });
+
+        test('a second click during a check does not start another', async () => {
+            refresh.mockImplementation(() => new Promise(() => {}));
+            mockReport(report());
+            render(<SecurityUpdates/>);
+
+            fireEvent.click(button());
+            fireEvent.click(button());
+
+            expect(refresh).toHaveBeenCalledTimes(1);
+        });
+
+        test('when no check was started (one ran a moment ago), says so', async () => {
+            refresh.mockImplementation(() => Promise.resolve({data: {securityUpdates: {refresh: report()}}}));
+            mockReport(report());
+            render(<SecurityUpdates/>);
+
+            await act(async () => {
+                fireEvent.click(button());
+            });
+
+            expect(status()).toHaveTextContent('page.notRefreshed');
+            expect(button()).toHaveTextContent('page.refresh');
+        });
+
+        test('a check that already ended when the answer comes is announced as completed, and the report is read again', async () => {
+            refresh.mockImplementation(() => Promise.resolve({data: {securityUpdates: {refresh: report({checkedAt: '2026-11-13T12:00:00Z'})}}}));
+            mockReport(report());
+            render(<SecurityUpdates/>);
+
+            await act(async () => {
+                fireEvent.click(button());
+            });
+
+            expect(status()).toHaveTextContent('page.refreshed');
+            expect(refetch).toHaveBeenCalledTimes(1);
+        });
+
+        test('a poll that fails is retried', async () => {
+            jest.useFakeTimers();
+            refetch
+                .mockImplementationOnce(() => Promise.reject(new Error('offline')))
+                .mockImplementationOnce(() => Promise.resolve(answer(report())));
+            mockReport(report());
+            render(<SecurityUpdates/>);
+
+            await act(async () => {
+                fireEvent.click(button());
+            });
+            await act(() => jest.advanceTimersByTimeAsync(4000));
+
+            expect(refetch).toHaveBeenCalledTimes(2);
+            expect(status()).toHaveTextContent('page.refreshed');
+        });
+
+        test('closing the page while a check starts or fails changes nothing', async () => {
+            let answerRefresh;
+            let failRefresh;
+            refresh
+                .mockImplementationOnce(() => new Promise(resolve => {
+                    answerRefresh = resolve;
+                }))
+                .mockImplementationOnce(() => new Promise((resolve, reject) => {
+                    failRefresh = reject;
+                }));
+            mockReport(report());
+            const first = render(<SecurityUpdates/>);
+            fireEvent.click(button());
+            first.unmount();
+            const second = render(<SecurityUpdates/>);
+            fireEvent.click(button());
+            second.unmount();
+
+            await act(async () => {
+                answerRefresh({data: {securityUpdates: {refresh: report({inProgress: true})}}});
+                failRefresh(new Error('late'));
+            });
+
+            expect(refetch).not.toHaveBeenCalled();
+        });
+
+        test('a failed start is announced and shown', async () => {
+            refresh.mockImplementation(() => Promise.reject(new Error('boom')));
+            mockReport(report());
+            render(<SecurityUpdates/>);
+
+            await act(async () => {
+                fireEvent.click(button());
+            });
+
+            expect(status()).toHaveTextContent('page.refreshError');
+            expect(screen.getAllByText('page.refreshError')).toHaveLength(2);
+        });
+
+        test('stops polling after about three minutes and says how to see the results', async () => {
+            jest.useFakeTimers();
+            refetch.mockImplementation(() => Promise.resolve(answer(report({inProgress: true}))));
+            mockReport(report());
+            render(<SecurityUpdates/>);
+
+            await act(async () => {
+                fireEvent.click(button());
+            });
+            await act(() => jest.advanceTimersByTimeAsync(4 * 60 * 1000));
+
+            expect(refetch.mock.calls.length).toBeLessThanOrEqual(91);
+            expect(status()).toHaveTextContent('page.refreshSlow');
+            expect(button()).toHaveTextContent('page.refresh');
+        });
+
+        test('a check already running when the page opens is followed too', async () => {
+            jest.useFakeTimers();
+            mockReport(report({inProgress: true}));
+            render(<SecurityUpdates/>);
+
+            expect(screen.getByText('page.running')).toBeInTheDocument();
+            await act(() => jest.advanceTimersByTimeAsync(2000));
+            expect(refetch).toHaveBeenCalled();
+        });
+
+        test('polling stops when the page closes', async () => {
+            jest.useFakeTimers();
+            refetch.mockImplementation(() => Promise.resolve(answer(report({inProgress: true}))));
+            mockReport(report({inProgress: true}));
+            const {unmount} = render(<SecurityUpdates/>);
+            unmount();
+            await act(() => jest.advanceTimersByTimeAsync(10000));
+            expect(refetch).not.toHaveBeenCalled();
+        });
     });
 
-    test('a failed refresh is announced', async () => {
-        refresh.mockImplementation(() => Promise.reject(new Error('boom')));
+    test('sets a localised document title and restores it', () => {
+        document.title = 'before';
         mockReport(report());
-        render(<SecurityUpdates/>);
-
-        fireEvent.click(screen.getByRole('button', {name: 'page.refresh'}));
-
-        await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('page.refreshError'));
+        const {unmount} = render(<SecurityUpdates/>);
+        expect(document.title).toBe('page.documentTitle {title=label}');
+        unmount();
+        expect(document.title).toBe('before');
     });
 
-    test('a refresh that returns the same check is announced as unchanged', async () => {
-        refresh.mockImplementation(() => Promise.resolve({data: {securityUpdates: {refresh: report()}}}));
+    test('tells the banner when the page opens and closes', () => {
+        const listener = jest.fn();
+        window.addEventListener(PAGE_EVENT, listener);
         mockReport(report());
-        render(<SecurityUpdates/>);
-
-        fireEvent.click(screen.getByRole('button', {name: 'page.refresh'}));
-
-        expect(await screen.findByText('page.notRefreshed')).toBeInTheDocument();
-    });
-
-    test('the button stays focusable during a check and a second click does not start another', () => {
-        refresh.mockImplementation(() => new Promise(() => {}));
-        mockReport(report());
-        render(<SecurityUpdates/>);
-        const button = screen.getByRole('button', {name: 'page.refresh'});
-
-        fireEvent.click(button);
-        fireEvent.click(button);
-
-        expect(refresh).toHaveBeenCalledTimes(1);
-        expect(button).not.toBeDisabled();
-        expect(screen.getByRole('status')).toHaveTextContent('page.refreshing');
-    });
-
-    test('a failed refresh is also shown visibly', async () => {
-        refresh.mockImplementation(() => Promise.reject(new Error('boom')));
-        mockReport(report());
-        render(<SecurityUpdates/>);
-
-        fireEvent.click(screen.getByRole('button', {name: 'page.refresh'}));
-
-        expect(await screen.findByRole('alert')).toHaveTextContent('page.refreshError');
+        const {unmount} = render(<SecurityUpdates/>);
+        expect(listener.mock.calls[0][0].detail).toEqual({isOpen: true});
+        unmount();
+        expect(listener.mock.calls[1][0].detail).toEqual({isOpen: false});
+        window.removeEventListener(PAGE_EVENT, listener);
     });
 
     test('is built from Moonstone components: LayoutContent, Header (h1 title, Check now), Table, Chip, RadioGroup', () => {
@@ -191,20 +477,20 @@ describe('SecurityUpdates page', () => {
         const header = used('Header')[0];
         expect(within(header).getByRole('heading', {level: 1})).toHaveTextContent('label');
         expect(within(header).getByRole('button', {name: 'page.refresh'})).toHaveAttribute('data-moonstone', 'Button');
-        expect(within(header).getByText('page.statusLabel.OK')).toBeInTheDocument();
+        expect(within(header).getByText('page.statusLabel.UPDATES_NEEDED')).toBeInTheDocument();
         expect(used('Table')).toHaveLength(1);
-        expect(used('TableHeadCell')).toHaveLength(7);
+        expect(used('TableHeadCell')).toHaveLength(8);
         expect(used('RadioGroup')).toHaveLength(1);
         expect(used('RadioItem')).toHaveLength(2);
-        expect(container.querySelector('table')).not.toBeNull();
     });
 
-    test('severity and source are Moonstone chips with a text label, and rows are not tab stops', () => {
-        mockReport(report({findings: [finding('m', 'CRITICAL')]}));
+    test('severity and source are chips with a text label, in colours that reach 7:1, and rows are not tab stops', () => {
+        mockReport(report({findings: [finding('m', 'CRITICAL'), finding('n', 'MEDIUM', 'OWNER_REPORTED')]}));
         const {container} = render(<SecurityUpdates/>);
-        const chips = [...container.querySelectorAll('[data-moonstone="Chip"]')].map(chip => chip.textContent);
+        const chips = [...container.querySelectorAll('[data-moonstone="Chip"]')];
 
-        expect(chips).toEqual(expect.arrayContaining(['page.severity.CRITICAL', 'page.source.ADVISORY']));
+        expect(chips.map(chip => chip.textContent)).toEqual(expect.arrayContaining(['page.severity.CRITICAL', 'page.source.ADVISORY']));
+        chips.forEach(chip => expect(['default', 'accent', 'danger']).toContain(chip.getAttribute('data-color')));
         container.querySelectorAll('tbody tr').forEach(row => expect(row).toHaveAttribute('tabindex', '-1'));
     });
 
@@ -212,7 +498,17 @@ describe('SecurityUpdates page', () => {
         mockReport(report({status: 'UNAVAILABLE'}));
         render(<SecurityUpdates/>);
 
-        const message = screen.getByText('page.status.UNAVAILABLE').closest('div');
+        const message = screen.getByText('page.status.UNAVAILABLE').closest('[data-tone]');
         expect(within(message).getByTestId('icon-warning')).toHaveAttribute('aria-hidden', 'true');
+    });
+
+    test('has no axe violation, with findings and store problems', async () => {
+        mockReport(report({
+            status: 'PARTIAL',
+            errors: [{storeUrl: 'https://a.example', kind: 'UNAVAILABLE', detail: 'TIMEOUT', message: 'x'}],
+            findings: [finding('m', 'CRITICAL'), finding('jahia-core', 'HIGH'), finding('o', 'LOW', 'OWNER_REPORTED')]
+        }));
+        const {container} = render(<SecurityUpdates/>);
+        expect(await axe(container)).toHaveNoViolations();
     });
 });

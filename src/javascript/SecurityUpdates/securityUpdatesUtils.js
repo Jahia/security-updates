@@ -1,7 +1,7 @@
 // Pure helpers of the security updates page and banner. Feed text is untrusted: it is only ever rendered
 // as React text, and links are only built from https URLs.
 
-export const SEVERITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'];
+import {SEVERITIES} from '../common/constants';
 
 const severityRank = severity => {
     const index = SEVERITIES.indexOf(severity);

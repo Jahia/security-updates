@@ -1,11 +1,42 @@
-// Layout only: Moonstone components carry the typography and colours. Spacing and colours come from Moonstone's
-// CSS variables (the fallbacks are for the unit tests, which run without the Moonstone stylesheet).
+// Layout, plus the accessibility overrides of WCAG 2.2 AAA: Moonstone gives the components their look; spacing and
+// colours come from Moonstone's CSS variables (the fallbacks are for the unit tests, which run without the Moonstone
+// stylesheet, and for older hosts).
+
+// Focus ring of 3px, at least 3:1 against the page (#004781 on white: 9.5:1), on every control of the page, over
+// Moonstone's own 2px ring (hence !important: Moonstone's selectors are more specific).
+$focus-color: var(--color-accent_dark_contrast, #004781);
+
+@mixin focus-ring {
+  outline: 3px solid $focus-color !important;
+  outline-offset: 2px !important;
+}
 
 .page {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-medium, 16px);
   max-width: 1400px;
+
+  :focus-visible {
+    @include focus-ring;
+  }
+
+  // Moonstone hides the radio input behind its icon: the ring goes around the whole item.
+  .radio:has(input:focus-visible) {
+    @include focus-ring;
+  }
+}
+
+// Running text stays within a readable line length.
+.text,
+.hint {
+  max-width: 80ch;
+}
+
+// Targets of at least 44 by 44 CSS pixels.
+.target {
+  min-height: 2.75rem !important;
+  min-width: 2.75rem;
 }
 
 .srOnly {
@@ -22,6 +53,8 @@
 
 .announcement {
   min-height: 1.5em;
+  margin: 0;
+  font-family: var(--moon-font-family, inherit);
 }
 
 .loader {
@@ -30,10 +63,16 @@
   padding: var(--spacing-big, 40px);
 }
 
+.checking {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-small, 8px);
+}
+
 .meta {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: var(--spacing-nano, 4px) var(--spacing-medium, 16px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-nano, 4px);
   margin: 0;
 
   dd {
@@ -41,7 +80,16 @@
   }
 }
 
+.metaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--spacing-small, 8px);
+}
+
 .link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
   text-decoration: underline;
   align-self: flex-start;
 }
@@ -52,14 +100,15 @@
   gap: var(--spacing-small, 8px);
 }
 
+// Icons reach at least 3:1, and the dark variants 7:1, against white.
 .iconWarning {
   flex-shrink: 0;
-  color: var(--color-warning, currentColor);
+  color: var(--color-warning_dark, #754c0b);
 }
 
 .iconInfo {
   flex-shrink: 0;
-  color: var(--color-accent, currentColor);
+  color: var(--color-accent_dark_contrast, #004781);
 }
 
 .section {
@@ -83,9 +132,13 @@
   margin: 0;
   padding: 0;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--spacing-small, 8px) var(--spacing-medium, 16px);
+  flex-direction: column;
+  gap: var(--spacing-small, 8px);
+}
+
+.radio {
+  min-height: 2.75rem;
+  justify-content: center;
 }
 
 .tableWrapper {
