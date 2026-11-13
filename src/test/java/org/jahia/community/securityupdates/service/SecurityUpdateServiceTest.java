@@ -331,6 +331,21 @@ class SecurityUpdateServiceTest {
     }
 
     @Test
+    @DisplayName("exposes the settings in effect, and the banner presentation follows them")
+    void settingsInEffect() {
+        Settings custom = new Settings(true, 6, false, "", DEFAULT_STORE, new BannerSettings(true,
+                org.jahia.community.securityupdates.model.Severity.LOW, false, "#0B3D91", "#FFFFFF",
+                org.jahia.community.securityupdates.model.DismissPolicy.NEVER, 24));
+
+        service.apply(custom);
+
+        assertThat(service.getSettings()).isSameAs(custom);
+        assertThat(service.getBanner().getBackgroundColor()).isEqualTo("#0B3D91");
+        assertThat(service.getBanner().getDismissPolicy())
+                .isEqualTo(org.jahia.community.securityupdates.model.DismissPolicy.NEVER);
+    }
+
+    @Test
     @DisplayName("the banner follows the current settings, without waiting for a check")
     void bannerFollowsSettings() {
         service.apply(Settings.defaults());

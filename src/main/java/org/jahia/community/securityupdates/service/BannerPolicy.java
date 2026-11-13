@@ -35,6 +35,7 @@ public final class BannerPolicy {
             }
         }
         Collections.sort(components);
-        return new BannerDecision(settings.isEnabled() && !components.isEmpty(), components.size(), minimum, components);
+        return new BannerDecision(settings.isEnabled() && !components.isEmpty(), components.size(), minimum, components,
+                settings.getBackgroundColor(), settings.getTextColor(), settings.getDismissPolicy(), settings.getDismissHours());
     }
 }

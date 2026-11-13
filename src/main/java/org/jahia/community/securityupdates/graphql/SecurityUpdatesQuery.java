@@ -7,6 +7,7 @@ import graphql.annotations.annotationTypes.GraphQLNonNull;
 import org.jahia.community.securityupdates.model.BannerDecision;
 import org.jahia.community.securityupdates.model.Severity;
 import org.jahia.community.securityupdates.service.SecurityUpdateService;
+import org.jahia.community.securityupdates.service.Settings;
 import org.jahia.modules.graphql.provider.dxm.security.GraphQLRequiresPermission;
 
 import java.util.Collections;
@@ -38,5 +39,16 @@ public class SecurityUpdatesQuery {
         return new GqlBanner(service == null
                 ? new BannerDecision(false, 0, Severity.HIGH, Collections.emptyList())
                 : service.getBanner());
+    }
+
+    @GraphQLField
+    @GraphQLName("settings")
+    @GraphQLNonNull
+    @GraphQLDescription("The settings in effect")
+    @GraphQLRequiresPermission(Permissions.ADMIN_TEMPLATES)
+    public GqlSettings getSettings() {
+        SecurityUpdateService service = ServiceLocator.service();
+        Settings settings = service == null ? Settings.defaults() : service.getSettings();
+        return new GqlSettings(settings.toValues());
     }
 }

@@ -193,6 +193,13 @@ public class SecurityUpdateService {
     }
 
     /**
+     * @return the settings in effect (after the configuration fallbacks)
+     */
+    public Settings getSettings() {
+        return settings;
+    }
+
+    /**
      * @return whether the notice is shown, decided from the current report and the current settings (a
      * configuration change applies at once, without waiting for a check)
      */

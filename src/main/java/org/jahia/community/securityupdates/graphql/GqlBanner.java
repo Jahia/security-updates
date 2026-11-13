@@ -5,6 +5,7 @@ import graphql.annotations.annotationTypes.GraphQLField;
 import graphql.annotations.annotationTypes.GraphQLName;
 import graphql.annotations.annotationTypes.GraphQLNonNull;
 import org.jahia.community.securityupdates.model.BannerDecision;
+import org.jahia.community.securityupdates.model.DismissPolicy;
 import org.jahia.community.securityupdates.model.Severity;
 
 import java.util.List;
@@ -50,5 +51,36 @@ public class GqlBanner {
     @GraphQLDescription("Component of each counted row, sorted (one entry per row), used as the dismissal key")
     public List<String> getComponents() {
         return decision.getComponents();
+    }
+
+    @GraphQLField
+    @GraphQLName("backgroundColor")
+    @GraphQLNonNull
+    @GraphQLDescription("Background colour, #RRGGBB, validated (at least 7:1 against the text colour)")
+    public String getBackgroundColor() {
+        return decision.getBackgroundColor();
+    }
+
+    @GraphQLField
+    @GraphQLName("textColor")
+    @GraphQLNonNull
+    @GraphQLDescription("Text colour, #RRGGBB, validated")
+    public String getTextColor() {
+        return decision.getTextColor();
+    }
+
+    @GraphQLField
+    @GraphQLName("dismissPolicy")
+    @GraphQLNonNull
+    @GraphQLDescription("How long a dismissed notice stays hidden")
+    public DismissPolicy getDismissPolicy() {
+        return decision.getDismissPolicy();
+    }
+
+    @GraphQLField
+    @GraphQLName("dismissHours")
+    @GraphQLDescription("Hours a dismissal lasts with the HOURS policy")
+    public int getDismissHours() {
+        return decision.getDismissHours();
     }
 }

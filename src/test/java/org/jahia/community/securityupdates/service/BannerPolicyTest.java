@@ -90,4 +90,18 @@ class BannerPolicyTest {
         assertThat(banner.getCount()).isZero();
         assertThat(banner.getComponents()).isEmpty();
     }
+
+    @Test
+    @DisplayName("passes the validated colours and dismiss policy through")
+    void presentation() {
+        BannerSettings settings = new BannerSettings(true, Severity.HIGH, true, "#0B3D91", "#FFFFFF",
+                org.jahia.community.securityupdates.model.DismissPolicy.HOURS, 12);
+
+        BannerDecision banner = BannerPolicy.decide(report(), settings);
+
+        assertThat(banner.getBackgroundColor()).isEqualTo("#0B3D91");
+        assertThat(banner.getTextColor()).isEqualTo("#FFFFFF");
+        assertThat(banner.getDismissPolicy()).isEqualTo(org.jahia.community.securityupdates.model.DismissPolicy.HOURS);
+        assertThat(banner.getDismissHours()).isEqualTo(12);
+    }
 }

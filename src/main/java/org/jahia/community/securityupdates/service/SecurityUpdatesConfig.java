@@ -42,4 +42,20 @@ public @interface SecurityUpdatesConfig {
 
     @AttributeDefinition(name = "%bannerIncludeOwnerReports", description = "%bannerIncludeOwnerReports.desc")
     boolean bannerIncludeOwnerReports() default true;
+
+    @AttributeDefinition(name = "%bannerBackgroundColor", description = "%bannerBackgroundColor.desc")
+    String bannerBackgroundColor() default BannerSettings.DEFAULT_BACKGROUND_COLOR;
+
+    @AttributeDefinition(name = "%bannerTextColor", description = "%bannerTextColor.desc")
+    String bannerTextColor() default BannerSettings.DEFAULT_TEXT_COLOR;
+
+    @AttributeDefinition(name = "%bannerDismissPolicy", description = "%bannerDismissPolicy.desc", options = {
+            @Option(label = "%dismiss.SESSION", value = "SESSION"),
+            @Option(label = "%dismiss.HOURS", value = "HOURS"),
+            @Option(label = "%dismiss.UNTIL_CHANGE", value = "UNTIL_CHANGE"),
+            @Option(label = "%dismiss.NEVER", value = "NEVER")})
+    String bannerDismissPolicy() default "SESSION";
+
+    @AttributeDefinition(name = "%bannerDismissHours", description = "%bannerDismissHours.desc", min = "1", max = "720")
+    int bannerDismissHours() default BannerSettings.DEFAULT_DISMISS_HOURS;
 }
