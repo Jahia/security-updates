@@ -218,4 +218,27 @@ class SecurityFeedParserTest {
 
         assertThat(SecurityFeedParser.parse(json).getAdvisories()).isEmpty();
     }
+
+    @Test
+    @DisplayName("a single-quoted string (accepted by org.json) cannot hide deep nesting from the pre-scan")
+    void singleQuotedStringCannotHideNesting() {
+        int depth = 100_000;
+        String json = "{\"schemaVersion\":1,\"x\":'\"',\"y\":" + "[".repeat(depth) + "]".repeat(depth) + "}";
+
+        assertThatThrownBy(() -> SecurityFeedParser.parse(json))
+                .isInstanceOf(FeedFormatException.class)
+                .hasMessageContaining("nested");
+    }
+
+    @Test
+    @DisplayName("brackets inside a single-quoted string do not count; an apostrophe inside a double-quoted string opens nothing")
+    void singleQuotes() throws Exception {
+        String brackets = "[{".repeat(100);
+        String inSingleQuotes = "{\"schemaVersion\":1,\"note\":'\\'" + brackets + "\"',\"advisories\":[]}";
+        String apostrophe = "{\"schemaVersion\":1,\"note\":\"it's\",\"extra\":" + "[".repeat(JsonNesting.MAX_DEPTH)
+                + "]".repeat(JsonNesting.MAX_DEPTH) + "}";
+
+        assertThat(SecurityFeedParser.parse(inSingleQuotes).getAdvisories()).isEmpty();
+        assertThatThrownBy(() -> SecurityFeedParser.parse(apostrophe)).isInstanceOf(FeedFormatException.class);
+    }
 }

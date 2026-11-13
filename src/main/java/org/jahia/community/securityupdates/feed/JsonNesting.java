@@ -4,7 +4,9 @@ import org.jahia.community.securityupdates.model.StoreErrorDetail;
 
 /**
  * Bounds the nesting of a JSON document before it is parsed: org.json parses recursively, so a document nested
- * thousands of levels deep would exhaust the stack. One linear pass, brackets inside strings ignored.
+ * thousands of levels deep would exhaust the stack. One linear pass, brackets inside strings ignored. Strings are
+ * delimited by double quotes, or by single quotes, which org.json's tokenizer also accepts: a quote of the other kind
+ * inside a string is a plain character, a backslash escapes the next character in both.
  */
 final class JsonNesting {
 
@@ -24,8 +26,8 @@ final class JsonNesting {
         int i = 0;
         while (i < json.length()) {
             char c = json.charAt(i);
-            if (c == '"') {
-                i = closingQuote(json, i + 1);
+            if (c == '"' || c == '\'') {
+                i = closingQuote(json, i + 1, c);
             } else if (c == '[' || c == '{') {
                 depth++;
                 if (depth > MAX_DEPTH) {
@@ -40,16 +42,17 @@ final class JsonNesting {
     }
 
     /**
+     * @param quote the quote that opened the string
      * @return the index of the quote that closes the string starting at {@code from}, or the document length when
      *         the string is not closed; escaped characters are skipped
      */
-    private static int closingQuote(String json, int from) {
+    private static int closingQuote(String json, int from, char quote) {
         int i = from;
         while (i < json.length()) {
             char c = json.charAt(i);
             if (c == '\\') {
                 i += 2;
-            } else if (c == '"') {
+            } else if (c == quote) {
                 return i;
             } else {
                 i++;
