@@ -611,6 +611,101 @@ class SecurityUpdateServiceSchedulingTest {
         }
     }
 
+    @Nested
+    @DisplayName("reruns and cancellation")
+    class RerunsAndCancellation {
+
+        @Test
+        @DisplayName("a scheduled check due while an on-demand check is queued asks for no rerun: the queued check covers it")
+        void tickWhileQueuedAsksNoRerun() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, EMPTY_FEED);
+            service.refresh();
+            fixture.clock.advance(Duration.ofMinutes(1));
+
+            scheduledTask().run();
+            fixture.runSubmitted();
+
+            assertThat(fixture.fetcher.requested).hasSize(2);
+            assertThat(fixture.submitted).isEmpty();
+            assertThat(service.getReportView().isInProgress()).isFalse();
+            assertThat(service.getReportView().getNextCheckAt()).isEqualTo(fixture.clock.instant().plus(Duration.ofHours(24)));
+        }
+
+        @Test
+        @DisplayName("a scheduled check skipped while a check started after it was due asks for no rerun")
+        void tickDuringALaterCheckAsksNoRerun() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, EMPTY_FEED);
+            Runnable scheduled = scheduledTask();
+            // the scheduled check was due 60 s after activation; the on-demand check starts 2 minutes after it
+            fixture.clock.advance(Duration.ofMinutes(2));
+            fixture.fetcher.onGet(scheduled);
+            service.refresh();
+
+            fixture.runSubmitted();
+
+            assertThat(fixture.fetcher.requested).hasSize(2);
+            assertThat(fixture.submitted).isEmpty();
+            assertThat(service.getReport().getStatus()).isEqualTo(ReportStatus.OK);
+        }
+
+        @Test
+        @DisplayName("a schedule change while a check is only queued needs no rerun: the check reads the new settings")
+        void scheduleChangeBeforeTheCheckStartsNeedsNoRerun() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(PRIVATE_STORE, EMPTY_FEED);
+            service.refresh();
+            service.apply(settings(true, true, "", PRIVATE_STORE));
+
+            fixture.runSubmitted();
+
+            assertThat(service.getReport().getStatus()).isEqualTo(ReportStatus.OK);
+            assertThat(fixture.fetcher.requested).allMatch(url -> url.startsWith(PRIVATE_STORE)).hasSize(2);
+            assertThat(fixture.submitted).isEmpty();
+        }
+
+        @Test
+        @DisplayName("a check cancelled by disabling publishes nothing even when re-enabled before it ends; a new check runs")
+        void disableThenEnableDuringACheck() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
+            fixture.fetcher.onGet(() -> {
+                service.apply(settings(false, true, "", DEFAULT_STORE));
+                service.apply(Settings.defaults());
+                // what the aborted requests of the cancelled check give
+                fixture.fetcher.answer(DEFAULT_STORE + StoreClient.SECURITY_FEED_PATH, new java.io.IOException("aborted"));
+            });
+
+            SecurityReport during = fixture.check(service);
+
+            assertThat(fixture.fetcher.cancelled).hasPositiveValue();
+            assertThat(during.getStatus()).isEqualTo(ReportStatus.NOT_CHECKED);
+            assertThat(during.getErrors()).isEmpty();
+            assertThat(service.getReportView().getNextCheckAt())
+                    .isEqualTo(fixture.clock.instant().plusSeconds(SecurityUpdateService.INITIAL_DELAY_SECONDS));
+            assertThat(fixture.submitted).hasSize(1);
+
+            fixture.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
+            fixture.runSubmitted();
+
+            assertThat(service.getReport().getStatus()).isEqualTo(ReportStatus.OK);
+            assertThat(service.getReport().getFindings()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("the banner reads the report and the settings of one moment")
+        void bannerSnapshot() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
+            fixture.check(service);
+
+            assertThat(service.getBanner().isVisible()).isTrue();
+            service.apply(new Settings(true, 24, true, "", DEFAULT_STORE, new BannerSettings(false, org.jahia.community.securityupdates.model.Severity.LOW, true)));
+            assertThat(service.getBanner().isVisible()).isFalse();
+        }
+    }
+
     @Test
     @DisplayName("a finding found by an on-demand check is logged once")
     void onDemandLogs() {

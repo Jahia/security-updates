@@ -47,10 +47,14 @@ import java.util.function.Supplier;
  *     restart the schedule. Disabling the check stops the thread.</li>
  *     <li>One check at a time: an on-demand check ({@link #refresh()}) is started in the background and the call
  *     returns at once; it is not started while a check runs, nor within {@code onDemandMinIntervalSeconds} of the
- *     later of the start and the end of the previous check. A scheduled check due while another runs is skipped,
- *     and one check runs as soon as the running one ends.</li>
+ *     later of the start and the end of the previous check. A scheduled check due while another runs is skipped;
+ *     one check runs as soon as the running one ends, unless the running one started after the skipped one was due
+ *     (or had not started yet).</li>
  *     <li>A check whose stores, interval or enabled state changed while it ran publishes nothing (its report
- *     describes settings no longer in effect); one check runs as soon as it ends.</li>
+ *     describes settings no longer in effect); one check runs as soon as it ends. A check that starts after such a
+ *     change uses the new settings and needs no second check.</li>
+ *     <li>A check running when the check is disabled is cancelled: its requests are aborted and it publishes nothing,
+ *     even if the check is enabled again before it ends (one check then runs when it ends).</li>
  *     <li>The report, the settings and the schedule state change under one lock; the network is never read under
  *     it. Deactivation aborts the requests in flight and the check stops before the next store.</li>
  *     <li>A report whose last check is older than twice the refresh interval is "stale": its status is at best
@@ -92,7 +96,14 @@ public class SecurityUpdateService {
     private Instant scheduledSince;
     private Instant nextCheckAt;
     private boolean running;
-    /** A check is to run as soon as the running one ends: a scheduled check was skipped, or the schedule changed. */
+    /** When the running check read its settings; null while it is only queued, or when no check runs. */
+    private Instant checkStartedAt;
+    /** The running check was cancelled by disabling the check: it publishes nothing, even if re-enabled meanwhile. */
+    private boolean checkCancelled;
+    /**
+     * A check is to run as soon as the running one ends: a scheduled check was skipped, or the schedule changed. A
+     * check clears it when it reads its settings, as it then covers what the flag asked for.
+     */
     private boolean rerunNeeded;
     private Instant lastStart;
     private Instant lastEnd;
@@ -167,6 +178,8 @@ public class SecurityUpdateService {
             }
             if (!newSettings.isEnabled()) {
                 cancelSchedule();
+                // its requests are aborted: what it would publish is made of those failures
+                checkCancelled = running;
                 report = disabledReport();
                 toStop = executor;
                 executor = null;
@@ -228,8 +241,14 @@ public class SecurityUpdateService {
      * change applies at once, without waiting for a check)
      */
     public BannerDecision getBanner() {
-        ReportView view = getReportView();
-        return BannerPolicy.decide(view.getReport(), getSettings().getBanner());
+        SecurityReport current;
+        BannerSettings banner;
+        synchronized (lock) {
+            // one snapshot: the report and the banner settings of the same moment
+            current = getReportView().getReport();
+            banner = settings.getBanner();
+        }
+        return BannerPolicy.decide(current, banner);
     }
 
     /**
@@ -345,6 +364,7 @@ public class SecurityUpdateService {
             return false;
         }
         running = true;
+        checkCancelled = false;
         lastStart = now;
         return true;
     }
@@ -361,14 +381,20 @@ public class SecurityUpdateService {
         synchronized (lock) {
             started = begin(false);
             if (!started && running && scheduled != null) {
-                // skipped: one check runs when the running one ends, and the next scheduled one is an interval away
-                rerunNeeded = true;
+                // skipped, and the next scheduled check is an interval away; one check runs when the running one
+                // ends, unless the running one started after this check was due (or is still queued): it covers it
+                rerunNeeded = rerunNeeded || startedBefore(nextCheckAt);
                 nextCheckAt = clock.instant().plusSeconds(settings.getRefreshIntervalHours() * SECONDS_PER_HOUR);
             }
         }
         if (started) {
             runSafely(true);
         }
+    }
+
+    /** Lock held. Whether the running check read its settings before {@code due} (any time when unknown). */
+    private boolean startedBefore(Instant due) {
+        return checkStartedAt != null && (due == null || checkStartedAt.isBefore(due));
     }
 
     /** The task of the executor: nothing may escape it, or a scheduled task would never run again. */
@@ -385,11 +411,15 @@ public class SecurityUpdateService {
     private void runCheck(boolean scheduledRun) {
         Settings current;
         SecurityReport previous;
+        Instant start;
         synchronized (lock) {
             current = settings;
             previous = report != null ? report : SecurityReport.notChecked(jahiaVersion.get());
+            start = clock.instant();
+            checkStartedAt = start;
+            // this check reads the settings in effect now: a rerun asked for before covers nothing more
+            rerunNeeded = false;
         }
-        Instant start = clock.instant();
         SecurityReport next = null;
         boolean stopped = false;
         try {
@@ -414,16 +444,19 @@ public class SecurityUpdateService {
     }
 
     /**
-     * Ends a check: keeps its report unless the check was stopped, or the check settings changed while it ran (it
-     * describes settings no longer in effect), then starts the check asked for while it ran, if any.
+     * Ends a check: keeps its report unless the check was stopped or cancelled by disabling the check, or the check
+     * settings changed while it ran (it describes settings no longer in effect), then starts the check asked for while
+     * it ran, if any.
      *
      * @param settingsUsed the settings the check ran with
      */
     private void publish(SecurityReport next, Settings settingsUsed, boolean scheduledRun) {
         synchronized (lock) {
             running = false;
+            checkStartedAt = null;
             lastEnd = clock.instant();
-            boolean current = settings.sameSchedule(settingsUsed);
+            boolean current = settings.sameSchedule(settingsUsed) && !checkCancelled;
+            checkCancelled = false;
             if (next != null && current && !closed.get()) {
                 report = next;
             }
@@ -474,7 +507,8 @@ public class SecurityUpdateService {
                 jahiaVersion.get(), Collections.emptyList(), Collections.emptyList());
     }
 
-    private static SecurityReport failedReport(SecurityReport previous, Instant now) {
+    /** The report of a check that failed unexpectedly: never OK, the previous findings and last success kept. */
+    static SecurityReport failedReport(SecurityReport previous, Instant now) {
         List<StoreError> errors = Collections.singletonList(new StoreError(null, StoreErrorKind.UNAVAILABLE,
                 StoreErrorDetail.CHECK_FAILED, "The check failed unexpectedly; see the Jahia log. The previous findings are shown"));
         ReportStatus status = previous.getFindings().isEmpty() && previous.getStatus() != ReportStatus.OK
