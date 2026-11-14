@@ -169,7 +169,7 @@ public class SettingsStore {
         List<String> changes = new ArrayList<>();
         for (String key : SettingsKeys.ALL) {
             Object old = current == null ? null : current.get(key);
-            String oldValue = old == null ? UNSET : String.valueOf(old);
+            String oldValue = old == null ? UNSET : Settings.asText(old);
             if (!oldValue.equals(values.get(key))) {
                 changes.add(key + ": " + logged(shown(key, oldValue)) + " -> " + logged(shown(key, values.get(key))));
             }

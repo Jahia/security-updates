@@ -115,6 +115,22 @@ class SettingsStoreTest {
     }
 
     @Test
+    @DisplayName("logs a multi-valued value edited by hand as its values joined, never as an array reference")
+    void auditsAMultiValuedValueJoined() throws IOException {
+        Dictionary<String, Object> current = new Hashtable<>(Settings.defaults().toValues());
+        current.put(SettingsKeys.EXTRA_FEED_URLS, new String[]{"https://a.example.org/f.json", "https://b.example.org/f.json"});
+        when(configuration.getProperties()).thenReturn(current);
+        Map<String, String> values = new HashMap<>(Settings.defaults().toValues());
+        values.put(SettingsKeys.EXTRA_FEED_URLS, "https://a.example.org/f.json");
+
+        store.save(values, "jdoe");
+
+        assertThat(audit).singleElement().satisfies(line -> assertThat(line)
+                .contains("extraFeedUrls: https://a.example.org/f.json, https://b.example.org/f.json -> https://a.example.org/f.json")
+                .doesNotContain("[Ljava"));
+    }
+
+    @Test
     @DisplayName("logs who changed which keys, old -> new, and nothing else")
     void auditsTheChange() throws IOException {
         Dictionary<String, Object> current = new Hashtable<>(Settings.defaults().toValues());

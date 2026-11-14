@@ -202,6 +202,21 @@ public final class Settings {
     }
 
     /** Lenient typed reads of configuration properties, with one warning per value not used as is. */
+    /**
+     * A property value as text: a multi-valued property (an array or a collection, as a typed .cfg file gives) reads as
+     * its values joined with ", ".
+     */
+    static String asText(Object value) {
+        if (value instanceof Object[]) {
+            return joined(Arrays.asList((Object[]) value));
+        }
+        return value instanceof Collection ? joined((Collection<?>) value) : String.valueOf(value);
+    }
+
+    private static String joined(Collection<?> values) {
+        return values.stream().map(String::valueOf).collect(Collectors.joining(", "));
+    }
+
     private static final class Reader {
         private final Map<String, ?> properties;
         private final Consumer<String> warnings;
@@ -211,20 +226,9 @@ public final class Settings {
             this.warnings = warnings;
         }
 
-        /** A multi-valued property (an array or a collection, as a typed .cfg file gives) reads as its values joined. */
         String text(String key, String defaultValue) {
             Object value = properties.get(key);
-            if (value == null) {
-                return defaultValue;
-            }
-            if (value instanceof Object[]) {
-                return joined(Arrays.asList((Object[]) value));
-            }
-            return value instanceof Collection ? joined((Collection<?>) value) : String.valueOf(value);
-        }
-
-        private static String joined(Collection<?> values) {
-            return values.stream().map(String::valueOf).collect(Collectors.joining(", "));
+            return value == null ? defaultValue : asText(value);
         }
 
         boolean bool(String key, boolean defaultValue) {
