@@ -255,6 +255,68 @@ class SettingsStoreTest {
     }
 
     @Test
+    @DisplayName("a .cfg file created between the write of the new file and its naming is never replaced")
+    void fileCreatedMeanwhileIsNeverReplaced() throws IOException {
+        when(configuration.getProperties()).thenReturn(null);
+        Path file = etc.resolve(SecurityUpdateService.PID + ".cfg");
+        String other = "# written by someone else\n";
+        SettingsStore racing = new SettingsStore(() -> etc.toString(), audit::add, (link, existing) -> {
+            Files.writeString(link, other, StandardCharsets.ISO_8859_1);
+            Files.createLink(link, existing);
+        });
+        racing.setConfigurationAdmin(configAdmin);
+
+        assertThatThrownBy(() -> racing.save(Settings.defaults().toValues(), "jdoe")).isInstanceOf(java.nio.file.FileAlreadyExistsException.class)
+                .hasMessageContaining("try again");
+
+        assertThat(Files.readString(file, StandardCharsets.ISO_8859_1)).isEqualTo(other);
+        try (java.util.stream.Stream<Path> files = Files.list(etc)) {
+            assertThat(files.map(f -> f.getFileName().toString())).containsExactly(SecurityUpdateService.PID + ".cfg");
+        }
+        verify(configuration, never()).update(any());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest(name = "without hard links ({0}), the new file is moved into place")
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+    void withoutHardLinks(boolean unsupported) throws IOException {
+        when(configuration.getProperties()).thenReturn(null);
+        SettingsStore noLinks = new SettingsStore(() -> etc.toString(), audit::add, (link, existing) -> {
+            if (unsupported) {
+                throw new UnsupportedOperationException("no links");
+            }
+            throw new java.nio.file.FileSystemException(link.toString(), null, "Operation not permitted");
+        });
+        noLinks.setConfigurationAdmin(configAdmin);
+
+        noLinks.save(Settings.defaults().toValues(), "jdoe");
+
+        Path file = etc.resolve(SecurityUpdateService.PID + ".cfg");
+        assertThat(Files.readString(file, StandardCharsets.ISO_8859_1)).startsWith(SettingsStore.MARKER);
+        try (java.util.stream.Stream<Path> files = Files.list(etc)) {
+            assertThat(files.map(f -> f.getFileName().toString())).containsExactly(SecurityUpdateService.PID + ".cfg");
+        }
+    }
+
+    @Test
+    @DisplayName("without hard links, an existing .cfg file is still never replaced")
+    void withoutHardLinksExistingFileIsKept() throws IOException {
+        when(configuration.getProperties()).thenReturn(null);
+        Path file = etc.resolve(SecurityUpdateService.PID + ".cfg");
+        Files.writeString(file, "enabled=false\n", StandardCharsets.ISO_8859_1);
+        SettingsStore noLinks = new SettingsStore(() -> etc.toString(), audit::add, (link, existing) -> {
+            throw new UnsupportedOperationException("no links");
+        });
+        noLinks.setConfigurationAdmin(configAdmin);
+
+        assertThatThrownBy(() -> noLinks.save(Settings.defaults().toValues(), "jdoe")).hasMessageContaining("try again");
+
+        assertThat(Files.readString(file, StandardCharsets.ISO_8859_1)).isEqualTo("enabled=false\n");
+        try (java.util.stream.Stream<Path> files = Files.list(etc)) {
+            assertThat(files.map(f -> f.getFileName().toString())).containsExactly(SecurityUpdateService.PID + ".cfg");
+        }
+    }
+
+    @Test
     @DisplayName("two saves at once, the first creating the file, leave a complete file, no temporary file, and both updates")
     void concurrentSaves() throws Exception {
         java.util.concurrent.atomic.AtomicReference<Dictionary<String, Object>> stored = new java.util.concurrent.atomic.AtomicReference<>();

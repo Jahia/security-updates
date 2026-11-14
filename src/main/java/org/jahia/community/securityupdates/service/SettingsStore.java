@@ -12,6 +12,7 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileSystemException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -59,6 +60,7 @@ public class SettingsStore {
 
     private final Supplier<String> karafEtc;
     private final Consumer<String> auditLog;
+    private final Linker linker;
     private ConfigurationAdmin configurationAdmin;
 
     public SettingsStore() {
@@ -66,8 +68,20 @@ public class SettingsStore {
     }
 
     SettingsStore(Supplier<String> karafEtc, Consumer<String> auditLog) {
+        this(karafEtc, auditLog, Files::createLink);
+    }
+
+    /** Test constructor: how the new file gets its name. */
+    SettingsStore(Supplier<String> karafEtc, Consumer<String> auditLog, Linker linker) {
         this.karafEtc = karafEtc;
         this.auditLog = auditLog;
+        this.linker = linker;
+    }
+
+    /** {@link Files#createLink}: gives {@code existing} the new name {@code link}, failing when {@code link} exists. */
+    @FunctionalInterface
+    interface Linker {
+        void createLink(Path link, Path existing) throws IOException;
     }
 
     /** Static mandatory reference, set by Declarative Services before the component is used. */
@@ -177,7 +191,11 @@ public class SettingsStore {
         return sb.toString();
     }
 
-    /** Writes a new .cfg file (temporary file then atomic move), starting with the default-configuration marker. */
+    /**
+     * Writes a new .cfg file, starting with the default-configuration marker: a temporary file, then given its name
+     * by a hard link, which fails when the file exists (atomically), so that a file created meanwhile is never
+     * overwritten.
+     */
     private Path writeNewFile(Map<String, String> values) throws IOException {
         String etc = karafEtc.get();
         if (etc == null || etc.trim().isEmpty()) {
@@ -187,11 +205,6 @@ public class SettingsStore {
         Path file = directory.resolve(SecurityUpdateService.PID + ".cfg");
         Path temp = Files.createTempFile(directory, SecurityUpdateService.PID, ".tmp");
         try {
-            if (Files.exists(file, LinkOption.NOFOLLOW_LINKS)) {
-                // FileInstall has not delivered it yet: overwriting it would lose its comments and hidden keys
-                throw new FileAlreadyExistsException(file.toString(), null, "the configuration file exists but is not "
-                        + "loaded yet; try again in a few seconds");
-            }
             try (BufferedWriter writer = Files.newBufferedWriter(temp, StandardCharsets.ISO_8859_1)) {
                 writer.write(MARKER);
                 writer.newLine();
@@ -204,13 +217,38 @@ public class SettingsStore {
                 // as the other karaf/etc files; the file holds no secret
                 Files.setPosixFilePermissions(temp, PosixFilePermissions.fromString("rw-r--r--"));
             }
-            // no REPLACE_EXISTING: a file created meanwhile is never overwritten (FileAlreadyExistsException)
-            Files.move(temp, file);
-        } catch (IOException | RuntimeException e) {
+            createWithoutReplacing(temp, file);
+        } finally {
+            // the temporary name only: the file keeps the content through its own name
             Files.deleteIfExists(temp);
-            throw e;
         }
         return file;
+    }
+
+    /**
+     * Gives the content of {@code temp} the name {@code file}, never replacing an existing file. Where hard links are
+     * not supported, falls back to a move without {@code REPLACE_EXISTING}, which also refuses an existing file (a file
+     * created between its check and the move could still be replaced there).
+     */
+    private void createWithoutReplacing(Path temp, Path file) throws IOException {
+        try {
+            linker.createLink(file, temp);
+            return;
+        } catch (FileAlreadyExistsException e) {
+            throw notLoadedYet(file);
+        } catch (UnsupportedOperationException | FileSystemException e) {
+            logger.debug("No hard link in {}: moving the new configuration file instead", file.getParent(), e);
+        }
+        if (Files.exists(file, LinkOption.NOFOLLOW_LINKS)) {
+            throw notLoadedYet(file);
+        }
+        Files.move(temp, file);
+    }
+
+    /** FileInstall has not delivered the file yet: overwriting it would lose its comments and hidden keys. */
+    private static FileAlreadyExistsException notLoadedYet(Path file) {
+        return new FileAlreadyExistsException(file.toString(), null, "the configuration file exists but is not "
+                + "loaded yet; try again in a few seconds");
     }
 
     /**
