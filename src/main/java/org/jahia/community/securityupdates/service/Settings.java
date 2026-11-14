@@ -2,6 +2,8 @@ package org.jahia.community.securityupdates.service;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -9,6 +11,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * Validated, immutable form of the configuration described by {@link SecurityUpdatesConfig}. The factories are lenient, as a configuration file
@@ -208,9 +211,20 @@ public final class Settings {
             this.warnings = warnings;
         }
 
+        /** A multi-valued property (an array or a collection, as a typed .cfg file gives) reads as its values joined. */
         String text(String key, String defaultValue) {
             Object value = properties.get(key);
-            return value == null ? defaultValue : String.valueOf(value);
+            if (value == null) {
+                return defaultValue;
+            }
+            if (value instanceof Object[]) {
+                return joined(Arrays.asList((Object[]) value));
+            }
+            return value instanceof Collection ? joined((Collection<?>) value) : String.valueOf(value);
+        }
+
+        private static String joined(Collection<?> values) {
+            return values.stream().map(String::valueOf).collect(Collectors.joining(", "));
         }
 
         boolean bool(String key, boolean defaultValue) {
@@ -231,14 +245,15 @@ public final class Settings {
             if (value == null) {
                 return defaultValue;
             }
-            int number;
+            // read as a long, so that a value beyond the int range is clamped (with the warning), never wrapped
+            long number;
             try {
-                number = value instanceof Number ? ((Number) value).intValue() : Integer.parseInt(String.valueOf(value).trim());
+                number = value instanceof Number ? ((Number) value).longValue() : Long.parseLong(String.valueOf(value).trim());
             } catch (NumberFormatException e) {
                 warnings.accept("Invalid " + key + " '" + shown(value) + USING + defaultValue);
                 return defaultValue;
             }
-            int clamped = clamp(number, min, max);
+            int clamped = (int) Math.max(min, Math.min(max, number));
             if (clamped != number) {
                 warnings.accept(key + " " + number + " is out of range (" + min + " to " + max + "): using " + clamped);
             }

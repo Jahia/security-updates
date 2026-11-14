@@ -101,6 +101,34 @@ class SettingsTest {
     }
 
     @Test
+    @DisplayName("a typed number beyond the int range is clamped with a warning, never wrapped")
+    void longBeyondIntRangeIsClamped() {
+        // 4294967297 wraps to 1 as an int: within range, it would have been taken silently
+        Settings settings = Settings.fromProperties(stored(
+                SettingsKeys.REFRESH_INTERVAL_HOURS, 4_294_967_297L,
+                Settings.ON_DEMAND_MIN_INTERVAL_SECONDS, "-4294967296"), warnings::add);
+
+        assertThat(settings.getRefreshIntervalHours()).isEqualTo(Settings.MAX_REFRESH_INTERVAL_HOURS);
+        assertThat(settings.getOnDemandMinInterval()).isZero();
+        assertThat(warnings).containsExactly(
+                "refreshIntervalHours 4294967297 is out of range (1 to 720): using 720",
+                "onDemandMinIntervalSeconds -4294967296 is out of range (0 to 3600): using 0");
+    }
+
+    @Test
+    @DisplayName("a multi-valued property (array or collection, from a typed .cfg) reads as its values joined")
+    void multiValuedProperties() {
+        Settings fromArray = Settings.fromProperties(stored(SettingsKeys.EXTRA_FEED_URLS,
+                new String[] {"https://a.example.org/f.json", "https://b.example.org/f.json"}), warnings::add);
+        Settings fromList = Settings.fromProperties(stored(SettingsKeys.EXTRA_FEED_URLS,
+                List.of("https://a.example.org/f.json", "https://b.example.org/f.json")), warnings::add);
+
+        assertThat(fromArray.getExtraFeedUrls()).containsExactly("https://a.example.org/f.json", "https://b.example.org/f.json");
+        assertThat(fromList.getExtraFeedUrls()).isEqualTo(fromArray.getExtraFeedUrls());
+        assertThat(warnings).isEmpty();
+    }
+
+    @Test
     @DisplayName("at most 10 extra feed URLs are kept, with a warning")
     void extraFeedUrlsAreCapped() {
         String urls = IntStream.range(0, 12).mapToObj(i -> "https://f" + i + ".example.org/f.json")
