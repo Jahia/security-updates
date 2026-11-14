@@ -4,7 +4,7 @@
 
 | Version | Supported |
 |---|---|
-| 1.0.x (latest release) | Yes |
+| Latest 1.0.x release | Yes |
 | Anything older, and snapshots | No |
 
 The module requires Jahia 8.2.3.7 or later. Only the latest release receives fixes.
