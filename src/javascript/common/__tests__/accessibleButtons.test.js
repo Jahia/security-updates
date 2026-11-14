@@ -25,6 +25,9 @@ const normalize = value => {
     return /^#[0-9A-F]{6}$/.test(hex) ? hex : null;
 };
 
+// Escapes every character that has a meaning in a regular expression, backslash included.
+const escapeRegExp = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 describe.each(STYLESHEETS)('%s', file => {
     const css = sass.compile(path.resolve(__dirname, '../..', file), {loadPaths: [path.resolve(__dirname, '../..')]}).css;
     const buttonRules = rules(css).filter(rule => rule.selector.includes('.target.target'));
@@ -34,7 +37,7 @@ describe.each(STYLESHEETS)('%s', file => {
         ['[data-variant=default][data-color=accent]', '[data-variant=default][data-color=danger]', '[data-variant=outlined]', '[data-variant=ghost]']
             .forEach(kind => {
                 expect(selectors).toContain(kind);
-                ['hover', 'active'].forEach(state => expect(selectors).toMatch(new RegExp(`${kind.replace(/[[\]=]/g, '\\$&')}[^\\n]*:${state}`)));
+                ['hover', 'active'].forEach(state => expect(selectors).toMatch(new RegExp(`${escapeRegExp(kind)}[^\\n]*:${state}`)));
             });
         expect(selectors).toMatch(/\[data-color=accent\]:focus-visible/);
     });
