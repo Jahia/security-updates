@@ -204,8 +204,11 @@ class ReportAssemblerTest {
             throw new OutOfMemoryError("test");
         };
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> assembler.assemble(Settings.defaults(), sources, fetch, NOW,
-                SecurityReport.notChecked(JAHIA), () -> false)).isInstanceOf(OutOfMemoryError.class);
+        Settings settings = Settings.defaults();
+        SecurityReport previous = SecurityReport.notChecked(JAHIA);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> assembler.assemble(settings, sources, fetch, NOW, previous,
+                () -> false)).isInstanceOf(OutOfMemoryError.class);
     }
 
     @Test
