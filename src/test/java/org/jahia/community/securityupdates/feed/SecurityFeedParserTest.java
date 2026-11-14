@@ -338,6 +338,19 @@ class SecurityFeedParserTest {
         assertThat(SecurityFeedParser.parse(json).getAdvisories()).isEmpty();
     }
 
+    @Test
+    @DisplayName("an unterminated string is not valid JSON; a fix entry that is not an object is skipped and counted")
+    void unterminatedStringAndNonObjectFix() throws Exception {
+        assertThatThrownBy(() -> SecurityFeedParser.parse("{\"schemaVersion\":1,\"note\":\"[[[["))
+                .isInstanceOf(FeedFormatException.class)
+                .satisfies(e -> assertThat(((FeedFormatException) e).getDetail()).isEqualTo(StoreErrorDetail.INVALID_JSON));
+
+        SecurityFeed feed = SecurityFeedParser.parse(advisoryWithFix("7,{\"component\":\"m\",\"fixedVersions\":[\"1.0\"]}"));
+
+        assertThat(feed.getAdvisories().get(0).getFixes()).hasSize(1);
+        assertThat(feed.getSkippedEntries()).isEqualTo(1);
+    }
+
     private static String advisoryWithFix(String fix) {
         return "{\"schemaVersion\":1,\"advisories\":[{\"id\":\"JSA-1\",\"fixes\":[" + fix + "]}]}";
     }
