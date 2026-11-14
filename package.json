@@ -17,8 +17,11 @@
     "sync-pom": "sync-pom-version --use-yarn"
   },
   "description": "Lists the installed Jahia components that have security updates, from the Jahia Store security feed",
-  "main": "index.js",
-  "repository": "git@github.com:Jahia/security-updates.git",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Jahia/security-updates.git"
+  },
+  "private": true,
   "author": "Jahia Solutions Group SA",
   "license": "MIT",
   "jahia": {
