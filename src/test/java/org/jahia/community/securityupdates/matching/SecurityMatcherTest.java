@@ -128,9 +128,9 @@ class SecurityMatcherTest {
             SecurityFeed feed = feed(advisory("JSA-1", Severity.HIGH, introduced));
 
             MatchResult before = new SecurityMatcher(JAHIA).match(List.of(module("m", "1.4.0")), List.of(feed), catalog("m",
-                    GROUP, "2.24.0", "version-8.2.0.0"));
+                    GROUP, "2.24.0", "8.2.0.0"));
             MatchResult after = new SecurityMatcher(JAHIA).match(List.of(module("m", "2.1.0")), List.of(feed), catalog("m",
-                    GROUP, "2.24.0", "version-8.2.0.0"));
+                    GROUP, "2.24.0", "8.2.0.0"));
 
             assertThat(before.getFindings()).isEmpty();
             assertThat(after.getFindings()).singleElement().satisfies(f -> assertThat(f.getRecommendedVersion()).isEqualTo("2.24.0"));
@@ -581,12 +581,12 @@ class SecurityMatcherTest {
 
         @ParameterizedTest(name = "requires {0} on Jahia {1} -> {2}")
         @CsvSource({
-                "version-8.2.0.0, 8.2.2.1, COMPATIBLE",
+                "8.2.0.0, 8.2.2.1, COMPATIBLE",
                 "8.2.2.1, 8.2.2.1, COMPATIBLE",
-                "version-8.2.3.0, 8.2.2.1, INCOMPATIBLE",
-                "version-7.2.0.0, 8.2.2.1, INCOMPATIBLE",
-                "version-9.0.0.0, 8.2.2.1, INCOMPATIBLE",
-                "version-garbage, 8.2.2.1, UNKNOWN"
+                "8.2.3.0, 8.2.2.1, INCOMPATIBLE",
+                "7.2.0.0, 8.2.2.1, INCOMPATIBLE",
+                "9.0.0.0, 8.2.2.1, INCOMPATIBLE",
+                "garbage, 8.2.2.1, UNKNOWN"
         })
         void compatibility(String required, String jahia, Compatibility expected) {
             SecurityFeed feed = feed(advisory("JSA-1", Severity.HIGH, fix("m", GROUP, "2.0.0")));
@@ -602,7 +602,7 @@ class SecurityMatcherTest {
         @DisplayName("is UNKNOWN when the recommended version is not in the catalogue")
         void versionNotInCatalogue() {
             SecurityFeed feed = feed(advisory("JSA-1", Severity.HIGH, fix("m", GROUP, "2.0.0")));
-            ModuleCatalog catalog = catalog("m", GROUP, "1.9.0", "version-8.0.0.0");
+            ModuleCatalog catalog = catalog("m", GROUP, "1.9.0", "8.0.0.0");
 
             Finding finding = new SecurityMatcher(JAHIA).match(List.of(module("m", "1.0.0")), List.of(feed), catalog)
                     .getFindings().get(0);
@@ -612,12 +612,18 @@ class SecurityMatcherTest {
         }
 
         @Test
-        @DisplayName("the required version is shown without the version- prefix")
-        void requiredVersionWithoutPrefix() {
+        @DisplayName("the required version of a parsed catalogue is shown without the version- prefix")
+        void requiredVersionWithoutPrefix() throws Exception {
             SecurityFeed feed = feed(advisory("JSA-1", Severity.HIGH, fix("m", GROUP, "2.0.0")));
-            Finding finding = new SecurityMatcher(JAHIA).match(List.of(module("m", "1.0.0")), List.of(feed),
-                    catalog("m", GROUP, "2.0.0", "version-8.2.3.0")).getFindings().get(0);
+            ModuleCatalog catalog = org.jahia.community.securityupdates.feed.ModuleCatalogParser.parse("[{\"modules\":[{"
+                    + "\"groupId\":\"" + GROUP + "\",\"name\":\"m\",\"versions\":[{\"version\":\"2.0.0\","
+                    + "\"requiredVersion\":\"version-8.2.3.0\"}]}]}]");
+
+            Finding finding = new SecurityMatcher(JAHIA).match(List.of(module("m", "1.0.0")), List.of(feed), catalog)
+                    .getFindings().get(0);
+
             assertThat(finding.getRequiredJahiaVersion()).isEqualTo("8.2.3.0");
+            assertThat(finding.getCompatibility()).isEqualTo(Compatibility.INCOMPATIBLE);
         }
     }
 

@@ -47,7 +47,6 @@ import java.util.regex.Pattern;
  */
 public final class SecurityMatcher {
 
-    private static final String REQUIRED_VERSION_PREFIX = "version-";
     /** A CVE, or a Jahia vulnerability identifier: JSA-YYYY-NNNN with an optional numeric suffix (JSA-2026-0036.1066). */
     private static final Pattern CVE = Pattern.compile("CVE-\\d{4}-\\d{4,}|JSA-\\d{4}-\\d{4}(\\.\\d+)?");
     private static final String HTTPS = "https://";
@@ -364,8 +363,9 @@ public final class SecurityMatcher {
             compatibility = Compatibility.JAHIA_UPGRADE;
             requiredJahiaVersion = recommended;
         } else {
+            // the catalogue parser already removed the "version-" prefix
             requiredJahiaVersion = catalog.requiredJahiaVersion(component.getName(), component.getGroupId(), recommended)
-                    .map(SecurityMatcher::stripPrefix).orElse(null);
+                    .orElse(null);
             compatibility = compatibility(requiredJahiaVersion);
         }
         return Optional.of(new Finding(component.getName(), component.getGroupId(), installed, recommended,
@@ -401,12 +401,6 @@ public final class SecurityMatcher {
         boolean notNewer = Versions.compare(requiredJahiaVersion, jahiaVersion) <= 0;
         boolean sameMajor = Versions.major(requiredJahiaVersion) == Versions.major(jahiaVersion);
         return notNewer && sameMajor ? Compatibility.COMPATIBLE : Compatibility.INCOMPATIBLE;
-    }
-
-    private static String stripPrefix(String requiredVersion) {
-        return requiredVersion.startsWith(REQUIRED_VERSION_PREFIX)
-                ? requiredVersion.substring(REQUIRED_VERSION_PREFIX.length())
-                : requiredVersion;
     }
 
     private static List<String> wellFormed(List<String> versions) {
