@@ -190,9 +190,11 @@ describe('Security updates: permissions', () => {
         cy.get('[data-testid="security-updates-status"]', {timeout: 120000})
             .should('contain', 'Check completed.');
 
-        // The values are there (positive signal), and cannot be changed.
-        cy.get(field('defaultStoreUrl')).should('have.value', 'https://storefixture').and('be.disabled');
-        cy.get(field('refreshIntervalHours')).should('have.value', '24').and('be.disabled');
+        // The values are shown as text (positive signal), and there is no control to change them.
+        cy.get('[data-testid="security-updates-setting-value-defaultStoreUrl"] dd').should('contain', 'https://storefixture');
+        cy.get('[data-testid="security-updates-setting-value-refreshIntervalHours"] dd').should('contain', '24');
+        cy.get(field('defaultStoreUrl')).should('not.exist');
+        cy.get('[data-testid="security-updates-settings-summary"] input').should('not.exist');
         cy.contains('Only server administrators can change these settings. They are shown here for information.')
             .should('be.visible');
         cy.contains('button', 'Save settings').should('not.exist');

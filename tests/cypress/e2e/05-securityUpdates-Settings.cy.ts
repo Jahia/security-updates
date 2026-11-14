@@ -216,7 +216,8 @@ describe('Security updates: settings', () => {
         cy.contains('button', 'Use this text colour #A6A6A6').click();
         cy.get(field('bannerTextColor')).should('have.value', '#A6A6A6');
         cy.get('[data-testid="security-updates-contrast"]').should('contain', 'Meets the 7:1 minimum');
-        cy.get(STATUS).should('contain', 'Text colour #A6A6A6 applied');
+        // The confirmation is shown next to the preview.
+        cy.get('[data-testid="security-updates-suggestion-status"]').should('contain', 'Text colour #A6A6A6 applied');
         cy.contains('button', 'Save settings').click();
         cy.get(STATUS).should('contain', 'Settings saved.');
 
