@@ -19,6 +19,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -509,5 +511,25 @@ class SecurityUpdateServiceTest {
             assertThat(service.getBanner().getCount()).isZero();
             assertThat(fixture.fetcher.requested).hasSize(fetches);
         }
+    }
+
+    @ParameterizedTest(name = "a failed check after a {0} report with findings {1} is {2}, never OK, and keeps the last success")
+    @CsvSource({"OK, false, PARTIAL", "OK, true, PARTIAL", "PARTIAL, false, UNAVAILABLE", "PARTIAL, true, PARTIAL",
+            "UNAVAILABLE, false, UNAVAILABLE", "NOT_CHECKED, false, UNAVAILABLE"})
+    void failedCheckFallback(ReportStatus previousStatus, boolean withFindings, ReportStatus expected) {
+        Instant lastSuccess = Instant.parse("2026-11-12T10:00:00Z");
+        Instant now = Instant.parse("2026-11-13T10:00:00Z");
+        List<Finding> findings = withFindings ? List.of(new Finding("jcontent", "org.jahia.modules", "3.4.0", "3.5.0",
+                Compatibility.UNKNOWN, null, Severity.HIGH, org.jahia.community.securityupdates.model.FindingSource.ADVISORY,
+                List.of(new AdvisoryRef("JSA-1", "t", null, List.of(), Severity.HIGH)))) : List.of();
+        SecurityReport previous = new SecurityReport(previousStatus, lastSuccess, lastSuccess, JAHIA, List.of(), findings);
+
+        SecurityReport failed = SecurityUpdateService.failedReport(previous, now);
+
+        assertThat(failed.getStatus()).isEqualTo(expected).isNotEqualTo(ReportStatus.OK);
+        assertThat(failed.getLastSuccess()).isEqualTo(lastSuccess);
+        assertThat(failed.getCheckedAt()).isEqualTo(now);
+        assertThat(failed.getFindings()).isEqualTo(findings);
+        assertThat(failed.getErrors()).extracting(StoreError::getDetail).containsExactly(StoreErrorDetail.CHECK_FAILED);
     }
 }

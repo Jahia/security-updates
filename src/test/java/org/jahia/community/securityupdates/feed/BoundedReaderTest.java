@@ -56,4 +56,35 @@ class BoundedReaderTest {
     void nullStreamIsEmpty() throws IOException {
         assertThat(BoundedReader.read(null, 5, FAR, false)).isEmpty();
     }
+
+    @Test
+    @DisplayName("a slow stream that crosses the deadline between two reads fails as a timeout at the next read")
+    void slowStreamCrossesTheDeadline() {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(50);
+        int[] reads = new int[1];
+        InputStream slow = new InputStream() {
+            @Override
+            public int read() {
+                return 'x';
+            }
+
+            @Override
+            public int read(byte[] b, int off, int len) {
+                reads[0]++;
+                if (reads[0] == 2) {
+                    // the second chunk arrives after the deadline; parks until then (no condition to wait for)
+                    while (System.nanoTime() - deadline <= 0) {
+                        java.util.concurrent.locks.LockSupport.parkNanos(java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(10));
+                    }
+                }
+                b[off] = 'x';
+                return 1;
+            }
+        };
+
+        assertThatThrownBy(() -> BoundedReader.read(slow, 1_000_000, deadline, false))
+                .isInstanceOf(java.net.SocketTimeoutException.class)
+                .hasMessage("Response read deadline exceeded");
+        assertThat(reads[0]).isEqualTo(2);
+    }
 }
