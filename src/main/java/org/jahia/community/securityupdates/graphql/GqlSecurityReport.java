@@ -80,7 +80,7 @@ public class GqlSecurityReport {
 
     @GraphQLField
     @GraphQLName("lastSuccess")
-    @GraphQLDescription("ISO-8601 time of the last check where every store feed was read and understood")
+    @GraphQLDescription("ISO-8601 time of the last check whose status was OK")
     public String getLastSuccess() {
         return iso(report.getLastSuccess());
     }

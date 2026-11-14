@@ -39,11 +39,14 @@ import java.util.regex.Pattern;
  *     <li>otherwise the recommendation is the smallest fixed version on X's line above X, else the smallest
  *     fixed version above X.</li>
  * </ul>
- * Owner-flagged rule: a flagged version V affects X when they share name (and groupId when both are known)
- * and major, and X &lt; V; the recommendation is the smallest such V.
+ * Owner-flagged rule, for modules only (a flagged version named {@code jahia-core} is ignored): a flagged version V
+ * affects X when they share name (and groupId when both are known) and major, and X &lt; V; each flag recommends
+ * its V.
  *
  * <p>Findings are grouped per component and source. The recommendation of a group is a version at which no
- * advisory of the group applies any more (computed by re-checking the candidate until it is stable).
+ * advisory, or no flag, of the group applies any more (computed by re-checking the candidate until it is stable):
+ * for owner flags, the version that clears every flag of the finding, which is the highest flagged version above
+ * X on X's major.
  */
 public final class SecurityMatcher {
 

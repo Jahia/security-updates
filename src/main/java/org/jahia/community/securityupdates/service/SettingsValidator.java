@@ -13,7 +13,7 @@ import java.util.Optional;
 
 /**
  * Strict validation of a full set of settings, as submitted by the settings UI. Unlike the configuration
- * fallbacks of {@link Settings#from}, an invalid value is refused with a {@link FieldError}; the result then
+ * fallbacks of {@link Settings#fromProperties}, an invalid value is refused with a {@link FieldError}; the result then
  * holds no value, so nothing can be written partially. Rules:
  * <ul>
  *     <li>every key of {@link SettingsKeys#ALL} is present;</li>

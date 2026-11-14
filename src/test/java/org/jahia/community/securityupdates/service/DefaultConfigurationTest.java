@@ -111,4 +111,47 @@ class DefaultConfigurationTest {
             assertThat(en.getProperty(method.getName() + ".desc")).as(method.getName()).isNotBlank();
         }
     }
+
+    private static Properties labels(String suffix) throws IOException {
+        Properties labels = new Properties();
+        try (InputStream in = DefaultConfigurationTest.class.getResourceAsStream(
+                "/OSGI-INF/l10n/security-updates/config" + suffix + ".properties")) {
+            labels.load(in);
+        }
+        return labels;
+    }
+
+    private static org.json.JSONObject uiLocale(String language) throws IOException {
+        try (InputStream in = DefaultConfigurationTest.class.getResourceAsStream("/javascript/locales/" + language + ".json")) {
+            assertThat(in).as(language).isNotNull();
+            return new org.json.JSONObject(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+        }
+    }
+
+    @Test
+    @DisplayName("the dismiss policy labels of the configuration UI are those of the settings page")
+    void dismissLabelsMatchTheUi() throws IOException {
+        for (String language : java.util.List.of("en", "fr")) {
+            Properties labels = labels("en".equals(language) ? "" : "_" + language);
+            org.json.JSONObject dismiss = uiLocale(language).getJSONObject("settings").getJSONObject("dismiss");
+            for (org.jahia.community.securityupdates.model.DismissPolicy policy
+                    : org.jahia.community.securityupdates.model.DismissPolicy.values()) {
+                assertThat(labels.getProperty("dismiss." + policy.name())).as(language + " " + policy)
+                        .isEqualTo(dismiss.getString(policy.name()));
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("the URL attributes, which may be empty, are not required in the metatype")
+    void urlAttributesAreOptional() throws IOException {
+        // the metatype XML is generated when the bundle is packaged, after the tests, and @AttributeDefinition is not
+        // kept at run time: the annotation is read from the source
+        String source = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(
+                "src/main/java/org/jahia/community/securityupdates/service/SecurityUpdatesConfig.java")), StandardCharsets.UTF_8);
+        for (String key : java.util.List.of(SettingsKeys.DEFAULT_STORE_URL, SettingsKeys.EXTRA_FEED_URLS)) {
+            assertThat(source).containsPattern("@AttributeDefinition\\(name = \"%" + key + "\"[^)]*required = false\\)");
+        }
+        assertThat(labels("").getProperty("defaultStoreUrl.desc")).contains("empty for none");
+    }
 }

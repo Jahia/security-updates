@@ -11,7 +11,7 @@ import graphql.annotations.annotationTypes.GraphQLName;
 @GraphQLName("SecurityUpdatesDismissPolicy")
 @GraphQLDescription("How long a dismissed security updates notice stays hidden")
 public enum DismissPolicy {
-    /** Until the browser session ends (sessionStorage). */
+    /** Until the browser tab is closed (sessionStorage, per tab). */
     SESSION,
     /** For a number of hours (localStorage, per Jahia user). */
     HOURS,

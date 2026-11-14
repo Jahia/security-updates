@@ -27,7 +27,7 @@ public @interface SecurityUpdatesConfig {
     @AttributeDefinition(name = "%extraFeedUrls", description = "%extraFeedUrls.desc", required = false)
     String extraFeedUrls() default "";
 
-    @AttributeDefinition(name = "%defaultStoreUrl", description = "%defaultStoreUrl.desc")
+    @AttributeDefinition(name = "%defaultStoreUrl", description = "%defaultStoreUrl.desc", required = false)
     String defaultStoreUrl() default Settings.DEFAULT_STORE_URL;
 
     @AttributeDefinition(name = "%bannerEnabled", description = "%bannerEnabled.desc")

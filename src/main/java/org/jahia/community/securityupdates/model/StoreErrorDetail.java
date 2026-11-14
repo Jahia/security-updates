@@ -15,7 +15,7 @@ public enum StoreErrorDetail {
     NOT_HTTPS,
     /** Jahia refused to connect to the address (outbound request screening, jahia.httpClient.allowedInternalHosts). */
     SSRF_BLOCKED,
-    /** The connection or the response timed out. */
+    /** The connection or the response timed out, or the check ran out of time before reading this store. */
     TIMEOUT,
     /** The connection failed (DNS, TLS, refused, reset). */
     CONNECTION,
@@ -35,6 +35,6 @@ public enum StoreErrorDetail {
     ENTRIES_SKIPPED,
     /** The stores of the module manager could not be read. */
     FORGE_SETTINGS_UNREADABLE,
-    /** The check failed unexpectedly; see the Jahia log. */
+    /** The check, or the check of one store, failed unexpectedly; see the Jahia log. */
     CHECK_FAILED
 }
