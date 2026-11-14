@@ -1,0 +1,12 @@
+[{"id": "f783f4e9", "path": "/sites/store/contents/modules-repository", "name": "modules-repository",
+  "modules": [
+   {"id": "1", "path": "/p", "jcrprimarytype": "jnt:forgeModule", "remoteUrl": "https://store.jahia.com/x", "groupId": "org.jahia.modules",
+    "name": "graphql-dxm-provider", "title": "GraphQL", "status": "supported",
+    "versions": [{"version": "3.10.0", "requiredVersion": "version-8.2.0.0", "downloadUrl": "https://store.jahia.com/a.jar"},
+                 {"version": "2.24.0", "requiredVersion": "version-8.1.0.0", "downloadUrl": "https://store.jahia.com/b.jar"},
+                 {"version": "4.0.0", "requiredVersion": "version-8.2.3.0", "downloadUrl": "https://store.jahia.com/c.jar"}]},
+   {"id": "2", "groupId": "org.jahia.community", "name": "broken-versions",
+    "versions": [{"version": "1.0.0"}, {"requiredVersion": "version-8.0.0.0"}, "nope"]},
+   {"id": "3", "name": "no-group", "versions": []},
+   "not a module"
+  ]}]

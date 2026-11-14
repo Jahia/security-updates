@@ -1,0 +1,320 @@
+{
+  "label": "Mises à jour de sécurité",
+  "page": {
+    "documentTitle": "{{title}} – Administration de Jahia",
+    "intro": "Cette page liste les composants installés (Jahia et ses modules) qui ont une mise à jour corrigeant un problème de sécurité, d’après les données de sécurité publiées par les stores.",
+    "glossary": {
+      "title": "Que signifient ces termes",
+      "advisory": {
+        "term": "Bulletin",
+        "definition": "Un message publié sur un problème de sécurité de Jahia ou d’un module. Il indique les versions qui ont le problème et la version qui le corrige."
+      },
+      "cve": {
+        "term": "CVE",
+        "definition": "Un numéro public donné à un problème de sécurité connu, comme CVE-2026-1234. Son lien ouvre la fiche du problème sur cve.org."
+      },
+      "store": {
+        "term": "Store",
+        "definition": "Un serveur qui propose des modules Jahia et publie leurs données de sécurité, comme le Jahia Store (store.jahia.com). Les stores vérifiés viennent de la gestion des modules et des paramètres ci-dessous."
+      },
+      "catalogue": {
+        "term": "Liste des modules (catalogue)",
+        "definition": "La liste des modules et des versions qu’un store propose. Cette page s’en sert pour dire si une mise à jour fonctionne avec votre version de Jahia."
+      }
+    },
+    "loading": "Chargement du rapport de sécurité…",
+    "error": "Le rapport de sécurité n’a pas pu être chargé. Rechargez la page pour réessayer.",
+    "updateError": "Le rapport de sécurité n’a pas pu être mis à jour : le dernier rapport chargé est affiché. Rechargez la page pour réessayer.",
+    "refresh": "Vérifier maintenant",
+    "checking": "Vérification…",
+    "refreshing": "Interrogation des stores… Cela peut prendre quelques minutes.",
+    "running": "Une vérification est en cours. Cette page se met à jour quand elle se termine.",
+    "alreadyRunning": "Une vérification est déjà en cours.",
+    "refreshed": "Vérification terminée. {{result}}",
+    "notRefreshed": "Une vérification vient d’avoir lieu : aucune nouvelle vérification n’a été lancée. Réessayez dans une minute.",
+    "refreshError": "La vérification a échoué, ou le serveur ne répond plus. Réessayez, ou consultez le journal de Jahia.",
+    "refreshSlow": "La vérification est toujours en cours. Rechargez cette page dans quelques minutes pour voir les résultats.",
+    "jahiaVersion": "Version de Jahia",
+    "checkedAt": "Dernière vérification",
+    "lastSuccess": "Dernière vérification ayant interrogé tous les stores",
+    "nextCheckAt": "Prochaine vérification",
+    "notScheduled": "Non prévue",
+    "never": "Jamais",
+    "unknown": "Inconnue",
+    "manageModules": "Ouvrir la gestion des modules",
+    "empty": "Aucune mise à jour de sécurité connue pour ce Jahia.",
+    "findingsTitle": "Composants à mettre à jour",
+    "summary": {
+      "one": "{{n}} composant a besoin d’une mise à jour de sécurité.",
+      "other": "{{n}} composants ont besoin d’une mise à jour de sécurité.",
+      "bySeverity": "Par gravité la plus haute : {{list}}.",
+      "severityCount": "{{severity}} : {{n}}"
+    },
+    "bannerCount": {
+      "one": "Le bandeau de l’interface de Jahia compte {{n}} composant ({{threshold}}).",
+      "other": "Le bandeau de l’interface de Jahia compte {{n}} composants ({{threshold}})."
+    },
+    "filteredEmpty": "Aucun bulletin Jahia ne concerne ce Jahia, mais des propriétaires de modules ont signalé des problèmes. Choisissez « Tout, y compris les signalements des propriétaires de modules » pour les voir.",
+    "newTab": "(s’ouvre dans un nouvel onglet)",
+    "requires": "Jahia minimum : {{version}}",
+    "advisoryFallback": "Bulletin {{id}}",
+    "advisoryFrom": "(source : {{store}})",
+    "advisoryFromLink": "(source : {{store}}, lien vers {{host}})",
+    "ownerReport": "Signalement du propriétaire du module",
+    "ownerLink": "Signalement du propriétaire sur {{host}}",
+    "cveLink": "{{id}} sur cve.org",
+    "afterTable": "Pour mettre à jour un module, ouvrez la <manage>gestion des modules</manage> et installez la version recommandée. Pour mettre à jour Jahia lui-même, suivez la <upgrade>documentation de mise à jour de Jahia</upgrade>.",
+    "action": {
+      "module": "Mettre à jour {{component}} dans la gestion des modules",
+      "core": "Documentation de mise à jour de Jahia"
+    },
+    "status": {
+      "NOT_CHECKED": "Aucune vérification n’a encore eu lieu. La première a lieu environ une minute après le démarrage. Utilisez « Vérifier maintenant » pour la lancer tout de suite.",
+      "DISABLED": "Les vérifications sont désactivées : cette page n’affiche aucun résultat et aucun bandeau n’est affiché. Un administrateur du serveur peut les activer dans les paramètres ci-dessous.",
+      "PARTIAL": "Certains stores n’ont pas pu être interrogés : cette liste peut être incomplète.",
+      "PARTIAL_EMPTY": "Certains stores n’ont pas pu être interrogés. Les stores qui ont répondu ne signalent aucune mise à jour de sécurité pour ce Jahia, mais les autres pourraient en signaler.",
+      "UNAVAILABLE": "Aucune donnée de sécurité n’a pu être lue : cette page ne peut pas dire si ce Jahia a besoin de mises à jour de sécurité.",
+      "NOT_PUBLISHED": "Le Jahia Store ne publie pas encore de données de sécurité. Il n’y a rien à configurer : cette page affichera des résultats dès que ces données seront publiées.",
+      "NOT_PUBLISHED_OTHER": "Les adresses de store vérifiées n’ont pas encore de données de sécurité. Vérifiez-les dans les paramètres ci-dessous ou dans la gestion des modules. Si elles sont correctes, cette page affichera des résultats dès que les données seront publiées.",
+      "STALE": "Les résultats ne sont peut-être plus à jour : aucune vérification n’a interrogé tous les stores depuis le {{date}}."
+    },
+    "errors": {
+      "title": "Problèmes constatés lors de la dernière vérification",
+      "infoTitle": "Détails des stores",
+      "store": "Store : {{url}}",
+      "technicalLabel": "Détails techniques (en anglais) :"
+    },
+    "errorKind": {
+      "NOT_PUBLISHED": "Pas encore de données de sécurité publiées",
+      "UNAVAILABLE": "Store indisponible",
+      "NOT_UNDERSTOOD": "Données de sécurité dans un format non pris en charge",
+      "INVALID_URL": "Adresse de store refusée",
+      "CATALOGUE_UNAVAILABLE": "Liste des modules indisponible : compatibilité inconnue",
+      "MALFORMED_VERSION": "Version impossible à comparer",
+      "NO_STORE": "Aucun store à interroger",
+      "STALE": "Résultats pas à jour"
+    },
+    "errorHelp": {
+      "NOT_PUBLISHED": "Il n’y a rien à configurer : les résultats apparaîtront dès que les données seront publiées.",
+      "UNAVAILABLE": "Réessayez plus tard.",
+      "NOT_UNDERSTOOD": "Le store a envoyé des données que ce module ne sait pas lire.",
+      "INVALID_URL": "Vérifiez l’adresse de ce store.",
+      "CATALOGUE_UNAVAILABLE": "Les résultats restent listés, sans leur compatibilité.",
+      "MALFORMED_VERSION": "La version de ce composant ne peut pas être comparée aux données de sécurité.",
+      "NO_STORE": "Ajoutez un store dans la gestion des modules, ou saisissez l’adresse d’un store par défaut dans les paramètres ci-dessous.",
+      "STALE": "Lancez une vérification, ou consultez les autres problèmes listés ici."
+    },
+    "errorDetail": {
+      "NOT_HTTPS": "L’adresse n’utilise pas https. Seules les adresses https sont acceptées : modifiez-la dans les paramètres ci-dessous ou dans la gestion des modules.",
+      "SSRF_BLOCKED": "Jahia a bloqué cette adresse car elle pointe vers un réseau interne. Si ce store est interne volontairement, un administrateur système peut autoriser son hôte avec la propriété jahia.httpClient.allowedInternalHosts.",
+      "TIMEOUT": "Le store n’a pas répondu à temps. Réessayez plus tard.",
+      "CONNECTION": "Jahia n’a pas pu se connecter au store. Vérifiez l’adresse, ainsi que les réglages réseau et proxy du serveur.",
+      "REDIRECT": "Le store a répondu par une redirection, qui n’est pas suivie. Utilisez l’adresse finale du store.",
+      "AUTH": "Le store a refusé le nom d’utilisateur ou le mot de passe. Vérifiez-les dans la gestion des modules.",
+      "HTTP_STATUS": "Le store a répondu par une erreur. Réessayez plus tard.",
+      "TOO_LARGE": "Le store a envoyé plus de données que la limite autorisée.",
+      "INVALID_JSON": "Le store a envoyé des données illisibles.",
+      "SCHEMA_UNSUPPORTED": "Le store utilise un format de données plus récent. Mettez à jour le module security-updates pour le lire.",
+      "ENTRIES_SKIPPED": "Certaines entrées n’ont pas pu être lues et ont été ignorées.",
+      "FORGE_SETTINGS_UNREADABLE": "Les stores configurés dans la gestion des modules n’ont pas pu être lus. Consultez le journal de Jahia.",
+      "CHECK_FAILED": "La vérification a échoué. Consultez le journal de Jahia."
+    },
+    "filter": {
+      "legend": "Afficher les résultats issus de",
+      "hint": "Les bulletins Jahia sont publiés par Jahia. Les propriétaires de modules peuvent aussi signaler qu’une version de leur module corrige un problème de sécurité : Jahia n’a pas examiné ces signalements.",
+      "advisories": "Bulletins Jahia uniquement ({{n}})",
+      "all": "Tout, y compris les signalements des propriétaires de modules ({{n}})",
+      "showing": {
+        "one": "{{n}} composant affiché.",
+        "other": "{{n}} composants affichés."
+      }
+    },
+    "table": {
+      "caption": "Composants ayant des mises à jour de sécurité, les plus graves d’abord",
+      "component": "Composant",
+      "severity": "Gravité",
+      "installed": "Version installée",
+      "recommended": "Version recommandée",
+      "compatibility": "Compatibilité",
+      "source": "Source",
+      "advisories": "Bulletins",
+      "action": "Que faire"
+    },
+    "severity": {
+      "CRITICAL": "Critique",
+      "HIGH": "Élevée",
+      "MEDIUM": "Moyenne",
+      "LOW": "Faible",
+      "UNKNOWN": "Inconnue"
+    },
+    "compatibility": {
+      "COMPATIBLE": "Compatible avec ce Jahia",
+      "INCOMPATIBLE": "Nécessite une autre version de Jahia",
+      "UNKNOWN": "Inconnue : le module n’est pas dans la liste des modules du store",
+      "JAHIA_UPGRADE": "Mise à jour de Jahia nécessaire"
+    },
+    "source": {
+      "ADVISORY": "Bulletin Jahia",
+      "OWNER_REPORTED": "Signalé par le propriétaire du module"
+    },
+    "statusLabel": {
+      "NOT_CHECKED": "Pas encore vérifié",
+      "DISABLED": "Désactivé",
+      "UP_TO_DATE": "À jour",
+      "UPDATES_NEEDED": "Mises à jour nécessaires",
+      "PARTIAL": "Vérifié en partie",
+      "NO_DATA": "Aucune donnée de sécurité",
+      "NOT_AVAILABLE_YET": "Pas encore disponible"
+    }
+  },
+  "banner": {
+    "label": "Mises à jour de sécurité",
+    "message": {
+      "one": "{{n}} composant a besoin d’une mise à jour de sécurité ({{threshold}}).",
+      "other": "{{n}} composants ont besoin d’une mise à jour de sécurité ({{threshold}})."
+    },
+    "threshold": {
+      "LOW": "gravité faible ou supérieure",
+      "MEDIUM": "gravité moyenne ou supérieure",
+      "HIGH": "gravité élevée ou supérieure",
+      "CRITICAL": "gravité critique"
+    },
+    "link": "Voir les mises à jour de sécurité",
+    "dismiss": "Masquer ce bandeau",
+    "hidden": {
+      "SESSION": "Bandeau masqué jusqu’à la fermeture de cet onglet du navigateur. Il revient plus tôt si un nouveau bulletin ou un nouveau composant est compté.",
+      "HOURS": {
+        "one": "Bandeau masqué pendant {{n}} heure. Il revient plus tôt si un nouveau bulletin ou un nouveau composant est compté.",
+        "other": "Bandeau masqué pendant {{n}} heures. Il revient plus tôt si un nouveau bulletin ou un nouveau composant est compté."
+      },
+      "UNTIL_CHANGE": "Bandeau masqué. Il revient quand un nouveau bulletin ou un nouveau composant est compté."
+    }
+  },
+  "settings": {
+    "title": "Paramètres",
+    "intro": "Les modifications sont enregistrées dans la configuration de Jahia, pour tous les serveurs du cluster. Les modifications du bandeau s’appliquent immédiatement. Après une modification des vérifications, la vérification suivante a lieu environ une minute plus tard.",
+    "loading": "Chargement des paramètres…",
+    "loadError": "Les paramètres n’ont pas pu être chargés. Rechargez la page pour réessayer.",
+    "readOnly": "Seuls les administrateurs du serveur peuvent modifier ces paramètres. Ils sont affichés ici pour information.",
+    "value": {
+      "on": "Activé",
+      "off": "Désactivé",
+      "none": "Non renseigné"
+    },
+    "groups": {
+      "checks": "Vérifications",
+      "banner": "Bandeau dans l’interface de Jahia"
+    },
+    "fields": {
+      "enabled": {
+        "label": "Rechercher les mises à jour de sécurité dans les stores",
+        "help": "Si l’option est désactivée, aucun store n’est interrogé : cette page n’affiche aucun résultat et aucun bandeau n’est affiché."
+      },
+      "refreshIntervalHours": {
+        "label": "Heures entre deux vérifications",
+        "help": "Un nombre entier d’heures, de 1 à 720 (30 jours). Après une modification, la vérification suivante a lieu environ une minute plus tard."
+      },
+      "useForgeSettings": {
+        "label": "Utiliser les stores de la gestion des modules",
+        "help": "Interroge les stores configurés dans la gestion des modules, avec leurs noms d’utilisateur et mots de passe."
+      },
+      "defaultStoreUrl": {
+        "label": "Adresse du store par défaut",
+        "help": "Interrogé quand aucun store ne vient de la gestion des modules. Une adresse https, par exemple https://store.jahia.com. Laissez vide pour n’interroger aucun store par défaut."
+      },
+      "extraFeedUrls": {
+        "label": "Autres adresses de données de sécurité",
+        "help": "Adresses d’autres fichiers de données de sécurité à interroger, par exemple ceux d’un partenaire. Séparez-les par des virgules, des espaces ou des retours à la ligne. Au plus 10 adresses https, sans nom d’utilisateur ni mot de passe."
+      },
+      "bannerEnabled": {
+        "label": "Afficher le bandeau",
+        "help": "Affiche un bandeau sur chaque page de l’interface de Jahia aux utilisateurs qui peuvent ouvrir cette page."
+      },
+      "bannerMinimumSeverity": {
+        "label": "Gravité la plus basse comptée par le bandeau",
+        "help": "Les composants dont les mises à jour sont moins graves ne sont pas comptés."
+      },
+      "bannerIncludeOwnerReports": {
+        "label": "Compter les signalements des propriétaires de modules",
+        "help": "Si l’option est désactivée, seuls les bulletins Jahia sont comptés."
+      },
+      "bannerBackgroundColor": {
+        "label": "Couleur de fond du bandeau",
+        "picker": "Choisir la couleur de fond du bandeau",
+        "help": "Un code couleur comme #1B1B1B. Le contraste avec la couleur du texte doit être d’au moins 7 pour 1 : le niveau d’accessibilité le plus élevé (WCAG AAA)."
+      },
+      "bannerTextColor": {
+        "label": "Couleur du texte du bandeau",
+        "picker": "Choisir la couleur du texte du bandeau",
+        "help": "Un code couleur comme #FFFFFF. Également utilisée pour le lien, le bouton et le contour de focus."
+      },
+      "bannerDismissPolicy": {
+        "label": "Quand un utilisateur masque le bandeau",
+        "help": "Sauf avec « Ne peut pas être masqué », le bandeau revient dès qu’un nouveau bulletin ou un nouveau composant est compté."
+      },
+      "bannerDismissHours": {
+        "label": "Heures pendant lesquelles le bandeau reste masqué",
+        "help": "Un nombre entier de 1 à 720, utilisé seulement avec « Masqué pendant un nombre d’heures ».",
+        "disabled": "Non utilisé pour l’instant : choisissez « Masqué pendant un nombre d’heures » ci-dessus pour le régler."
+      }
+    },
+    "dismiss": {
+      "SESSION": "Masqué jusqu’à la fermeture de l’onglet du navigateur",
+      "HOURS": "Masqué pendant un nombre d’heures",
+      "UNTIL_CHANGE": "Masqué jusqu’à ce qu’un nouveau bulletin ou un nouveau composant soit compté",
+      "NEVER": "Ne peut pas être masqué"
+    },
+    "preview": {
+      "title": "Aperçu",
+      "ratio": "Rapport de contraste :",
+      "pass": "Atteint le minimum de 7:1 (WCAG AAA).",
+      "fail": "En dessous du minimum de 7:1 : ces couleurs ne peuvent pas être enregistrées.",
+      "failLabel": "Ces couleurs ne peuvent pas être enregistrées",
+      "invalid": "Saisissez deux codes couleur comme #1B1B1B pour voir le contraste.",
+      "announcePass": "Les couleurs du bandeau atteignent maintenant le minimum de 7:1.",
+      "announceFail": "Les couleurs du bandeau sont maintenant en dessous du minimum de 7:1."
+    },
+    "save": "Enregistrer les paramètres",
+    "reset": "Rétablir les valeurs par défaut",
+    "saving": "Enregistrement…",
+    "saved": "Paramètres enregistrés. La prochaine vérification a lieu dans environ une minute.",
+    "savedNow": "Paramètres enregistrés. Ils s’appliquent immédiatement.",
+    "resetDone": "Paramètres par défaut rétablis. La prochaine vérification a lieu dans environ une minute.",
+    "resetDoneNow": "Paramètres par défaut rétablis. Ils s’appliquent immédiatement.",
+    "invalid": "Certains paramètres ne sont pas valides : rien n’a été enregistré. Voir les champs signalés en erreur.",
+    "invalidList": "Paramètres à corriger :",
+    "resetConfirm": {
+      "title": "Rétablir la valeur par défaut de chaque paramètre ?",
+      "body": "Vos paramètres actuels, y compris les adresses des stores et les couleurs du bandeau, seront remplacés par les valeurs par défaut. Cette action est irréversible.",
+      "confirm": "Rétablir les valeurs par défaut",
+      "cancel": "Annuler"
+    },
+    "errors": {
+      "MISSING": "Une valeur est requise.",
+      "INVALID_BOOLEAN": "Doit être activé ou désactivé.",
+      "INVALID_NUMBER": "Saisissez un nombre entier.",
+      "OUT_OF_RANGE": "Saisissez un nombre entier de 1 à 720.",
+      "INVALID_URL": "Saisissez des adresses https complètes, sans rien après un ? ou un #, et sans nom d’utilisateur ni mot de passe.",
+      "NOT_HTTPS": "Saisissez uniquement des adresses https : les adresses http sont refusées.",
+      "TOO_MANY": "Saisissez au plus 10 adresses.",
+      "INVALID_VALUE": "Choisissez une des valeurs proposées.",
+      "INVALID_COLOR": "Saisissez un code couleur comme #0B3D91.",
+      "LOW_CONTRAST": "Le rapport de contraste des deux couleurs est de {{ratio}}:1, mais au moins 7:1 est requis.",
+      "WRITE_FAILED": "Les paramètres n’ont pas pu être enregistrés. Consultez le journal de Jahia.",
+      "DENIED": "Vous n’êtes pas autorisé à modifier ces paramètres.",
+      "REQUEST_FAILED": "Les paramètres n’ont pas pu être envoyés au serveur. Vérifiez votre connexion et réessayez."
+    },
+    "suggest": {
+      "intro": "Couleurs qui atteignent 7:1 :",
+      "text": "Couleur du texte {{value}}, contraste {{ratio}}:1",
+      "background": "Couleur de fond {{value}}, contraste {{ratio}}:1",
+      "use_text": "Utiliser cette couleur de texte {{value}}",
+      "use_background": "Utiliser cette couleur de fond {{value}}",
+      "none": "Aucune modification d’une seule couleur n’atteint 7:1 avec ces couleurs. Les couleurs par défaut atteignent ce niveau.",
+      "useDefaults": "Utiliser les couleurs par défaut {{background}} et {{text}}",
+      "appliedText": "Couleur du texte {{value}} appliquée. Enregistrez les paramètres pour la conserver.",
+      "appliedBackground": "Couleur de fond {{value}} appliquée. Enregistrez les paramètres pour la conserver.",
+      "appliedDefaults": "Couleurs par défaut appliquées. Enregistrez les paramètres pour les conserver."
+    }
+  }
+}

@@ -1,0 +1,18 @@
+# The fixture store addressed over plain http, which the module refuses (error detail NOT_HTTPS) and never
+# fetches. Port 80 of storefixture serves a trap feed (advisory JSA-2099-0666) that must never appear.
+# Every key is set, so that this file alone gives a known state whatever ran before.
+- editConfiguration: "org.jahia.community.securityupdates"
+  properties:
+    enabled: "true"
+    refreshIntervalHours: "24"
+    useForgeSettings: "false"
+    defaultStoreUrl: "http://storefixture"
+    extraFeedUrls: ""
+    bannerEnabled: "true"
+    bannerMinimumSeverity: "HIGH"
+    bannerIncludeOwnerReports: "true"
+    bannerBackgroundColor: "#1B1B1B"
+    bannerTextColor: "#FFFFFF"
+    bannerDismissPolicy: "SESSION"
+    bannerDismissHours: "24"
+    onDemandMinIntervalSeconds: "0"

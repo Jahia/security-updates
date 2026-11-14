@@ -1,0 +1,6 @@
+{"schemaVersion": 1,
+ "advisories": [
+   {"id": "JSA-2099-0666", "title": "HTTP trap: this advisory is served over plain http only", "severity": "critical", "cves": [],
+    "fixes": [{"component": "jahia-core", "fixedVersions": ["99.0.0.0"]}]}
+ ],
+ "flaggedVersions": []}

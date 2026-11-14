@@ -1,0 +1,265 @@
+package org.jahia.community.securityupdates.graphql;
+
+import graphql.annotations.annotationTypes.GraphQLField;
+import graphql.annotations.annotationTypes.GraphQLName;
+import graphql.annotations.annotationTypes.GraphQLTypeExtension;
+import org.jahia.community.securityupdates.model.AdvisoryRef;
+import org.jahia.community.securityupdates.model.Compatibility;
+import org.jahia.community.securityupdates.model.Finding;
+import org.jahia.community.securityupdates.model.FindingSource;
+import org.jahia.community.securityupdates.model.ReportStatus;
+import org.jahia.community.securityupdates.model.SecurityReport;
+import org.jahia.community.securityupdates.model.Severity;
+import org.jahia.community.securityupdates.model.StoreError;
+import org.jahia.community.securityupdates.model.StoreErrorDetail;
+import org.jahia.community.securityupdates.model.StoreErrorKind;
+import org.jahia.community.securityupdates.model.ReportView;
+import org.jahia.community.securityupdates.service.SecurityUpdateService;
+import org.jahia.modules.graphql.provider.dxm.DXGraphQLProvider;
+import org.jahia.modules.graphql.provider.dxm.security.GraphQLRequiresPermission;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@DisplayName("Security updates GraphQL API")
+class SecurityUpdatesGraphQLTest {
+
+    private static final Instant CHECKED = Instant.parse("2026-11-13T10:00:00Z");
+    private static final Instant SUCCESS = Instant.parse("2026-11-12T10:00:00Z");
+
+    @AfterEach
+    void resetLocator() {
+        ServiceLocator.reset();
+    }
+
+    private static SecurityReport report() {
+        AdvisoryRef safe = new AdvisoryRef("JSA-1", "Title", "https://academy.jahia.com/jsa-1", List.of("CVE-2026-1"), Severity.HIGH,
+                "store.jahia.com");
+        AdvisoryRef unsafeLink = new AdvisoryRef("JSA-2", "Other", "http://example.org/jsa-2", List.of(), Severity.LOW);
+        Finding finding = new Finding("graphql-dxm-provider", "org.jahia.modules", "3.4.0", "3.10.0",
+                Compatibility.COMPATIBLE, "8.2.0.0", Severity.HIGH, FindingSource.ADVISORY, List.of(safe, unsafeLink));
+        return new SecurityReport(ReportStatus.PARTIAL, CHECKED, SUCCESS, "8.2.2.1",
+                List.of(new StoreError("https://store.jahia.com", StoreErrorKind.NOT_PUBLISHED, "404")), List.of(finding));
+    }
+
+    @Test
+    @DisplayName("exposes the report of the service")
+    void query() {
+        SecurityUpdateService service = mock(SecurityUpdateService.class);
+        when(service.getReportView()).thenReturn(new org.jahia.community.securityupdates.model.ReportView(report(), false, null, false));
+        ServiceLocator.override(() -> service);
+
+        GqlSecurityReport gql = new SecurityUpdatesQuery().getReport();
+
+        assertThat(gql.getStatus()).isEqualTo(ReportStatus.PARTIAL);
+        assertThat(gql.getCheckedAt()).isEqualTo("2026-11-13T10:00:00Z");
+        assertThat(gql.getLastSuccess()).isEqualTo("2026-11-12T10:00:00Z");
+        assertThat(gql.getJahiaVersion()).isEqualTo("8.2.2.1");
+        assertThat(gql.getErrors()).singleElement().satisfies(e -> {
+            assertThat(e.getStoreUrl()).isEqualTo("https://store.jahia.com");
+            assertThat(e.getKind()).isEqualTo(StoreErrorKind.NOT_PUBLISHED);
+            assertThat(e.getMessage()).isEqualTo("404");
+        });
+        GqlFinding finding = gql.getFindings().get(0);
+        assertThat(finding.getComponent()).isEqualTo("graphql-dxm-provider");
+        assertThat(finding.getGroupId()).isEqualTo("org.jahia.modules");
+        assertThat(finding.getInstalledVersion()).isEqualTo("3.4.0");
+        assertThat(finding.getRecommendedVersion()).isEqualTo("3.10.0");
+        assertThat(finding.getCompatibility()).isEqualTo(Compatibility.COMPATIBLE);
+        assertThat(finding.getRequiredJahiaVersion()).isEqualTo("8.2.0.0");
+        assertThat(finding.getSeverity()).isEqualTo(Severity.HIGH);
+        assertThat(finding.getSource()).isEqualTo(FindingSource.ADVISORY);
+        assertThat(finding.getAdvisories()).extracting(GqlAdvisory::getId).containsExactly("JSA-1", "JSA-2");
+        GqlAdvisory advisory = finding.getAdvisories().get(0);
+        assertThat(advisory.getTitle()).isEqualTo("Title");
+        assertThat(advisory.getCves()).containsExactly("CVE-2026-1");
+        assertThat(advisory.getSeverity()).isEqualTo(Severity.HIGH);
+        assertThat(advisory.getUrl()).isEqualTo("https://academy.jahia.com/jsa-1");
+        assertThat(advisory.getStoreHost()).isEqualTo("store.jahia.com");
+        // a reference whose store is unknown has an empty host, never null (the field is non-null)
+        assertThat(finding.getAdvisories().get(1).getStoreHost()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("only https advisory links are exposed")
+    void onlyHttpsLinks() {
+        SecurityUpdateService service = mock(SecurityUpdateService.class);
+        when(service.getReportView()).thenReturn(new org.jahia.community.securityupdates.model.ReportView(report(), false, null, false));
+        ServiceLocator.override(() -> service);
+
+        assertThat(new SecurityUpdatesQuery().getReport().getFindings().get(0).getAdvisories().get(1).getUrl()).isNull();
+    }
+
+    @Test
+    @DisplayName("exposes the banner decision of the service")
+    void banner() throws NoSuchMethodException {
+        SecurityUpdateService service = mock(SecurityUpdateService.class);
+        when(service.getBanner()).thenReturn(new org.jahia.community.securityupdates.model.BannerDecision(
+                true, Severity.HIGH, List.of("jahia-core", "security-updates"),
+                List.of("jahia-core|JSA-1", "security-updates|JSA-2", "security-updates|https://example.org/r"),
+                "#1B1B1B", "#FFFFFF", org.jahia.community.securityupdates.model.DismissPolicy.SESSION, 24));
+        ServiceLocator.override(() -> service);
+
+        GqlBanner banner = new SecurityUpdatesQuery().getBanner();
+
+        assertThat(banner.isVisible()).isTrue();
+        assertThat(banner.getCount()).isEqualTo(2);
+        assertThat(banner.getMinimumSeverity()).isEqualTo(Severity.HIGH);
+        assertThat(banner.getComponents()).containsExactly("jahia-core", "security-updates");
+        assertThat(banner.getDismissalKeys()).containsExactly("jahia-core|JSA-1", "security-updates|JSA-2",
+                "security-updates|https://example.org/r");
+        assertPermission(SecurityUpdatesQuery.class.getMethod("getBanner"));
+        assertThat(GqlBanner.class.getAnnotation(GraphQLName.class).value()).isEqualTo("SecurityUpdatesBanner");
+    }
+
+    @Test
+    @DisplayName("without the service, no banner")
+    void bannerWithoutService() {
+        ServiceLocator.override(() -> null);
+
+        GqlBanner banner = new SecurityUpdatesQuery().getBanner();
+
+        assertThat(banner.isVisible()).isFalse();
+        assertThat(banner.getCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("the refresh mutation runs an on-demand refresh")
+    void mutation() {
+        SecurityUpdateService service = mock(SecurityUpdateService.class);
+        when(service.refresh()).thenReturn(new org.jahia.community.securityupdates.model.ReportView(report(), true, null, false));
+        ServiceLocator.override(() -> service);
+
+        GqlSecurityReport gql = new SecurityUpdatesMutation().refresh();
+
+        verify(service).refresh();
+        assertThat(gql.getFindings()).hasSize(1);
+        assertThat(gql.isInProgress()).isTrue();
+    }
+
+    @Test
+    @DisplayName("the report exposes inProgress, nextCheckAt, stale and the error details")
+    void reportState() {
+        SecurityUpdateService service = mock(SecurityUpdateService.class);
+        SecurityReport base = new SecurityReport(ReportStatus.PARTIAL, CHECKED, SUCCESS, "8.2.2.1", List.of(
+                new StoreError("https://store.example.org", StoreErrorKind.INVALID_URL, StoreErrorDetail.NOT_HTTPS, "Plain http"),
+                new StoreError(null, StoreErrorKind.STALE, "old")), List.of());
+        when(service.getReportView()).thenReturn(new ReportView(base, false, CHECKED.plusSeconds(3600), true));
+        ServiceLocator.override(() -> service);
+
+        GqlSecurityReport gql = new SecurityUpdatesQuery().getReport();
+
+        assertThat(gql.isInProgress()).isFalse();
+        assertThat(gql.getNextCheckAt()).isEqualTo("2026-11-13T11:00:00Z");
+        assertThat(gql.isStale()).isTrue();
+        assertThat(gql.getErrors()).extracting(GqlSecurityReport.GqlStoreError::getKind, GqlSecurityReport.GqlStoreError::getDetail)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(StoreErrorKind.INVALID_URL, StoreErrorDetail.NOT_HTTPS),
+                        org.assertj.core.groups.Tuple.tuple(StoreErrorKind.STALE, null));
+        assertThat(GqlSecurityReport.serviceUnavailable().getNextCheckAt()).isNull();
+        assertThat(GqlSecurityReport.serviceUnavailable().isInProgress()).isFalse();
+    }
+
+    @Test
+    @DisplayName("without the service, the report says the check is unavailable")
+    void serviceMissing() {
+        ServiceLocator.override(() -> null);
+
+        GqlSecurityReport query = new SecurityUpdatesQuery().getReport();
+        GqlSecurityReport mutation = new SecurityUpdatesMutation().refresh();
+
+        assertThat(query.getStatus()).isEqualTo(ReportStatus.UNAVAILABLE);
+        assertThat(query.getCheckedAt()).isNull();
+        assertThat(query.getErrors()).isNotEmpty();
+        assertThat(mutation.getStatus()).isEqualTo(ReportStatus.UNAVAILABLE);
+    }
+
+    @Test
+    @DisplayName("one namespace field on Query and one on Mutation, both requiring adminTemplates")
+    void namespaceContainers() throws NoSuchMethodException {
+        assertThat(SecurityUpdatesQueryExtension.class.getAnnotation(GraphQLTypeExtension.class).value())
+                .isEqualTo(DXGraphQLProvider.Query.class);
+        assertThat(SecurityUpdatesMutationExtension.class.getAnnotation(GraphQLTypeExtension.class).value())
+                .isEqualTo(DXGraphQLProvider.Mutation.class);
+        assertSingleRootField(SecurityUpdatesQueryExtension.class);
+        assertSingleRootField(SecurityUpdatesMutationExtension.class);
+
+        assertThat(SecurityUpdatesQueryExtension.securityUpdates()).isInstanceOf(SecurityUpdatesQuery.class);
+        assertThat(SecurityUpdatesMutationExtension.securityUpdates()).isInstanceOf(SecurityUpdatesMutation.class);
+        assertThat(SecurityUpdatesQuery.class.getAnnotation(GraphQLName.class).value()).isEqualTo("SecurityUpdatesQuery");
+        assertThat(SecurityUpdatesMutation.class.getAnnotation(GraphQLName.class).value()).isEqualTo("SecurityUpdatesMutation");
+        assertPermission(SecurityUpdatesQuery.class.getMethod("getReport"));
+        assertPermission(SecurityUpdatesMutation.class.getMethod("refresh"));
+    }
+
+    private static void assertSingleRootField(Class<?> extension) throws NoSuchMethodException {
+        List<Method> fields = Arrays.stream(extension.getDeclaredMethods())
+                .filter(m -> m.isAnnotationPresent(GraphQLField.class)).collect(java.util.stream.Collectors.toList());
+        assertThat(fields).singleElement().satisfies(m -> {
+            assertThat(Modifier.isStatic(m.getModifiers())).isTrue();
+            assertThat(m.getAnnotation(GraphQLName.class).value()).isEqualTo("securityUpdates");
+        });
+        assertPermission(extension.getMethod("securityUpdates"));
+    }
+
+    @Test
+    @DisplayName("every field of the module's Query and Mutation types requires exactly its permission")
+    void everyFieldRequiresAPermission() {
+        // writes need admin (server administrators); reads, refresh and the namespace containers need adminTemplates
+        Map<String, String> expected = Map.of(
+                "SecurityUpdatesQueryExtension.securityUpdates", "adminTemplates",
+                "SecurityUpdatesMutationExtension.securityUpdates", "adminTemplates",
+                "SecurityUpdatesQuery.report", "adminTemplates",
+                "SecurityUpdatesQuery.banner", "adminTemplates",
+                "SecurityUpdatesQuery.settings", "adminTemplates",
+                "SecurityUpdatesMutation.refresh", "adminTemplates",
+                "SecurityUpdatesMutation.updateSettings", "admin",
+                "SecurityUpdatesMutation.resetSettings", "admin");
+        Map<String, String> actual = new java.util.HashMap<>();
+        for (Class<?> type : List.of(SecurityUpdatesQuery.class, SecurityUpdatesMutation.class,
+                SecurityUpdatesQueryExtension.class, SecurityUpdatesMutationExtension.class)) {
+            for (Method m : type.getDeclaredMethods()) {
+                if (m.isAnnotationPresent(GraphQLField.class)) {
+                    GraphQLRequiresPermission permission = m.getAnnotation(GraphQLRequiresPermission.class);
+                    actual.put(type.getSimpleName() + "." + m.getAnnotation(GraphQLName.class).value(),
+                            permission == null ? null : permission.value());
+                }
+            }
+        }
+        assertThat(actual).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("canEdit is false, never an error, when the session or the permission check fails")
+    void canEditFailsClosed() {
+        org.jahia.services.content.JCRNodeWrapper failing = mock(org.jahia.services.content.JCRNodeWrapper.class);
+        when(failing.hasPermission(Permissions.ADMIN)).thenThrow(new IllegalStateException("no session"));
+        org.jahia.services.content.JCRNodeWrapper admin = mock(org.jahia.services.content.JCRNodeWrapper.class);
+        when(admin.hasPermission(Permissions.ADMIN)).thenReturn(true);
+
+        assertThat(ServiceLocator.holdsAdmin(() -> {
+            throw new javax.jcr.RepositoryException("no session");
+        })).isFalse();
+        assertThat(ServiceLocator.holdsAdmin(() -> {
+            throw new IllegalStateException("no request");
+        })).isFalse();
+        assertThat(ServiceLocator.holdsAdmin(() -> failing)).isFalse();
+        assertThat(ServiceLocator.holdsAdmin(() -> admin)).isTrue();
+    }
+
+    private static void assertPermission(Method method) {
+        assertThat(method.getAnnotation(GraphQLRequiresPermission.class)).isNotNull();
+        assertThat(method.getAnnotation(GraphQLRequiresPermission.class).value()).isEqualTo("adminTemplates");
+    }
+}

@@ -1,0 +1,16 @@
+{"schemaVersion": 1,
+ "advisories": [
+   {"id": "JSA-2099-0001", "title": "Fixture platform advisory", "severity": "critical", "cvss": 9.8,
+    "cves": ["CVE-2099-0001"], "url": "https://academy.jahia.com/fixture-jsa-2099-0001", "published": "2099-01-01",
+    "fixes": [{"component": "jahia-core", "fixedVersions": ["99.0.0.0"]}]},
+   {"id": "JSA-2099-0002", "title": "Fixture module advisory", "severity": "high", "cves": [],
+    "fixes": [{"component": "security-updates", "groupId": "org.jahia.community", "fixedVersions": ["99.0.0"]}]},
+   {"id": "JSA-2099-0003", "title": "Fixture advisory fixed long ago", "severity": "low", "cves": [],
+    "fixes": [{"component": "security-updates", "fixedVersions": ["0.1.0"]}]},
+   {"id": "JSA-2099-0004", "title": "Fixture advisory for a module that is not installed", "severity": "critical", "cves": [],
+    "fixes": [{"component": "not-installed-module", "fixedVersions": ["9.9.9"]}]}
+ ],
+ "flaggedVersions": [
+   {"groupId": "org.jahia.community", "name": "security-updates", "version": "1.0.1", "severity": "high",
+    "references": ["GHSA-2c2c-3f3f-4g4g"], "note": "Fixture owner note"}
+ ]}

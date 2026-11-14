@@ -1,0 +1,16 @@
+query getSecurityUpdatesBanner {
+    securityUpdates {
+        banner {
+            visible
+            count
+            minimumSeverity
+            components
+            dismissalKeys
+            backgroundColor
+            textColor
+            dismissPolicy
+            dismissHours
+            username
+        }
+    }
+}

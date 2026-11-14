@@ -1,0 +1,9 @@
+[{"id": "fixture-repository", "path": "/sites/store/contents/modules-repository", "name": "modules-repository",
+  "title": "Fixture store",
+  "modules": [{"id": "fixture-security-updates", "path": "/sites/store/contents/modules-repository/security-updates",
+    "jcrprimarytype": "jnt:forgeModule", "remoteUrl": "http://storefixture/security-updates.html",
+    "groupId": "org.jahia.community", "name": "security-updates", "title": "Security updates", "status": "community",
+    "versions": [
+      {"version": "99.0.0", "requiredVersion": "version-8.2.0.0", "downloadUrl": "http://storefixture/security-updates-99.0.0.jar"},
+      {"version": "1.0.1", "requiredVersion": "version-8.99.0.0", "downloadUrl": "http://storefixture/security-updates-1.0.1.jar"}
+    ]}]}]

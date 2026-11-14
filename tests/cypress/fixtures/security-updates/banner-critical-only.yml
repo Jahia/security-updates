@@ -1,0 +1,17 @@
+# Fixture store, banner counting critical findings only.
+# Every key is set, so that this file alone gives a known state whatever ran before.
+- editConfiguration: "org.jahia.community.securityupdates"
+  properties:
+    enabled: "true"
+    refreshIntervalHours: "24"
+    useForgeSettings: "false"
+    defaultStoreUrl: "https://storefixture"
+    extraFeedUrls: ""
+    bannerEnabled: "true"
+    bannerMinimumSeverity: "CRITICAL"
+    bannerIncludeOwnerReports: "true"
+    bannerBackgroundColor: "#1B1B1B"
+    bannerTextColor: "#FFFFFF"
+    bannerDismissPolicy: "SESSION"
+    bannerDismissHours: "24"
+    onDemandMinIntervalSeconds: "0"

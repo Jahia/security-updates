@@ -1,0 +1,33 @@
+mutation updateSecurityUpdatesSettings($input: InputSecurityUpdatesSettingsValues!) {
+    securityUpdates {
+        updateSettings(input: $input) {
+            ok
+            errors {
+                field
+                code
+                message
+                suggestions {
+                    field
+                    value
+                    ratio
+                }
+            }
+            settings {
+                enabled
+                refreshIntervalHours
+                useForgeSettings
+                defaultStoreUrl
+                extraFeedUrls
+                bannerEnabled
+                bannerMinimumSeverity
+                bannerIncludeOwnerReports
+                bannerBackgroundColor
+                bannerTextColor
+                bannerDismissPolicy
+                bannerDismissHours
+                contrastRatio
+                canEdit
+            }
+        }
+    }
+}

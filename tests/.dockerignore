@@ -1,0 +1,9 @@
+# Read only by a "docker build" that uses tests/Dockerfile. ci.build.sh builds the test image with the Dockerfile of
+# @jahia/cypress (env.Dockerfile), and BuildKit then reads env.Dockerfile.dockerignore next to it, not this file.
+# .env is not excluded on purpose: inside the Cypress container, the env.run.sh and env.provision.sh of
+# @jahia/cypress source .env (else .env.example, which would replace the values docker-compose passes with
+# placeholders) for MODULE_ID and the other values that docker-compose.yml does not pass. artifacts/ holds the
+# module jar that env.provision.sh installs from inside the container.
+results/
+run-artifacts/
+node_modules

@@ -1,0 +1,20 @@
+query getSecurityUpdatesSettings {
+    securityUpdates {
+        settings {
+            enabled
+            refreshIntervalHours
+            useForgeSettings
+            defaultStoreUrl
+            extraFeedUrls
+            bannerEnabled
+            bannerMinimumSeverity
+            bannerIncludeOwnerReports
+            bannerBackgroundColor
+            bannerTextColor
+            bannerDismissPolicy
+            bannerDismissHours
+            contrastRatio
+            canEdit
+        }
+    }
+}

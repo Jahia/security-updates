@@ -1,0 +1,720 @@
+package org.jahia.community.securityupdates.service;
+
+import org.jahia.community.securityupdates.feed.StoreClient;
+import org.jahia.community.securityupdates.feed.StoreTarget;
+import org.jahia.community.securityupdates.model.Finding;
+import org.jahia.community.securityupdates.model.ReportStatus;
+import org.jahia.community.securityupdates.model.ReportView;
+import org.jahia.community.securityupdates.model.SecurityReport;
+import org.jahia.community.securityupdates.model.StoreError;
+import org.jahia.community.securityupdates.model.StoreErrorDetail;
+import org.jahia.community.securityupdates.model.StoreErrorKind;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+
+import java.time.Duration;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.jahia.community.securityupdates.service.ServiceFixture.DEFAULT_STORE;
+import static org.jahia.community.securityupdates.service.ServiceFixture.EMPTY_FEED;
+import static org.jahia.community.securityupdates.service.ServiceFixture.FEED_WITH_FINDING;
+import static org.jahia.community.securityupdates.service.ServiceFixture.PRIVATE_STORE;
+import static org.jahia.community.securityupdates.service.ServiceFixture.onDemandInterval;
+import static org.jahia.community.securityupdates.service.ServiceFixture.settings;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+/**
+ * Schedule, on-demand checks, staleness, concurrency and shutdown of {@link SecurityUpdateService}.
+ */
+@DisplayName("SecurityUpdateService scheduling")
+class SecurityUpdateServiceSchedulingTest {
+
+    private ServiceFixture fixture;
+    private SecurityUpdateService service;
+
+    @BeforeEach
+    void setUp() {
+        fixture = new ServiceFixture();
+        service = fixture.service();
+    }
+
+    private Runnable scheduledTask() {
+        ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
+        verify(fixture.executor).scheduleWithFixedDelay(task.capture(), anyLong(), anyLong(), any(TimeUnit.class));
+        return task.getValue();
+    }
+
+    @Nested
+    @DisplayName("schedule")
+    class Schedule {
+
+        @Test
+        @DisplayName("schedules the first check shortly after activation, then at the configured interval")
+        void schedules() {
+            service.apply(new Settings(true, 6, true, "", DEFAULT_STORE));
+
+            verify(fixture.executor).scheduleWithFixedDelay(any(Runnable.class), eq(SecurityUpdateService.INITIAL_DELAY_SECONDS),
+                    eq(6L * 3600), eq(TimeUnit.SECONDS));
+            assertThat(service.getReportView().getNextCheckAt())
+                    .isEqualTo(fixture.clock.instant().plusSeconds(SecurityUpdateService.INITIAL_DELAY_SECONDS));
+
+            fixture.storeServes(DEFAULT_STORE, EMPTY_FEED);
+            fixture.clock.advance(Duration.ofMinutes(1));
+            scheduledTask().run();
+
+            assertThat(service.getReport().getStatus()).isEqualTo(ReportStatus.OK);
+            assertThat(service.getReportView().getNextCheckAt()).isEqualTo(fixture.clock.instant().plus(Duration.ofHours(6)));
+        }
+
+        @Test
+        @DisplayName("activate and modified read the OSGi configuration")
+        void activateAndModified() {
+            service.activate(java.util.Map.of("enabled", "true", "refreshIntervalHours", "12", "component.name",
+                    SecurityUpdateService.PID));
+            verify(fixture.executor).scheduleWithFixedDelay(any(Runnable.class), anyLong(), eq(12L * 3600), any(TimeUnit.class));
+
+            service.modified(java.util.Map.of("enabled", Boolean.FALSE));
+
+            assertThat(service.getReport().getStatus()).isEqualTo(ReportStatus.DISABLED);
+            verify(fixture.future).cancel(false);
+            verify(fixture.executor).shutdownNow();
+            assertThat(service.getReportView().getNextCheckAt()).isNull();
+        }
+
+        @Test
+        @DisplayName("a value that cannot be read takes its default with one WARN, and the component activates")
+        void unreadableValuesTakeTheirDefault() {
+            List<String> warnings = new java.util.ArrayList<>();
+            service.setConfigWarnings(warnings::add);
+
+            service.activate(java.util.Map.of("enabled", "ture", "refreshIntervalHours", "abc"));
+
+            assertThat(service.getSettings().isEnabled()).isTrue();
+            assertThat(service.getSettings().getRefreshIntervalHours()).isEqualTo(Settings.DEFAULT_REFRESH_INTERVAL_HOURS);
+            assertThat(warnings).hasSize(2).anyMatch(w -> w.startsWith("Invalid enabled 'ture'"))
+                    .anyMatch(w -> w.startsWith("Invalid refreshIntervalHours 'abc'"));
+            verify(fixture.executor).scheduleWithFixedDelay(any(Runnable.class), anyLong(), eq(24L * 3600), any(TimeUnit.class));
+
+            warnings.clear();
+            service.modified(java.util.Map.of("enabled", "ture"));
+            assertThat(warnings).hasSize(1);
+            assertThat(service.getSettings().isEnabled()).isTrue();
+        }
+
+        @Test
+        @DisplayName("a change of the banner settings only does not restart the schedule; a change of the stores does")
+        void reschedulesOnlyForCheckSettings() {
+            service.apply(Settings.defaults());
+
+            service.apply(new Settings(true, 24, true, "", Settings.DEFAULT_STORE_URL, new BannerSettings(true,
+                    org.jahia.community.securityupdates.model.Severity.LOW, false)));
+            service.apply(onDemandInterval(0));
+            verify(fixture.executor, times(1)).scheduleWithFixedDelay(any(Runnable.class), anyLong(), anyLong(), any(TimeUnit.class));
+            verify(fixture.future, never()).cancel(false);
+
+            service.apply(settings(true, true, "", PRIVATE_STORE));
+            verify(fixture.future).cancel(false);
+            verify(fixture.executor, times(2)).scheduleWithFixedDelay(any(Runnable.class), anyLong(), anyLong(), any(TimeUnit.class));
+        }
+
+        @Test
+        @DisplayName("a disabled module reports DISABLED, fetches nothing and runs no thread")
+        void disabled() {
+            service.apply(settings(false, true, "", DEFAULT_STORE));
+
+            ReportView view = service.refresh();
+
+            assertThat(view.getReport().getStatus()).isEqualTo(ReportStatus.DISABLED);
+            assertThat(view.isInProgress()).isFalse();
+            assertThat(view.getNextCheckAt()).isNull();
+            assertThat(fixture.fetcher.requested).isEmpty();
+            assertThat(fixture.check(service).getStatus()).isEqualTo(ReportStatus.DISABLED);
+            verify(fixture.executor, never()).scheduleWithFixedDelay(any(Runnable.class), anyLong(), anyLong(), any(TimeUnit.class));
+        }
+
+        @Test
+        @DisplayName("re-enabling after a disabled period starts a new thread and schedule")
+        void reEnable() {
+            service.apply(Settings.defaults());
+            service.apply(settings(false, true, "", DEFAULT_STORE));
+            service.apply(Settings.defaults());
+
+            verify(fixture.executor, times(2)).scheduleWithFixedDelay(any(Runnable.class), anyLong(), anyLong(), any(TimeUnit.class));
+            assertThat(service.getReport().getStatus()).isEqualTo(ReportStatus.NOT_CHECKED);
+        }
+
+        @Test
+        @DisplayName("re-enabling keeps the time of the last successful check, kept through the disabled period")
+        void reEnableKeepsLastSuccess() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, EMPTY_FEED);
+            java.time.Instant success = fixture.check(service).getLastSuccess();
+            assertThat(success).isNotNull();
+
+            service.apply(settings(false, true, "", DEFAULT_STORE));
+            assertThat(service.getReport().getLastSuccess()).isEqualTo(success);
+            service.apply(Settings.defaults());
+
+            assertThat(service.getReport().getStatus()).isEqualTo(ReportStatus.NOT_CHECKED);
+            assertThat(service.getReport().getLastSuccess()).isEqualTo(success);
+        }
+
+        @Test
+        @DisplayName("the scheduled task never lets anything escape, an Error included, and keeps the previous findings")
+        void scheduledTaskSwallowsFailures() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
+            scheduledTask().run();
+            when(fixture.installed.installedModules()).thenThrow(new LinkageError("class missing"));
+            fixture.clock.advance(Duration.ofHours(24));
+
+            scheduledTask().run();
+
+            SecurityReport report = service.getReport();
+            assertThat(report.getStatus()).isEqualTo(ReportStatus.PARTIAL);
+            assertThat(report.getFindings()).hasSize(1);
+            assertThat(report.getErrors()).extracting(StoreError::getDetail).containsExactly(StoreErrorDetail.CHECK_FAILED);
+            assertThat(service.getReportView().isInProgress()).isFalse();
+        }
+
+        @Test
+        @DisplayName("a stack overflow during the first check gives UNAVAILABLE and does not stop the schedule")
+        void stackOverflow() {
+            service.apply(Settings.defaults());
+            fixture.fetcher.failWith(new StackOverflowError());
+
+            scheduledTask().run();
+
+            assertThat(service.getReport().getStatus()).isEqualTo(ReportStatus.UNAVAILABLE);
+        }
+
+        @Test
+        @DisplayName("the default executor runs on a daemon thread")
+        void defaultExecutorIsDaemon() throws Exception {
+            ScheduledExecutorService real = SecurityUpdateService.newExecutor();
+            try {
+                Boolean daemon = real.submit(() -> Thread.currentThread().isDaemon()).get(5, TimeUnit.SECONDS);
+                assertThat(daemon).isTrue();
+            } finally {
+                real.shutdownNow();
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("on-demand checks")
+    class OnDemand {
+
+        @Test
+        @DisplayName("refresh starts the check in the background and returns at once with inProgress")
+        void refreshIsNonBlocking() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
+
+            ReportView started = service.refresh();
+
+            assertThat(started.isInProgress()).isTrue();
+            assertThat(started.getReport().getStatus()).isEqualTo(ReportStatus.NOT_CHECKED);
+            assertThat(fixture.fetcher.requested).isEmpty();
+
+            fixture.runSubmitted();
+
+            ReportView done = service.getReportView();
+            assertThat(done.isInProgress()).isFalse();
+            assertThat(done.getReport().getStatus()).isEqualTo(ReportStatus.OK);
+        }
+
+        @Test
+        @DisplayName("an on-demand check within the minimum interval of the last start is not started")
+        void onDemandRateLimit() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, EMPTY_FEED);
+
+            service.refresh();
+            fixture.runSubmitted();
+            fixture.clock.advance(Duration.ofSeconds(5));
+            ReportView second = service.refresh();
+            assertThat(second.isInProgress()).isFalse();
+            assertThat(fixture.submitted).isEmpty();
+            assertThat(second.getReport().getCheckedAt()).isEqualTo(fixture.clock.instant().minusSeconds(5));
+
+            fixture.clock.advance(Duration.ofSeconds(25));
+            assertThat(service.refresh().isInProgress()).isTrue();
+            fixture.runSubmitted();
+            assertThat(fixture.fetcher.requested).hasSize(4);
+        }
+
+        @Test
+        @DisplayName("after a slow check, the next on-demand check waits the minimum interval from its END")
+        void rateLimitCountsFromTheEndOfASlowCheck() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, EMPTY_FEED);
+            // the check takes two minutes, more than the 30 s window
+            fixture.fetcher.onGet(() -> fixture.clock.advance(Duration.ofMinutes(2)));
+            service.refresh();
+            fixture.runSubmitted();
+
+            fixture.clock.advance(Duration.ofSeconds(10));
+            assertThat(service.refresh().isInProgress()).isFalse();
+            assertThat(fixture.submitted).isEmpty();
+
+            fixture.clock.advance(Duration.ofSeconds(20));
+            assertThat(service.refresh().isInProgress()).isTrue();
+        }
+
+        @Test
+        @DisplayName("onDemandMinIntervalSeconds=0 removes the rate limit")
+        void noRateLimit() {
+            service.apply(onDemandInterval(0));
+            fixture.storeServes(DEFAULT_STORE, EMPTY_FEED);
+
+            service.refresh();
+            fixture.runSubmitted();
+            assertThat(service.refresh().isInProgress()).isTrue();
+        }
+
+        @Test
+        @DisplayName("a refresh while a check runs starts nothing and says a check is in progress")
+        void refreshWhileRunningIsCoalesced() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, EMPTY_FEED);
+            ReportView[] during = new ReportView[1];
+            fixture.fetcher.onGet(() -> during[0] = service.refresh());
+
+            fixture.check(service);
+
+            assertThat(during[0].isInProgress()).isTrue();
+            assertThat(fixture.submitted).isEmpty();
+            assertThat(fixture.fetcher.requested).hasSize(2);
+        }
+
+        @Test
+        @DisplayName("a scheduled check due while an on-demand check runs is skipped: one check runs when it ends, "
+                + "and the next scheduled check is an interval away")
+        void scheduledSkippedWhileRunning() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, EMPTY_FEED);
+            Runnable scheduled = scheduledTask();
+            fixture.fetcher.onGet(() -> {
+                fixture.clock.advance(Duration.ofMinutes(1));
+                scheduled.run();
+            });
+            service.refresh();
+
+            fixture.runSubmitted();
+
+            assertThat(fixture.fetcher.requested).hasSize(2);
+            assertThat(service.getReportView().getNextCheckAt()).isEqualTo(fixture.clock.instant().plus(Duration.ofHours(24)));
+            assertThat(service.getReportView().isInProgress()).isTrue();
+            assertThat(fixture.submitted).hasSize(1);
+
+            fixture.runSubmitted();
+
+            assertThat(fixture.fetcher.requested).hasSize(4);
+            assertThat(service.getReportView().isInProgress()).isFalse();
+            assertThat(fixture.submitted).isEmpty();
+        }
+
+        @Test
+        @DisplayName("a check whose stores change while it runs publishes nothing; one check of the new stores runs when it ends")
+        void storesChangedDuringCheck() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
+            fixture.storeServes(PRIVATE_STORE, EMPTY_FEED);
+            fixture.fetcher.onGet(() -> service.apply(settings(true, true, "", PRIVATE_STORE)));
+            service.refresh();
+
+            fixture.runSubmitted();
+
+            assertThat(service.getReport().getStatus()).isEqualTo(ReportStatus.NOT_CHECKED);
+            assertThat(service.getReport().getFindings()).isEmpty();
+            assertThat(service.getReportView().getNextCheckAt())
+                    .isEqualTo(fixture.clock.instant().plusSeconds(SecurityUpdateService.INITIAL_DELAY_SECONDS));
+            assertThat(fixture.submitted).hasSize(1);
+
+            fixture.runSubmitted();
+
+            assertThat(service.getReport().getStatus()).isEqualTo(ReportStatus.OK);
+            assertThat(fixture.fetcher.requested).last().asString().startsWith(PRIVATE_STORE);
+        }
+
+        @Test
+        @DisplayName("a scheduled check whose interval changes while it runs keeps the new schedule's next check time")
+        void intervalChangedDuringScheduledCheck() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, EMPTY_FEED);
+            fixture.fetcher.onGet(() -> service.apply(new Settings(true, 6, true, "", DEFAULT_STORE)));
+            Runnable first = scheduledTask();
+
+            first.run();
+
+            assertThat(service.getReport().getStatus()).isEqualTo(ReportStatus.NOT_CHECKED);
+            assertThat(service.getReportView().getNextCheckAt())
+                    .isEqualTo(fixture.clock.instant().plusSeconds(SecurityUpdateService.INITIAL_DELAY_SECONDS));
+        }
+
+        @Test
+        @DisplayName("a change of the banner settings only while a check runs does not discard the check")
+        void bannerChangedDuringCheck() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
+            fixture.fetcher.onGet(() -> service.apply(new Settings(true, 24, true, "", DEFAULT_STORE, new BannerSettings(true,
+                    org.jahia.community.securityupdates.model.Severity.LOW, false))));
+
+            assertThat(fixture.check(service).getStatus()).isEqualTo(ReportStatus.OK);
+            assertThat(fixture.submitted).isEmpty();
+        }
+
+        @Test
+        @DisplayName("a check queued, then dropped when the check is disabled, does not stay running: re-enabling can start one")
+        void droppedQueuedCheck() {
+            service.apply(onDemandInterval(0));
+            fixture.storeServes(DEFAULT_STORE, EMPTY_FEED);
+            when(fixture.executor.shutdownNow()).thenAnswer(invocation -> {
+                List<Runnable> dropped = new java.util.ArrayList<>(fixture.submitted);
+                fixture.submitted.clear();
+                return dropped;
+            });
+            assertThat(service.refresh().isInProgress()).isTrue();
+
+            service.apply(settings(false, true, "", DEFAULT_STORE));
+            service.apply(onDemandInterval(0));
+
+            assertThat(service.getReportView().isInProgress()).isFalse();
+            assertThat(service.refresh().isInProgress()).isTrue();
+            fixture.runSubmitted();
+            assertThat(service.getReport().getStatus()).isEqualTo(ReportStatus.OK);
+        }
+
+        @Test
+        @DisplayName("the cancelled periodic task dropped at shutdown is not taken for a queued check")
+        void droppedPeriodicTaskOnly() {
+            service.apply(onDemandInterval(0));
+            fixture.storeServes(DEFAULT_STORE, EMPTY_FEED);
+            ScheduledFuture<?> cancelled = mock(ScheduledFuture.class, org.mockito.Mockito.withSettings()
+                    .extraInterfaces(Runnable.class));
+            when(cancelled.isCancelled()).thenReturn(true);
+            when(fixture.executor.shutdownNow()).thenReturn(List.of((Runnable) cancelled));
+            service.refresh();
+            fixture.fetcher.onGet(() -> {
+                service.apply(settings(false, true, "", DEFAULT_STORE));
+                // the check still runs: a re-enable must not start a second one
+                service.apply(onDemandInterval(0));
+                assertThat(service.refresh().isInProgress()).isTrue();
+                assertThat(fixture.submitted).isEmpty();
+            });
+
+            fixture.runSubmitted();
+
+            // the schedule restarted while the check ran: one more check runs after it
+            assertThat(fixture.submitted).hasSize(1);
+            fixture.runSubmitted();
+            assertThat(service.getReportView().isInProgress()).isFalse();
+        }
+
+        @Test
+        @DisplayName("a rejected start leaves no check marked as running")
+        void rejectedStart() {
+            service.apply(Settings.defaults());
+            org.mockito.Mockito.doThrow(new java.util.concurrent.RejectedExecutionException("shut down"))
+                    .when(fixture.executor).execute(any(Runnable.class));
+
+            ReportView view = service.refresh();
+
+            assertThat(view.isInProgress()).isFalse();
+        }
+    }
+
+    @Nested
+    @DisplayName("staleness")
+    class Staleness {
+
+        @Test
+        @DisplayName("a report older than twice the interval is stale: PARTIAL with a STALE error, its findings still in the "
+                + "banner; younger is not")
+        void staleReport() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
+            fixture.check(service);
+
+            fixture.clock.advance(Duration.ofHours(48));
+            assertThat(service.getReportView().isStale()).isFalse();
+            assertThat(service.getReport().getStatus()).isEqualTo(ReportStatus.OK);
+
+            fixture.clock.advance(Duration.ofMinutes(1));
+            ReportView view = service.getReportView();
+            assertThat(view.isStale()).isTrue();
+            assertThat(view.getReport().getStatus()).isEqualTo(ReportStatus.PARTIAL);
+            assertThat(view.getReport().getErrors()).extracting(StoreError::getKind).containsExactly(StoreErrorKind.STALE);
+            assertThat(view.getReport().getFindings()).hasSize(1);
+            org.jahia.community.securityupdates.model.BannerDecision banner = service.getBanner();
+            assertThat(banner.isVisible()).isTrue();
+            assertThat(banner.getComponents()).containsExactly("graphql-dxm-provider");
+        }
+
+        @Test
+        @DisplayName("without any check since the schedule started twice the interval ago, the report is stale")
+        void neverChecked() {
+            service.apply(Settings.defaults());
+            fixture.clock.advance(Duration.ofHours(49));
+
+            ReportView view = service.getReportView();
+
+            assertThat(view.isStale()).isTrue();
+            assertThat(view.getReport().getStatus()).isEqualTo(ReportStatus.NOT_CHECKED);
+        }
+
+        @Test
+        @DisplayName("an UNAVAILABLE report stays UNAVAILABLE when stale; a disabled module is never stale")
+        void staleKeepsWorseStatus() {
+            service.apply(Settings.defaults());
+            fixture.storeAnswers(DEFAULT_STORE, 404);
+            fixture.check(service);
+            fixture.clock.advance(Duration.ofDays(3));
+
+            assertThat(service.getReport().getStatus()).isEqualTo(ReportStatus.UNAVAILABLE);
+
+            service.apply(settings(false, true, "", DEFAULT_STORE));
+            assertThat(service.getReportView().isStale()).isFalse();
+        }
+    }
+
+    @Nested
+    @DisplayName("concurrency and shutdown")
+    class ConcurrencyAndShutdown {
+
+        @Test
+        @DisplayName("disabling the check while a check runs leaves the report DISABLED")
+        void disabledDuringCheck() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
+            fixture.fetcher.onGet(() -> service.apply(settings(false, true, "", DEFAULT_STORE)));
+
+            SecurityReport report = fixture.check(service);
+
+            assertThat(report.getStatus()).isEqualTo(ReportStatus.DISABLED);
+            assertThat(service.getReport().getStatus()).isEqualTo(ReportStatus.DISABLED);
+            assertThat(fixture.fetcher.cancelled).hasPositiveValue();
+        }
+
+        @Test
+        @DisplayName("deactivation during a check aborts the requests, stops before the next store and publishes nothing")
+        void deactivateDuringCheck() {
+            fixture.forges.stores = List.of(StoreTarget.store(DEFAULT_STORE, null, null), StoreTarget.store(PRIVATE_STORE, null, null));
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
+            fixture.storeServes(PRIVATE_STORE, EMPTY_FEED);
+            fixture.fetcher.onGet(service::deactivate);
+
+            fixture.check(service);
+
+            assertThat(fixture.fetcher.requested).noneMatch(url -> url.startsWith(PRIVATE_STORE));
+            assertThat(fixture.fetcher.cancelled).hasValue(1);
+            assertThat(service.getReport().getStatus()).isEqualTo(ReportStatus.NOT_CHECKED);
+            verify(fixture.executor).shutdownNow();
+        }
+
+        @Test
+        @DisplayName("deactivation waits for the thread, warns when it does not stop, and keeps an interrupt")
+        void shutdown() throws InterruptedException {
+            service.apply(Settings.defaults());
+            when(fixture.executor.awaitTermination(anyLong(), any(TimeUnit.class))).thenReturn(false);
+            service.deactivate();
+            verify(fixture.executor).awaitTermination(5, TimeUnit.SECONDS);
+
+            ServiceFixture interrupted = new ServiceFixture();
+            SecurityUpdateService other = interrupted.service();
+            other.apply(Settings.defaults());
+            when(interrupted.executor.awaitTermination(anyLong(), any(TimeUnit.class))).thenThrow(new InterruptedException());
+            try {
+                other.deactivate();
+                assertThat(Thread.currentThread().isInterrupted()).isTrue();
+            } finally {
+                assertThat(Thread.interrupted()).isTrue();
+            }
+        }
+
+        @Test
+        @DisplayName("after deactivation, nothing starts")
+        void nothingAfterDeactivation() {
+            service.apply(Settings.defaults());
+            service.deactivate();
+
+            assertThat(service.refresh().isInProgress()).isFalse();
+            assertThat(service.getReportView().getNextCheckAt()).isNull();
+        }
+
+        @Test
+        @DisplayName("concurrent refreshes and setting changes on a real thread end in a consistent state")
+        void concurrentRefreshAndApply() throws Exception {
+            ServiceFixture real = new ServiceFixture();
+            List<ScheduledExecutorService> executors = new java.util.concurrent.CopyOnWriteArrayList<>();
+            SecurityUpdateService concurrent = new SecurityUpdateService(real.clock, () -> ServiceFixture.JAHIA, () -> {
+                ScheduledExecutorService created = SecurityUpdateService.newExecutor();
+                executors.add(created);
+                return created;
+            }, real.warned::add);
+            concurrent.setHttpFetcher(real.fetcher);
+            concurrent.setForgeSettingsReader(real.forges);
+            concurrent.setInstalledComponentsProvider(real.installed);
+            real.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
+            concurrent.apply(onDemandInterval(0));
+            ExecutorService callers = Executors.newFixedThreadPool(4);
+            CountDownLatch go = new CountDownLatch(1);
+            try {
+                List<Future<?>> calls = new java.util.ArrayList<>();
+                for (int i = 0; i < 4; i++) {
+                    int caller = i;
+                    calls.add(callers.submit(() -> {
+                        go.await();
+                        for (int j = 0; j < 50; j++) {
+                            if (caller == 0) {
+                                concurrent.apply(j % 2 == 0 ? onDemandInterval(0) : settings(false, true, "", DEFAULT_STORE));
+                            } else {
+                                concurrent.refresh();
+                                concurrent.getBanner();
+                            }
+                        }
+                        return null;
+                    }));
+                }
+                go.countDown();
+                for (Future<?> call : calls) {
+                    call.get(30, TimeUnit.SECONDS);
+                }
+                concurrent.apply(settings(false, true, "", DEFAULT_STORE));
+                assertThat(concurrent.getReport().getStatus()).isEqualTo(ReportStatus.DISABLED);
+                assertThat(concurrent.getReportView().isInProgress()).isFalse();
+            } finally {
+                callers.shutdownNow();
+                concurrent.deactivate();
+                executors.forEach(ScheduledExecutorService::shutdownNow);
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("reruns and cancellation")
+    class RerunsAndCancellation {
+
+        @Test
+        @DisplayName("a scheduled check due while an on-demand check is queued asks for no rerun: the queued check covers it")
+        void tickWhileQueuedAsksNoRerun() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, EMPTY_FEED);
+            service.refresh();
+            fixture.clock.advance(Duration.ofMinutes(1));
+
+            scheduledTask().run();
+            fixture.runSubmitted();
+
+            assertThat(fixture.fetcher.requested).hasSize(2);
+            assertThat(fixture.submitted).isEmpty();
+            assertThat(service.getReportView().isInProgress()).isFalse();
+            assertThat(service.getReportView().getNextCheckAt()).isEqualTo(fixture.clock.instant().plus(Duration.ofHours(24)));
+        }
+
+        @Test
+        @DisplayName("a scheduled check skipped while a check started after it was due asks for no rerun")
+        void tickDuringALaterCheckAsksNoRerun() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, EMPTY_FEED);
+            Runnable scheduled = scheduledTask();
+            // the scheduled check was due 60 s after activation; the on-demand check starts 2 minutes after it
+            fixture.clock.advance(Duration.ofMinutes(2));
+            fixture.fetcher.onGet(scheduled);
+            service.refresh();
+
+            fixture.runSubmitted();
+
+            assertThat(fixture.fetcher.requested).hasSize(2);
+            assertThat(fixture.submitted).isEmpty();
+            assertThat(service.getReport().getStatus()).isEqualTo(ReportStatus.OK);
+        }
+
+        @Test
+        @DisplayName("a schedule change while a check is only queued needs no rerun: the check reads the new settings")
+        void scheduleChangeBeforeTheCheckStartsNeedsNoRerun() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(PRIVATE_STORE, EMPTY_FEED);
+            service.refresh();
+            service.apply(settings(true, true, "", PRIVATE_STORE));
+
+            fixture.runSubmitted();
+
+            assertThat(service.getReport().getStatus()).isEqualTo(ReportStatus.OK);
+            assertThat(fixture.fetcher.requested).allMatch(url -> url.startsWith(PRIVATE_STORE)).hasSize(2);
+            assertThat(fixture.submitted).isEmpty();
+        }
+
+        @Test
+        @DisplayName("a check cancelled by disabling publishes nothing even when re-enabled before it ends; a new check runs")
+        void disableThenEnableDuringACheck() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
+            fixture.fetcher.onGet(() -> {
+                service.apply(settings(false, true, "", DEFAULT_STORE));
+                service.apply(Settings.defaults());
+                // what the aborted requests of the cancelled check give
+                fixture.fetcher.answer(DEFAULT_STORE + StoreClient.SECURITY_FEED_PATH, new java.io.IOException("aborted"));
+            });
+
+            SecurityReport during = fixture.check(service);
+
+            assertThat(fixture.fetcher.cancelled).hasPositiveValue();
+            assertThat(during.getStatus()).isEqualTo(ReportStatus.NOT_CHECKED);
+            assertThat(during.getErrors()).isEmpty();
+            assertThat(service.getReportView().getNextCheckAt())
+                    .isEqualTo(fixture.clock.instant().plusSeconds(SecurityUpdateService.INITIAL_DELAY_SECONDS));
+            assertThat(fixture.submitted).hasSize(1);
+
+            fixture.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
+            fixture.runSubmitted();
+
+            assertThat(service.getReport().getStatus()).isEqualTo(ReportStatus.OK);
+            assertThat(service.getReport().getFindings()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("the banner reads the report and the settings of one moment")
+        void bannerSnapshot() {
+            service.apply(Settings.defaults());
+            fixture.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
+            fixture.check(service);
+
+            assertThat(service.getBanner().isVisible()).isTrue();
+            service.apply(new Settings(true, 24, true, "", DEFAULT_STORE, new BannerSettings(false, org.jahia.community.securityupdates.model.Severity.LOW, true)));
+            assertThat(service.getBanner().isVisible()).isFalse();
+        }
+    }
+
+    @Test
+    @DisplayName("a finding found by an on-demand check is logged once")
+    void onDemandLogs() {
+        service.apply(Settings.defaults());
+        fixture.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
+        service.refresh();
+        fixture.runSubmitted();
+
+        assertThat(fixture.warned).extracting(Finding::getComponent).containsExactly("graphql-dxm-provider");
+        assertThat(fixture.fetcher.requested).contains(DEFAULT_STORE + StoreClient.SECURITY_FEED_PATH);
+    }
+}
