@@ -200,7 +200,9 @@ describe('Security updates: banner', () => {
         // The focus went into the banner from a known element: Hide (Enter) gives it back to that element.
         focusOriginBeforeBanner();
         tabToDismiss();
-        cy.press(Cypress.Keyboard.Keys.ENTER);
+        // Real Tab presses reach the button; cy.press only sends the raw key event, which Electron does not turn into
+        // a button activation, so the activation key is typed into the focused button (Cypress simulates the click).
+        cy.focused().type('{enter}');
         cy.get(BANNER).should('not.exist');
         cy.focused().should('have.id', FOCUS_ORIGIN_ID);
 
@@ -215,7 +217,7 @@ describe('Security updates: banner', () => {
         cy.focused().should('have.id', FOCUS_ORIGIN_ID);
         tabToDismiss();
         cy.get(`#${FOCUS_ORIGIN_ID}`).then($origin => $origin.remove());
-        cy.press(Cypress.Keyboard.Keys.SPACE);
+        cy.focused().type(' ');
         cy.get(BANNER).should('not.exist');
         cy.document().should(doc => {
             expect(doc.getElementById(FOCUS_ORIGIN_ID), 'the focus origin is gone').to.equal(null);
