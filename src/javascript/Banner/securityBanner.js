@@ -43,7 +43,8 @@ const BANNER_QUERY = 'query SecurityUpdatesBanner { jcr { nodeByPath(path: "/") 
 // Sizes are in rem (they follow the user's text size); the link and the button are 44 by 44 pixel targets.
 // On a small viewport (a phone, or a 400% zoom: 40rem wide or high at most), the box becomes a compact strip across
 // the edge, at most 40% of the height (scrolling inside beyond that), so that it never covers most of the screen, even
-// when it cannot be hidden. It stays fixed rather than in the flow: the Jahia interface fills the viewport and scrolls
+// when it cannot be hidden; its padding keeps the 5px focus ring of the link and the button inside the scrolling box.
+// It stays fixed rather than in the flow: the Jahia interface fills the viewport and scrolls
 // inside its own containers, so an element after it in the body would be out of view.
 const CSS = `
 #${BANNER_ID} { position: fixed; right: 1rem; bottom: 1rem; z-index: 9999;
@@ -67,7 +68,7 @@ const CSS = `
   padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @media (max-width: 40rem), (max-height: 40rem) {
   #${BANNER_ID} { left: 0; right: 0; bottom: 0; max-width: none; max-height: 40vh; overflow-y: auto; border-radius: 0;
-    gap: 0.25rem 0.75rem; padding: 0.25rem 0.75rem; box-shadow: 0 -2px 8px rgba(0, 0, 0, .35); }
+    gap: 0.25rem 0.75rem; padding: 0.5rem 0.75rem; box-shadow: 0 -2px 8px rgba(0, 0, 0, .35); }
   #${BANNER_ID}[data-position="top"] { top: 0; bottom: auto; }
 }
 `;
