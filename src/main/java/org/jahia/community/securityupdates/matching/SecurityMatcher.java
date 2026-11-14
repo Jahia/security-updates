@@ -94,8 +94,8 @@ public final class SecurityMatcher {
         List<StoreError> problems = new ArrayList<>();
         List<InstalledComponent> components = usableComponents(modules, problems);
 
-        List<Advisory> advisories = distinctAdvisories(feeds);
-        List<FlaggedVersion> flags = distinctFlags(feeds);
+        List<FromFeed<Advisory>> advisories = distinctAdvisories(feeds);
+        List<FromFeed<FlaggedVersion>> flags = distinctFlags(feeds);
 
         List<Finding> findings = new ArrayList<>();
         for (InstalledComponent component : components) {
@@ -219,6 +219,17 @@ public final class SecurityMatcher {
         }
     }
 
+    /** An advisory or a flagged version, with the host of the store whose feed published it. */
+    private static final class FromFeed<T> {
+        private final T entry;
+        private final String storeHost;
+
+        FromFeed(T entry, String storeHost) {
+            this.entry = entry;
+            this.storeHost = storeHost;
+        }
+    }
+
     private List<InstalledComponent> usableComponents(List<InstalledComponent> modules, List<StoreError> problems) {
         List<InstalledComponent> components = new ArrayList<>();
         if (jahiaVersionUsable) {
@@ -241,30 +252,33 @@ public final class SecurityMatcher {
         return components;
     }
 
-    private static List<Advisory> distinctAdvisories(List<SecurityFeed> feeds) {
-        Map<String, Advisory> byId = new LinkedHashMap<>();
+    private static List<FromFeed<Advisory>> distinctAdvisories(List<SecurityFeed> feeds) {
+        Map<String, FromFeed<Advisory>> byId = new LinkedHashMap<>();
         for (SecurityFeed feed : feeds) {
             for (Advisory advisory : feed.getAdvisories()) {
-                byId.putIfAbsent(advisory.getId(), advisory);
+                byId.putIfAbsent(advisory.getId(), new FromFeed<>(advisory, feed.getStoreHost()));
             }
         }
         return new ArrayList<>(byId.values());
     }
 
-    private static List<FlaggedVersion> distinctFlags(List<SecurityFeed> feeds) {
-        Map<String, FlaggedVersion> byKey = new LinkedHashMap<>();
+    private static List<FromFeed<FlaggedVersion>> distinctFlags(List<SecurityFeed> feeds) {
+        Map<String, FromFeed<FlaggedVersion>> byKey = new LinkedHashMap<>();
         for (SecurityFeed feed : feeds) {
             for (FlaggedVersion flag : feed.getFlaggedVersions()) {
-                byKey.putIfAbsent(flag.getGroupId() + ':' + flag.getName() + '@' + flag.getVersion(), flag);
+                byKey.putIfAbsent(flag.getGroupId() + ':' + flag.getName() + '@' + flag.getVersion(),
+                        new FromFeed<>(flag, feed.getStoreHost()));
             }
         }
         return new ArrayList<>(byKey.values());
     }
 
-    private static List<Rule> advisoryRules(InstalledComponent component, List<Advisory> advisories, List<StoreError> problems) {
+    private static List<Rule> advisoryRules(InstalledComponent component, List<FromFeed<Advisory>> advisories,
+                                            List<StoreError> problems) {
         List<Rule> rules = new ArrayList<>();
         int versions = 0;
-        for (Advisory advisory : advisories) {
+        for (FromFeed<Advisory> published : advisories) {
+            Advisory advisory = published.entry;
             for (AdvisoryFix fix : advisory.getFixes()) {
                 if (concerns(fix, component)) {
                     List<String> fixed = fix.getFixedVersions();
@@ -278,7 +292,7 @@ public final class SecurityMatcher {
                     }
                     boolean core = component.isCore();
                     AdvisoryRef ref = new AdvisoryRef(advisory.getId(), advisory.getTitle(), advisory.getUrl(),
-                            advisory.getCves(), advisory.getSeverity());
+                            advisory.getCves(), advisory.getSeverity(), published.storeHost);
                     rules.add(new Rule(ref, version -> recommendForAdvisory(version, fixed, introduced, core)));
                 }
             }
@@ -295,20 +309,21 @@ public final class SecurityMatcher {
         return expected == null || actual == null || expected.equals(actual);
     }
 
-    private static List<Rule> flagRules(InstalledComponent component, List<FlaggedVersion> flags) {
+    private static List<Rule> flagRules(InstalledComponent component, List<FromFeed<FlaggedVersion>> flags) {
         List<Rule> rules = new ArrayList<>();
-        for (FlaggedVersion flag : flags) {
+        for (FromFeed<FlaggedVersion> published : flags) {
+            FlaggedVersion flag = published.entry;
             if (flag.getName().equals(component.getName())
                     && sameGroupWhenKnown(flag.getGroupId(), component.getGroupId())
                     && Versions.isWellFormed(flag.getVersion())) {
                 List<String> flagged = Collections.singletonList(flag.getVersion());
-                rules.add(new Rule(ownerRef(flag), version -> recommendForFlags(version, flagged)));
+                rules.add(new Rule(ownerRef(flag, published.storeHost), version -> recommendForFlags(version, flagged)));
             }
         }
         return rules;
     }
 
-    private static AdvisoryRef ownerRef(FlaggedVersion flag) {
+    private static AdvisoryRef ownerRef(FlaggedVersion flag, String storeHost) {
         List<String> references = flag.getReferences();
         String id = references.isEmpty()
                 ? "owner:" + flag.getName() + '@' + flag.getVersion()
@@ -322,7 +337,7 @@ public final class SecurityMatcher {
                 url = reference;
             }
         }
-        return new AdvisoryRef(id, flag.getNote(), url, cves, flag.getSeverity());
+        return new AdvisoryRef(id, flag.getNote(), url, cves, flag.getSeverity(), storeHost);
     }
 
     private static String capped(String id) {

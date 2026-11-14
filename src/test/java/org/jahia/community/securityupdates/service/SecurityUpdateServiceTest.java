@@ -155,6 +155,26 @@ class SecurityUpdateServiceTest {
         }
 
         @Test
+        @DisplayName("each advisory carries the host of the store or extra feed that published it")
+        void advisoriesCarryTheirStoreHost() {
+            service.apply(settings(true, true, MIRROR_FEED, DEFAULT_STORE));
+            fixture.storeServes(DEFAULT_STORE, FEED_WITH_FINDING);
+            fixture.fetcher.answer(MIRROR_FEED, new HttpResult(200,
+                    "{\"schemaVersion\":1,\"advisories\":[" + ServiceFixture.ADVISORY_JCONTENT + "],\"flaggedVersions\":["
+                            + "{\"name\":\"jcontent\",\"version\":\"3.4.9\",\"references\":[\"CVE-2026-9\"]}]}"));
+
+            SecurityReport report = fixture.check(service);
+
+            assertThat(report.getFindings()).hasSize(3).allSatisfy(f -> assertThat(f.getAdvisories()).isNotEmpty());
+            assertThat(report.getFindings()).filteredOn(f -> f.getComponent().equals("graphql-dxm-provider")).singleElement()
+                    .satisfies(f -> assertThat(f.getAdvisories()).extracting(AdvisoryRef::getStoreHost)
+                            .containsOnly("store.jahia.com"));
+            assertThat(report.getFindings()).filteredOn(f -> f.getComponent().equals("jcontent"))
+                    .flatExtracting(Finding::getAdvisories).extracting(AdvisoryRef::getStoreHost)
+                    .containsOnly("mirror.example.org");
+        }
+
+        @Test
         @DisplayName("without any store, the report is UNAVAILABLE, never OK")
         void noStore() {
             service.apply(settings(true, true, "", ""));

@@ -135,7 +135,7 @@ public final class StoreClient {
             return FeedOutcome.FAILED;
         }
         try {
-            SecurityFeed feed = feedParser.parse(result.getBody());
+            SecurityFeed feed = feedParser.parse(result.getBody()).withStoreHost(StoreUrls.host(base));
             if (feed.getSkippedEntries() > 0) {
                 errors.add(new StoreError(base, StoreErrorKind.NOT_UNDERSTOOD, StoreErrorDetail.ENTRIES_SKIPPED,
                         feed.getSkippedEntries() + " entries of the security feed could not be understood and were ignored"));

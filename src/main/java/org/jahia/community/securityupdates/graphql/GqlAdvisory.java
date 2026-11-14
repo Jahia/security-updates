@@ -56,6 +56,15 @@ public class GqlAdvisory {
     }
 
     @GraphQLField
+    @GraphQLName("storeHost")
+    @GraphQLNonNull
+    @GraphQLDescription("Lower-case host of the store (or extra feed URL) whose security feed published this advisory or "
+            + "owner report, such as store.jahia.com")
+    public String getStoreHost() {
+        return advisory.getStoreHost();
+    }
+
+    @GraphQLField
     @GraphQLName("severity")
     @GraphQLNonNull
     @GraphQLDescription("Severity of this advisory")

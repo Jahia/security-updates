@@ -41,16 +41,24 @@ public final class StoreUrls {
     }
 
     /**
+     * @return the lower-case host of {@code url}, empty when it has none
+     */
+    public static String host(String url) {
+        try {
+            String host = new URI(url == null ? "" : url.trim()).getHost();
+            return host == null ? "" : host.toLowerCase(Locale.ROOT);
+        } catch (URISyntaxException e) {
+            return "";
+        }
+    }
+
+    /**
      * @return true when {@code url} is on the Jahia Store host
      */
     public static boolean isJahiaStore(String url) {
-        try {
-            String host = new URI(url == null ? "" : url.trim()).getHost();
-            return host != null && JAHIA_STORE_HOST.equals(host.toLowerCase(Locale.ROOT));
-        } catch (URISyntaxException e) {
-            return false;
-        }
+        return JAHIA_STORE_HOST.equals(host(url));
     }
+
 
     /**
      * @return a form of {@code url} safe to show or log: the URL itself when valid, otherwise its scheme and

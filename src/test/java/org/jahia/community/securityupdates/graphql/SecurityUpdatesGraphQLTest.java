@@ -45,7 +45,8 @@ class SecurityUpdatesGraphQLTest {
     }
 
     private static SecurityReport report() {
-        AdvisoryRef safe = new AdvisoryRef("JSA-1", "Title", "https://academy.jahia.com/jsa-1", List.of("CVE-2026-1"), Severity.HIGH);
+        AdvisoryRef safe = new AdvisoryRef("JSA-1", "Title", "https://academy.jahia.com/jsa-1", List.of("CVE-2026-1"), Severity.HIGH,
+                "store.jahia.com");
         AdvisoryRef unsafeLink = new AdvisoryRef("JSA-2", "Other", "http://example.org/jsa-2", List.of(), Severity.LOW);
         Finding finding = new Finding("graphql-dxm-provider", "org.jahia.modules", "3.4.0", "3.10.0",
                 Compatibility.COMPATIBLE, "8.2.0.0", Severity.HIGH, FindingSource.ADVISORY, List.of(safe, unsafeLink));
@@ -86,6 +87,9 @@ class SecurityUpdatesGraphQLTest {
         assertThat(advisory.getCves()).containsExactly("CVE-2026-1");
         assertThat(advisory.getSeverity()).isEqualTo(Severity.HIGH);
         assertThat(advisory.getUrl()).isEqualTo("https://academy.jahia.com/jsa-1");
+        assertThat(advisory.getStoreHost()).isEqualTo("store.jahia.com");
+        // a reference whose store is unknown has an empty host, never null (the field is non-null)
+        assertThat(finding.getAdvisories().get(1).getStoreHost()).isEmpty();
     }
 
     @Test

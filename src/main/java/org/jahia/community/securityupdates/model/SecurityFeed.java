@@ -14,6 +14,7 @@ public final class SecurityFeed {
     private final List<FlaggedVersion> flaggedVersions;
     private final int skippedEntries;
     private final boolean truncated;
+    private final String storeHost;
 
     /**
      * @param advisories      the advisories
@@ -30,10 +31,24 @@ public final class SecurityFeed {
      */
     public SecurityFeed(List<Advisory> advisories, List<FlaggedVersion> flaggedVersions, int skippedEntries,
                         boolean truncated) {
+        this(advisories, flaggedVersions, skippedEntries, truncated, "");
+    }
+
+    private SecurityFeed(List<Advisory> advisories, List<FlaggedVersion> flaggedVersions, int skippedEntries,
+                         boolean truncated, String storeHost) {
         this.advisories = List.copyOf(advisories);
         this.flaggedVersions = List.copyOf(flaggedVersions);
         this.skippedEntries = skippedEntries;
         this.truncated = truncated;
+        this.storeHost = storeHost == null ? "" : storeHost;
+    }
+
+    /**
+     * @param host the lower-case host of the store (or extra feed URL) that published this feed
+     * @return a copy of this feed that knows where it comes from
+     */
+    public SecurityFeed withStoreHost(String host) {
+        return new SecurityFeed(advisories, flaggedVersions, skippedEntries, truncated, host);
     }
 
     public List<Advisory> getAdvisories() {
@@ -46,6 +61,11 @@ public final class SecurityFeed {
 
     public int getSkippedEntries() {
         return skippedEntries;
+    }
+
+    /** @return the lower-case host of the store that published this feed; empty when unknown */
+    public String getStoreHost() {
+        return storeHost;
     }
 
     /** @return true when entries beyond the limit were not read: the feed is then not fully used */

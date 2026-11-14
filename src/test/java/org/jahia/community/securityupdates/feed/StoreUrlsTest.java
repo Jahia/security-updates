@@ -106,4 +106,17 @@ class StoreUrlsTest {
     void recognisesTheJahiaStore(String url, boolean official) {
         assertThat(StoreUrls.isJahiaStore(url)).isEqualTo(official);
     }
+
+    @ParameterizedTest(name = "host of [{0}] is [{1}]")
+    @CsvSource(value = {
+            "https://STORE.Jahia.com/, store.jahia.com",
+            "https://mirror.example.org/security.json, mirror.example.org",
+            "'', ''",
+            "not a url, ''",
+            "https://exa mple.org, ''"
+    }, nullValues = "null")
+    void host(String url, String host) {
+        assertThat(StoreUrls.host(url)).isEqualTo(host);
+        assertThat(StoreUrls.host(null)).isEmpty();
+    }
 }

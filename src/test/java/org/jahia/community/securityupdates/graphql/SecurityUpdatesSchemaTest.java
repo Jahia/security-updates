@@ -27,7 +27,7 @@ class SecurityUpdatesSchemaTest {
             + " status inProgress stale checkedAt lastSuccess nextCheckAt jahiaVersion"
             + " errors { storeUrl kind detail message }"
             + " findings { component groupId installedVersion recommendedVersion compatibility requiredJahiaVersion severity"
-            + " source advisories { id title url cves severity } } }";
+            + " source advisories { id title url cves severity storeHost } } }";
     private static final String SETTINGS_FIELDS = "fragment SecurityUpdatesSettingsFields on SecurityUpdatesSettings {"
             + " enabled refreshIntervalHours useForgeSettings defaultStoreUrl extraFeedUrls bannerEnabled bannerMinimumSeverity"
             + " bannerIncludeOwnerReports bannerBackgroundColor bannerTextColor bannerDismissPolicy bannerDismissHours"

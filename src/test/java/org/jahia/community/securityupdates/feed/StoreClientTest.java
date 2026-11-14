@@ -70,6 +70,7 @@ class StoreClientTest {
         assertThat(result.getStoreUrl()).isEqualTo(BASE);
         assertThat(result.getFeed()).isNotNull();
         assertThat(result.getFeed().getAdvisories()).isNotEmpty();
+        assertThat(result.getFeed().getStoreHost()).isEqualTo("store.example.org");
         assertThat(result.getCatalog()).isNotNull();
         assertThat(result.getErrors()).isEmpty();
     }
