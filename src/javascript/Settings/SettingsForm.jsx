@@ -2,7 +2,7 @@ import {useEffect, useRef, useState} from 'react';
 import PropTypes from 'prop-types';
 import {useMutation, useQuery} from '@apollo/client';
 import {useTranslation} from 'react-i18next';
-import {Button, Loader, Separator, Typography} from '@jahia/moonstone';
+import {Button, Loader, Typography} from '@jahia/moonstone';
 import styles from './SettingsForm.scss';
 import {GET_SETTINGS, RESET_SETTINGS, UPDATE_SETTINGS} from './Settings.gql';
 import {FIELDS, fromSettings, restartsSchedule, toInput} from './settingsValues';
@@ -43,7 +43,6 @@ const Section = ({children}) => {
     const {t} = useTranslation(NS);
     return (
         <section className={styles.settings} aria-labelledby={TITLE_ID}>
-            <Separator/>
             <Typography component="h2" variant="heading" id={TITLE_ID}>{t('settings.title')}</Typography>
             {children}
         </section>

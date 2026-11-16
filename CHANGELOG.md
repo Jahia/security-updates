@@ -31,12 +31,13 @@ First release (1.0.0). It requires Jahia 8.2.3.7 or later.
 - GraphQL API under `Query.securityUpdates` (`report`, `banner`, `settings`) and `Mutation.securityUpdates`
   (`refresh`, `updateSettings`, `resetSettings`).
 - Admin page **Server settings > System components > Security updates** (English, French), built from
-  Moonstone, WCAG 2.2 AAA contrast.
+  Moonstone, WCAG 2.2 AAA contrast, with two tabs: **Check results** and **Settings** (`?tab=settings` in the
+  address opens the second).
 - Banner for `adminTemplates` users in the Jahia UI, decided server-side: counts distinct components at or
   above a configurable severity, with dismissal policies `SESSION` (browser tab), `HOURS`, `UNTIL_CHANGE`,
   `NEVER`, keyed on component and advisory. Colours are `#RRGGBB` with a contrast of at least 7:1, with
   suggestions.
-- Settings section on the page, with full server-side validation, a confirmation before reset, and a
+- Settings tab on the page, with full server-side validation, a confirmation before reset, and a
   read-only view for users who cannot change them. Settings are saved through ConfigurationAdmin into
   `karaf/etc`, which Jahia propagates across the cluster.
 - OSGi configuration `org.jahia.community.securityupdates` (`enabled`, `refreshIntervalHours`,

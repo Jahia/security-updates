@@ -2,7 +2,11 @@
   "label": "Security updates",
   "page": {
     "documentTitle": "{{title}} – Jahia administration",
-    "intro": "This page lists the installed components (Jahia and its modules) that have an update fixing a security problem, from the security data that the stores publish.",
+    "tabs": {
+      "label": "Security updates sections",
+      "results": "Check results",
+      "settings": "Settings"
+    },
     "loading": "Loading the security report…",
     "error": "The security report could not be loaded. Reload the page to try again.",
     "updateError": "The security report could not be updated: the last report loaded is shown. Reload the page to try again.",
@@ -51,12 +55,12 @@
     },
     "status": {
       "NOT_CHECKED": "No check has run yet. The first check runs about one minute after startup. Use \"Check now\" to run it at once.",
-      "DISABLED": "Checks are turned off, so this page shows no results and no banner is shown. A server administrator can turn them on in the settings below.",
+      "DISABLED": "Checks are turned off, so this page shows no results and no banner is shown. A server administrator can turn them on in the Settings tab.",
       "PARTIAL": "Some stores could not be checked: this list may be incomplete.",
       "PARTIAL_EMPTY": "Some stores could not be checked. The stores that answered report no security update for this Jahia, but the others might.",
       "UNAVAILABLE": "No security data could be read, so this page cannot tell whether this Jahia needs security updates.",
       "NOT_PUBLISHED": "The Jahia Store does not publish security data yet. There is nothing to configure: this page will show results once the data is published.",
-      "NOT_PUBLISHED_OTHER": "The store addresses checked have no security data yet. Check them in the settings below or in Manage modules. If they are right, this page will show results once the data is published.",
+      "NOT_PUBLISHED_OTHER": "The store addresses checked have no security data yet. Check them in the Settings tab or in Manage modules. If they are right, this page will show results once the data is published.",
       "STALE": "The results may be out of date: no check has reached every store since {{date}}."
     },
     "errors": {
@@ -82,11 +86,11 @@
       "INVALID_URL": "Check the address of this store.",
       "CATALOGUE_UNAVAILABLE": "Findings are still listed, without their compatibility.",
       "MALFORMED_VERSION": "The version of this component cannot be compared with the security data.",
-      "NO_STORE": "Add a store in Manage modules, or enter a default store address in the settings below.",
+      "NO_STORE": "Add a store in Manage modules, or enter a default store address in the Settings tab.",
       "STALE": "Run a check, or see the other problems listed here."
     },
     "errorDetail": {
-      "NOT_HTTPS": "The address does not use https. Only https addresses are accepted: change it in the settings below or in Manage modules.",
+      "NOT_HTTPS": "The address does not use https. Only https addresses are accepted: change it in the Settings tab or in Manage modules.",
       "SSRF_BLOCKED": "Jahia blocked this address because it points to an internal network. If this store is internal on purpose, a system administrator can allow its host with the jahia.httpClient.allowedInternalHosts property.",
       "TIMEOUT": "The store did not answer in time. Try again later.",
       "CONNECTION": "Jahia could not connect to the store. Check the address, and the network and proxy settings of the server.",

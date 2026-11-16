@@ -1,5 +1,5 @@
 import {
-    ADMIN_PATH,
+    SETTINGS_PATH,
     BANNER,
     BANNER_DISMISS,
     BANNER_PREVIEW,
@@ -78,7 +78,7 @@ describe('Security updates: settings', () => {
 
     it('the form shows the stored values, with native labels, to a server administrator', () => {
         cy.login();
-        cy.visit(ADMIN_PATH);
+        cy.visit(SETTINGS_PATH);
         cy.contains('h2', 'Settings').should('be.visible');
         cy.get(field('defaultStoreUrl')).should('have.value', 'https://storefixture').and('not.be.disabled');
         cy.get(field('enabled')).should('be.checked');
@@ -106,7 +106,7 @@ describe('Security updates: settings', () => {
 
     it('saving from the form changes the settings and the banner', () => {
         cy.login();
-        cy.visit(ADMIN_PATH);
+        cy.visit(SETTINGS_PATH);
         fill('refreshIntervalHours', '12');
         cy.get(field('bannerMinimumSeverity')).select('CRITICAL');
         cy.contains('button', 'Save settings').click();
@@ -123,7 +123,7 @@ describe('Security updates: settings', () => {
 
     it('invalid input in the form shows field errors (https only, at most 10 addresses), changes nothing, and passes axe', () => {
         cy.login();
-        cy.visit(ADMIN_PATH);
+        cy.visit(SETTINGS_PATH);
         fill('refreshIntervalHours', '0');
         fill('defaultStoreUrl', 'http://store.example.org');
         fill('extraFeedUrls', ELEVEN_FEEDS, {delay: 0});
@@ -209,7 +209,7 @@ describe('Security updates: settings', () => {
         });
 
         cy.login();
-        cy.visit(ADMIN_PATH);
+        cy.visit(SETTINGS_PATH);
         fill('bannerTextColor', '#333333');
         cy.get('[data-testid="security-updates-contrast"]').should('contain', 'Below the 7:1 minimum');
         cy.get('[data-testid="security-updates-suggestion-text"]').should('contain', '#A6A6A6').and('contain', '7.07:1');
@@ -311,7 +311,7 @@ describe('Security updates: settings', () => {
         until(readSettings, {refreshIntervalHours: 12}, 'saved settings');
 
         cy.login();
-        cy.visit(ADMIN_PATH);
+        cy.visit(SETTINGS_PATH);
         cy.get(field('refreshIntervalHours')).should('have.value', '12');
         cy.contains('button', 'Reset to defaults').click();
         cy.get('[role="dialog"]').should('be.visible')

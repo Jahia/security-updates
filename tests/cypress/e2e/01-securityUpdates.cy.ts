@@ -10,8 +10,11 @@ import {
     named,
     openAppPage,
     provision,
+    openTab,
     readReport,
     refresh,
+    TAB_RESULTS,
+    TAB_SETTINGS,
     waitForBannerDecision
 } from '../utils/securityUpdates';
 
@@ -143,6 +146,62 @@ describe('Security updates: report, Check now and the admin page', () => {
         cy.get('[role="region"][aria-labelledby="security-updates-findings-title"] tbody tr').should('have.length', 3);
         cy.get('#security-updates-setting-defaultStoreUrl').should('have.value', 'https://storefixture');
         checkPageAccessibility();
+        // The axe run skips hidden content: the settings tab is checked open.
+        openTab('settings');
+        checkPageAccessibility();
+    });
+
+    it('two tabs: the results first, the settings second; arrow keys switch them and the address keeps the tab', () => {
+        cy.login();
+        cy.visit(ADMIN_PATH);
+        cy.get('[role="tablist"]').should('have.attr', 'aria-label', 'Security updates sections');
+        cy.get(TAB_RESULTS).should('have.attr', 'aria-selected', 'true').and('have.attr', 'tabindex', '0').and('contain', 'Check results');
+        cy.get(TAB_SETTINGS).should('have.attr', 'aria-selected', 'false').and('have.attr', 'tabindex', '-1').and('contain', 'Settings');
+        cy.get('#security-updates-panel-results').should('be.visible');
+        cy.get('#security-updates-panel-settings').should('not.be.visible');
+        // The content of the tab starts right under the tabs (the empty status line takes no room).
+        cy.get('#security-updates-panel-results tbody tr').should('have.length', 3);
+        cy.get('[data-testid="security-updates-status"]').should('be.empty');
+        cy.get('[role="tablist"]').then($tabs => {
+            const tabsBottom = $tabs[0].getBoundingClientRect().bottom;
+            cy.get('#security-updates-panel-results').should($panel => {
+                const contentTop = ($panel[0].firstElementChild as Element).getBoundingClientRect().top;
+                expect(contentTop - tabsBottom, 'space under the tabs').to.be.within(0, 24);
+            });
+        });
+        // Targets of 44 by 44 pixels at least.
+        cy.get(TAB_SETTINGS).should($tab => {
+            const rect = $tab[0].getBoundingClientRect();
+            expect(rect.height, 'height').to.be.at.least(44);
+            expect(rect.width, 'width').to.be.at.least(44);
+        });
+
+        // Keyboard: the arrow key selects the settings and moves the focus there.
+        cy.get(TAB_RESULTS).focus();
+        cy.press(Cypress.Keyboard.Keys.RIGHT);
+        cy.focused().should('match', TAB_SETTINGS);
+        cy.get(TAB_SETTINGS).should('have.attr', 'aria-selected', 'true');
+        cy.get('#security-updates-panel-settings').should('be.visible');
+        cy.contains('h2', 'Settings').should('be.visible');
+        cy.get('[role="tablist"]').then($tabs => {
+            const tabsBottom = $tabs[0].getBoundingClientRect().bottom;
+            cy.get('#security-updates-settings-title').should($title => {
+                expect($title[0].getBoundingClientRect().top - tabsBottom, 'space under the tabs').to.be.within(0, 24);
+            });
+        });
+        cy.location('search').should('equal', '?tab=settings');
+
+        // A reload opens the same tab.
+        cy.reload();
+        cy.get(TAB_SETTINGS, {timeout: 60000}).should('have.attr', 'aria-selected', 'true');
+        // The field is lower in the form: scrolled to, as a user would.
+        cy.get('#security-updates-setting-defaultStoreUrl').scrollIntoView();
+        cy.get('#security-updates-setting-defaultStoreUrl').should('be.visible');
+
+        // Back to the results by a click: the address loses the parameter.
+        openTab('results');
+        cy.location('search').should('equal', '');
+        cy.get('#security-updates-panel-settings').should('not.be.visible');
     });
 
     it('Check now within the on-demand interval says that no check was started', () => {

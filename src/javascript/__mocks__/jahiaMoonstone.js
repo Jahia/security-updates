@@ -6,7 +6,9 @@
 // onOpenChange) that focuses its first tabbable element when it opens (Floating UI's FloatingFocusManager with its
 // default initialFocus 0), and ModalHeader its title as an h4; ModalFooter is a flex row aligned to the end (class
 // flexRow_reverse: justify-content flex-end, not row-reverse), so the DOM order is the visual and the tab order. Each
-// double carries data-moonstone="<Name>" so that tests can check what is used.
+// double carries data-moonstone="<Name>" so that tests can check what is used. Tab is a div role="tablist", TabItem a
+// button role="tab" with aria-selected (true or false) and its label in a span; other props (id, tabIndex, aria-*,
+// onKeyDown) reach the button.
 import React from 'react';
 
 const mark = name => ({'data-moonstone': name});
@@ -48,9 +50,9 @@ export const Table = ({children, ...rest}) => <table {...mark('Table')} {...rest
 export const TableHead = ({children, ...rest}) => <thead {...mark('TableHead')} {...rest}>{children}</thead>;
 export const TableBody = ({children, ...rest}) => <tbody {...mark('TableBody')} {...rest}>{children}</tbody>;
 export const TableRow = ({children, ...rest}) => <tr {...mark('TableRow')} {...rest}>{children}</tr>;
-export const TableHeadCell = ({children, ...rest}) => <th {...mark('TableHeadCell')} {...rest}>{children}</th>;
-export const TableBodyCell = ({children, component: Component = 'td', verticalAlign, ...rest}) => (
-    <Component {...mark('TableBodyCell')} {...rest}>{children}</Component>
+export const TableHeadCell = ({children, width, ...rest}) => <th {...mark('TableHeadCell')} style={{width}} {...rest}>{children}</th>;
+export const TableBodyCell = ({children, component: Component = 'td', verticalAlign, width, ...rest}) => (
+    <Component {...mark('TableBodyCell')} style={{width}} {...rest}>{children}</Component>
 );
 
 const TABBABLE = 'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
@@ -137,3 +139,13 @@ export const RadioItem = ({id, label, value, ...rest}) => {
 export const Information = props => <svg data-testid="icon-information" {...mark('Information')} {...props}/>;
 export const Warning = props => <svg data-testid="icon-warning" {...mark('Warning')} {...props}/>;
 export const OpenInNew = ({size, ...props}) => <svg data-size={size} {...mark('OpenInNew')} {...props}/>;
+
+export const Tab = ({children, className, ...rest}) => (
+    <div role="tablist" className={className} {...mark('Tab')} {...rest}>{children}</div>
+);
+
+export const TabItem = ({component: Component = 'button', label, size, isReversed, isDisabled, icon, isSelected = false, onClick, className, ...rest}) => (
+    <Component role="tab" aria-selected={isSelected} disabled={isDisabled} className={className} onClick={onClick} {...mark('TabItem')} {...rest}>
+        {label && <span>{label}</span>}
+    </Component>
+);

@@ -2,7 +2,11 @@
   "label": "Mises à jour de sécurité",
   "page": {
     "documentTitle": "{{title}} – Administration de Jahia",
-    "intro": "Cette page liste les composants installés (Jahia et ses modules) qui ont une mise à jour corrigeant un problème de sécurité, d’après les données de sécurité publiées par les stores.",
+    "tabs": {
+      "label": "Sections des mises à jour de sécurité",
+      "results": "Résultats de la vérification",
+      "settings": "Paramètres"
+    },
     "loading": "Chargement du rapport de sécurité…",
     "error": "Le rapport de sécurité n’a pas pu être chargé. Rechargez la page pour réessayer.",
     "updateError": "Le rapport de sécurité n’a pas pu être mis à jour : le dernier rapport chargé est affiché. Rechargez la page pour réessayer.",
@@ -51,12 +55,12 @@
     },
     "status": {
       "NOT_CHECKED": "Aucune vérification n’a encore eu lieu. La première a lieu environ une minute après le démarrage. Utilisez « Vérifier maintenant » pour la lancer tout de suite.",
-      "DISABLED": "Les vérifications sont désactivées : cette page n’affiche aucun résultat et aucun bandeau n’est affiché. Un administrateur du serveur peut les activer dans les paramètres ci-dessous.",
+      "DISABLED": "Les vérifications sont désactivées : cette page n’affiche aucun résultat et aucun bandeau n’est affiché. Un administrateur du serveur peut les activer dans l’onglet Paramètres.",
       "PARTIAL": "Certains stores n’ont pas pu être interrogés : cette liste peut être incomplète.",
       "PARTIAL_EMPTY": "Certains stores n’ont pas pu être interrogés. Les stores qui ont répondu ne signalent aucune mise à jour de sécurité pour ce Jahia, mais les autres pourraient en signaler.",
       "UNAVAILABLE": "Aucune donnée de sécurité n’a pu être lue : cette page ne peut pas dire si ce Jahia a besoin de mises à jour de sécurité.",
       "NOT_PUBLISHED": "Le Jahia Store ne publie pas encore de données de sécurité. Il n’y a rien à configurer : cette page affichera des résultats dès que ces données seront publiées.",
-      "NOT_PUBLISHED_OTHER": "Les adresses de store vérifiées n’ont pas encore de données de sécurité. Vérifiez-les dans les paramètres ci-dessous ou dans la gestion des modules. Si elles sont correctes, cette page affichera des résultats dès que les données seront publiées.",
+      "NOT_PUBLISHED_OTHER": "Les adresses de store vérifiées n’ont pas encore de données de sécurité. Vérifiez-les dans l’onglet Paramètres ou dans la gestion des modules. Si elles sont correctes, cette page affichera des résultats dès que les données seront publiées.",
       "STALE": "Les résultats ne sont peut-être plus à jour : aucune vérification n’a interrogé tous les stores depuis le {{date}}."
     },
     "errors": {
@@ -82,11 +86,11 @@
       "INVALID_URL": "Vérifiez l’adresse de ce store.",
       "CATALOGUE_UNAVAILABLE": "Les résultats restent listés, sans leur compatibilité.",
       "MALFORMED_VERSION": "La version de ce composant ne peut pas être comparée aux données de sécurité.",
-      "NO_STORE": "Ajoutez un store dans la gestion des modules, ou saisissez l’adresse d’un store par défaut dans les paramètres ci-dessous.",
+      "NO_STORE": "Ajoutez un store dans la gestion des modules, ou saisissez l’adresse d’un store par défaut dans l’onglet Paramètres.",
       "STALE": "Lancez une vérification, ou consultez les autres problèmes listés ici."
     },
     "errorDetail": {
-      "NOT_HTTPS": "L’adresse n’utilise pas https. Seules les adresses https sont acceptées : modifiez-la dans les paramètres ci-dessous ou dans la gestion des modules.",
+      "NOT_HTTPS": "L’adresse n’utilise pas https. Seules les adresses https sont acceptées : modifiez-la dans l’onglet Paramètres ou dans la gestion des modules.",
       "SSRF_BLOCKED": "Jahia a bloqué cette adresse car elle pointe vers un réseau interne. Si ce store est interne volontairement, un administrateur système peut autoriser son hôte avec la propriété jahia.httpClient.allowedInternalHosts.",
       "TIMEOUT": "Le store n’a pas répondu à temps. Réessayez plus tard.",
       "CONNECTION": "Jahia n’a pas pu se connecter au store. Vérifiez l’adresse, ainsi que les réglages réseau et proxy du serveur.",

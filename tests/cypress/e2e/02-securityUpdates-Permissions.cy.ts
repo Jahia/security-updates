@@ -1,5 +1,6 @@
 import {createUser, deleteUser, grantRoles, revokeRoles} from '@jahia/cypress';
 import {
+    openTab,
     ADMIN_PATH,
     APP_PATH,
     BANNER,
@@ -191,6 +192,7 @@ describe('Security updates: permissions', () => {
             .should('contain', 'Check completed.');
 
         // The values are shown as text (positive signal), and there is no control to change them.
+        openTab('settings');
         cy.get('[data-testid="security-updates-setting-value-defaultStoreUrl"] dd').should('contain', 'https://storefixture');
         cy.get('[data-testid="security-updates-setting-value-refreshIntervalHours"] dd').should('contain', '24');
         cy.get(field('defaultStoreUrl')).should('not.exist');

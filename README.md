@@ -38,6 +38,13 @@ The first check runs about one minute after the module starts. **Check now** sta
 
 ## What the page shows
 
+The page has two tabs: **Check results** (open first) and **Settings**. The address keeps the open tab:
+`/jahia/administration/securityUpdates?tab=settings` opens the settings. The arrow keys, Home and End move
+between the tabs. Changes not saved yet in the Settings tab are kept when you switch tabs. The status line
+of **Check now** sits under the tabs, outside them, so it is read whichever tab is open.
+
+**Check results** shows:
+
 - A status chip: **Up to date**, **Updates needed**, **Partly checked**, **No security data**,
   **Not available yet**, **Turned off** or **Not checked yet**. The chip is worded, never colour only.
 - A table of the components with security updates, most severe first. Each row gives the component, its
@@ -57,7 +64,7 @@ The first check runs about one minute after the module starts. **Check now** sta
   and is labelled "Technical details (in English)".
 - When a filter leaves no finding, the page says so.
 - The time of the last check and of the last check that reached every store, and when the next one is due.
-- After you save or reset the settings, the page loads the report again. If that fails, it keeps the last
+- After you save or reset the settings, the page loads the report again in the **Check results** tab. If that fails, it keeps the last
   report and says "The security report could not be updated: the last report loaded is shown. Reload the page
   to try again."
 

@@ -138,4 +138,41 @@ describe('Security updates: findings from a known store', () => {
         cy.get('#security-updates-filter-advisories').should('be.checked');
         cy.get(`${REGION} tbody tr`).should('have.length', 2);
     });
+
+    it('no cell text is cut and no cell scrolls: text and chips wrap inside their cell, in a narrow window too', () => {
+        cy.viewport(900, 768);
+        cy.login();
+        cy.visit(ADMIN_PATH);
+        cy.get(`${REGION} tbody tr`).should('have.length', 3);
+        // Moonstone's table cells put their text in a one-line Typography that cuts it with an ellipsis.
+        cy.get(`${REGION} table`).find('td, th').then($cells => {
+            const texts = $cells.find('[class*="moonstone-nowrap"]').toArray();
+            expect(texts.length, 'Moonstone cell texts').to.be.greaterThan(0);
+            texts.forEach(text => {
+                const style = getComputedStyle(text);
+                const where = text.textContent?.trim().slice(0, 40);
+                expect(style.whiteSpace, `white-space of "${where}"`).to.equal('normal');
+                expect(style.textOverflow, `text-overflow of "${where}"`).to.not.equal('ellipsis');
+                expect(text.scrollWidth, `"${where}" fits its cell`).to.be.at.most(text.clientWidth + 1);
+            });
+            // No cell scrolls: the row grows with its content.
+            $cells.toArray().forEach(cell => {
+                const where = cell.textContent?.trim().slice(0, 40);
+                expect(cell.scrollHeight, `no scroll bar in the cell "${where}"`).to.be.at.most(cell.clientHeight + 1);
+                expect(cell.scrollWidth, `no horizontal scroll bar in the cell "${where}"`).to.be.at.most(cell.clientWidth + 1);
+            });
+            // A chip (severity, source) grows with its label: the label never spills out of it.
+            const chips = $cells.find('[class~="moonstone-chip"]').toArray();
+            expect(chips.length, 'chips').to.be.greaterThan(0);
+            chips.forEach(chip => {
+                const label = chip.textContent?.trim();
+                expect(chip.scrollHeight, `the chip "${label}" holds its label`).to.be.at.most(chip.clientHeight + 1);
+                const chipBox = chip.getBoundingClientRect();
+                Array.from(chip.children).forEach(child => {
+                    const box = child.getBoundingClientRect();
+                    expect(box.bottom, `the label of "${label}" stays inside its chip`).to.be.at.most(chipBox.bottom + 1);
+                });
+            });
+        });
+    });
 });

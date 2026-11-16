@@ -10,6 +10,17 @@ import type {Interception} from 'cypress/types/net-stubbing';
  */
 
 export const ADMIN_PATH = '/jahia/administration/securityUpdates';
+/** The page with its Settings tab open (the address keeps the selected tab). */
+export const SETTINGS_PATH = `${ADMIN_PATH}?tab=settings`;
+export const TAB_RESULTS = '[data-sel-role="security-updates-tab-results"]';
+export const TAB_SETTINGS = '[data-sel-role="security-updates-tab-settings"]';
+
+/** Selects a tab of the page by a click, and waits until its panel is shown. */
+export const openTab = (name: 'results' | 'settings'): void => {
+    cy.get(name === 'results' ? TAB_RESULTS : TAB_SETTINGS).click();
+    cy.get(`#security-updates-panel-${name}`).should('be.visible');
+};
+
 export const APP_PATH = '/jahia/dashboard';
 export const FIXTURE_STORE = 'https://storefixture';
 export const JAHIA_STORE = 'https://store.jahia.com';
