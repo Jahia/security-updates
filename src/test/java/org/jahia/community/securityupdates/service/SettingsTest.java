@@ -54,6 +54,7 @@ class SettingsTest {
                 SettingsKeys.BANNER_TEXT_COLOR, "#ffffff",
                 SettingsKeys.BANNER_DISMISS_POLICY, "hours",
                 SettingsKeys.BANNER_DISMISS_HOURS, "12",
+                SettingsKeys.BANNER_POSITION, "bottom",
                 Settings.ON_DEMAND_MIN_INTERVAL_SECONDS, "0"), warnings::add);
 
         assertThat(settings.isEnabled()).isFalse();
@@ -67,6 +68,7 @@ class SettingsTest {
         assertThat(settings.getBanner().getBackgroundColor()).isEqualTo("#0B3D91");
         assertThat(settings.getBanner().getDismissPolicy()).isEqualTo(DismissPolicy.HOURS);
         assertThat(settings.getBanner().getDismissHours()).isEqualTo(12);
+        assertThat(settings.getBanner().getPosition()).isEqualTo(org.jahia.community.securityupdates.model.BannerPosition.BOTTOM);
         assertThat(settings.getOnDemandMinInterval()).isZero();
         assertThat(warnings).isEmpty();
     }

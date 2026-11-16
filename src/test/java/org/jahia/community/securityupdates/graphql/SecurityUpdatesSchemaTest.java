@@ -31,7 +31,7 @@ class SecurityUpdatesSchemaTest {
     private static final String SETTINGS_FIELDS = "fragment SecurityUpdatesSettingsFields on SecurityUpdatesSettings {"
             + " enabled refreshIntervalHours useForgeSettings defaultStoreUrl extraFeedUrls bannerEnabled bannerMinimumSeverity"
             + " bannerIncludeOwnerReports bannerBackgroundColor bannerTextColor bannerDismissPolicy bannerDismissHours"
-            + " contrastRatio canEdit }";
+            + " bannerPosition contrastRatio canEdit }";
     private static final String SETTINGS_RESULT = "{ ok errors { field code message suggestions { field value ratio } }"
             + " settings { ...SecurityUpdatesSettingsFields } }";
 
@@ -91,7 +91,7 @@ class SecurityUpdatesSchemaTest {
     @DisplayName("the banner query of the UI is valid (its jcr part belongs to Jahia's schema)")
     void bannerDocument() {
         assertThat(validate("query SecurityUpdatesBanner { securityUpdates { banner { visible count minimumSeverity components"
-                + " dismissalKeys backgroundColor textColor dismissPolicy dismissHours username } } }")).isEmpty();
+                + " dismissalKeys backgroundColor textColor dismissPolicy dismissHours position username } } }")).isEmpty();
     }
 
     @Test
@@ -111,5 +111,8 @@ class SecurityUpdatesSchemaTest {
                         "CHECK_FAILED");
         assertThat(((graphql.schema.GraphQLEnumType) schema.getType("SecurityUpdatesErrorKind")).getValues())
                 .extracting(graphql.schema.GraphQLEnumValueDefinition::getName).contains("STALE", "INVALID_URL");
+        assertThat(((graphql.schema.GraphQLEnumType) schema.getType("SecurityUpdatesBannerPosition")).getValues())
+                .extracting(graphql.schema.GraphQLEnumValueDefinition::getName)
+                .containsExactly("TOP", "BOTTOM", "TOP_RIGHT", "BOTTOM_RIGHT");
     }
 }

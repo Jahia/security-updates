@@ -15,6 +15,7 @@ export const GROUPS = {
         'bannerIncludeOwnerReports',
         'bannerBackgroundColor',
         'bannerTextColor',
+        'bannerPosition',
         'bannerDismissPolicy',
         'bannerDismissHours']
 };
@@ -33,6 +34,10 @@ const valueText = (t, field, value) => {
 
     if (field === 'bannerMinimumSeverity') {
         return t(`page.severity.${value}`);
+    }
+
+    if (field === 'bannerPosition') {
+        return t(`settings.position.${value}`);
     }
 
     if (field === 'bannerDismissPolicy') {

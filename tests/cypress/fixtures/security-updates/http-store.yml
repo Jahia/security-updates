@@ -15,4 +15,5 @@
     bannerTextColor: "#FFFFFF"
     bannerDismissPolicy: "SESSION"
     bannerDismissHours: "24"
+    bannerPosition: "TOP"
     onDemandMinIntervalSeconds: "0"

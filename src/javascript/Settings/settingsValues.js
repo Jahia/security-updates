@@ -1,5 +1,7 @@
 // Conversion between the settings returned by GraphQL, the form state (text for the inputs) and the mutation input.
 
+import {DEFAULT_BANNER_POSITION} from '../common/constants';
+
 export const FIELDS = [
     'enabled',
     'refreshIntervalHours',
@@ -11,6 +13,7 @@ export const FIELDS = [
     'bannerIncludeOwnerReports',
     'bannerBackgroundColor',
     'bannerTextColor',
+    'bannerPosition',
     'bannerDismissPolicy',
     'bannerDismissHours'
 ];
@@ -32,12 +35,18 @@ export const restartsSchedule = (before, after) => Boolean(after?.enabled) &&
 export const BOOLEAN_FIELDS = ['enabled', 'useForgeSettings', 'bannerEnabled', 'bannerIncludeOwnerReports'];
 export const NUMBER_FIELDS = ['refreshIntervalHours', 'bannerDismissHours'];
 
+/**
+ * The value a choice takes when the server returns none, so that the select shows (and a save sends) a valid value
+ * rather than an empty one.
+ */
+export const FIELD_DEFAULTS = {bannerPosition: DEFAULT_BANNER_POSITION};
+
 const WHOLE_NUMBER = /^-?\d+$/;
 
 /** Form state from the GraphQL settings: booleans for the checkboxes, text for every other control. */
 export const fromSettings = settings => FIELDS.reduce((form, field) => ({
     ...form,
-    [field]: BOOLEAN_FIELDS.includes(field) ? Boolean(settings[field]) : String(settings[field] ?? '')
+    [field]: BOOLEAN_FIELDS.includes(field) ? Boolean(settings[field]) : String(settings[field] ?? FIELD_DEFAULTS[field] ?? '')
 }), {});
 
 /**

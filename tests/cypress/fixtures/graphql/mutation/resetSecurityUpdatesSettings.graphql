@@ -25,6 +25,7 @@ mutation resetSecurityUpdatesSettings {
                 bannerTextColor
                 bannerDismissPolicy
                 bannerDismissHours
+                bannerPosition
                 contrastRatio
                 canEdit
             }

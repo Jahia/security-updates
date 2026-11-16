@@ -34,6 +34,7 @@ const settings = {
     bannerIncludeOwnerReports: true,
     bannerBackgroundColor: '#1B1B1B',
     bannerTextColor: '#FFFFFF',
+    bannerPosition: 'TOP',
     bannerDismissPolicy: 'SESSION',
     bannerDismissHours: 24,
     contrastRatio: 17.22,

@@ -11,14 +11,14 @@ import {values} from '../common/i18n';
 import {StatusMessage} from './StatusMessage';
 import {StoreErrors} from './StoreErrors';
 import {Findings} from './Findings';
-import {Glossary} from './Glossary';
 import {ReportDates, ReportStatus} from './ReportOverview';
 import {adminUrl, sortFindings} from './securityUpdatesUtils';
 import {chipColor, viewStatus} from './reportView';
 import {useCheck} from './useCheck';
+import {PageTabs, TabPanel, usePageTab} from './PageTabs';
 
-// Built from Moonstone (LayoutContent, Header, Table, Chip, RadioGroup, Typography, Button) like the other Jahia
-// administration pages. Feed text is untrusted: it is only rendered as React text, and links only for https URLs.
+// Built from Moonstone (LayoutContent, Header, Tab, Table, Chip, RadioGroup, Typography, Button) like the other Jahia
+// administration pages. Two tabs: the results of the last check, and the settings. Feed text is untrusted: it is only rendered as React text, and links only for https URLs.
 
 const useDocumentTitle = title => {
     useEffect(() => {
@@ -92,6 +92,7 @@ export const SecurityUpdates = () => {
     const report = shown?.securityUpdates?.report;
     const check = useCheck({report, refetch, refreshReport, t, language: i18n?.language});
     const isMounted = useMounted();
+    const [tab, selectTab] = usePageTab();
     useDocumentTitle(t('page.documentTitle', values({title: t('label')})));
     usePageEvents();
     // A saved or reset setting can change the whole report (checks turned off or on, the banner threshold): it is read
@@ -123,33 +124,39 @@ export const SecurityUpdates = () => {
 
     const content = (
         <div className={styles.page}>
-            <Typography className={styles.text}>{t('page.intro')}</Typography>
-            <Glossary/>
-
-            {/* Always in the page, so that screen readers follow it from the start; empty until the page is mounted. */}
-            <div role="status" aria-live="polite" aria-atomic="true" className={styles.announcement} data-testid="security-updates-status">
-                {isMounted && <PageStatus isLoading={Boolean(loading)} check={check}/>}
+            {/* The tabs and the status line, with no space between them: an empty status line takes no room. */}
+            <div className={styles.tabsHeader}>
+                <PageTabs selected={tab} onSelect={selectTab}/>
+                {/* Always in the page, so that screen readers follow it from the start; empty until the page is mounted.
+                    Outside the tab panels: Check now (in the header) is announced whichever tab is open. */}
+                <div role="status" aria-live="polite" aria-atomic="true" className={styles.announcement} data-testid="security-updates-status">
+                    {isMounted && <PageStatus isLoading={Boolean(loading)} check={check}/>}
+                </div>
             </div>
 
-            {loading && !report && <div className={styles.loader} aria-hidden="true"><Loader size="big"/></div>}
+            <TabPanel tab="results" selected={tab}>
+                {loading && !report && <div className={styles.loader} aria-hidden="true"><Loader size="big"/></div>}
 
-            {error && (
-                <StatusMessage tone="warning" role="alert" data-testid="security-updates-error">
-                    {t(report ? 'page.updateError' : 'page.error')}
-                </StatusMessage>
-            )}
+                {error && (
+                    <StatusMessage tone="warning" role="alert" data-testid="security-updates-error">
+                        {t(report ? 'page.updateError' : 'page.error')}
+                    </StatusMessage>
+                )}
 
-            {report && (
-                <>
-                    <ReportDates report={report}/>
-                    <Typography component="a" className={styles.link} href={adminUrl('manageModules')}>{t('page.manageModules')}</Typography>
-                    <ReportStatus report={{...report, findings}}/>
-                    <StoreErrors errors={report.errors}/>
-                    {findings.length > 0 && !isDisabled && <Findings findings={findings} banner={shown?.securityUpdates?.banner}/>}
-                </>
-            )}
+                {report && (
+                    <>
+                        <ReportDates report={report}/>
+                        <Typography component="a" className={styles.link} href={adminUrl('manageModules')}>{t('page.manageModules')}</Typography>
+                        <ReportStatus report={{...report, findings}}/>
+                        <StoreErrors errors={report.errors}/>
+                        {findings.length > 0 && !isDisabled && <Findings findings={findings} banner={shown?.securityUpdates?.banner}/>}
+                    </>
+                )}
+            </TabPanel>
 
-            <SettingsForm onSettingsChanged={onSettingsChanged}/>
+            <TabPanel tab="settings" selected={tab}>
+                <SettingsForm onSettingsChanged={onSettingsChanged}/>
+            </TabPanel>
         </div>
     );
 

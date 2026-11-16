@@ -14,6 +14,7 @@ public final class BannerDecision {
     public static final String DEFAULT_TEXT_COLOR = "#FFFFFF";
     public static final DismissPolicy DEFAULT_DISMISS_POLICY = DismissPolicy.SESSION;
     public static final int DEFAULT_DISMISS_HOURS = 24;
+    public static final BannerPosition DEFAULT_POSITION = BannerPosition.TOP;
     public static final Severity DEFAULT_MINIMUM_SEVERITY = Severity.HIGH;
 
     private final boolean visible;
@@ -24,6 +25,17 @@ public final class BannerDecision {
     private final String textColor;
     private final DismissPolicy dismissPolicy;
     private final int dismissHours;
+    private final BannerPosition position;
+
+    /**
+     * A decision shown at the {@link #DEFAULT_POSITION}.
+     */
+    @SuppressWarnings("java:S107") // a plain value object exposed to GraphQL
+    public BannerDecision(boolean visible, Severity minimumSeverity, List<String> components, List<String> dismissalKeys,
+                          String backgroundColor, String textColor, DismissPolicy dismissPolicy, int dismissHours) {
+        this(visible, minimumSeverity, components, dismissalKeys, backgroundColor, textColor, dismissPolicy, dismissHours,
+                DEFAULT_POSITION);
+    }
 
     /**
      * @param visible         true when the banner is enabled and at least one finding qualifies
@@ -34,10 +46,12 @@ public final class BannerDecision {
      * @param textColor       validated {@code #RRGGBB} text colour, at least 7:1 against the background
      * @param dismissPolicy   how long a dismissal lasts
      * @param dismissHours    duration of a dismissal for {@link DismissPolicy#HOURS}
+     * @param position        where the banner appears in the Jahia UI
      */
     @SuppressWarnings("java:S107") // a plain value object exposed to GraphQL
     public BannerDecision(boolean visible, Severity minimumSeverity, List<String> components, List<String> dismissalKeys,
-                          String backgroundColor, String textColor, DismissPolicy dismissPolicy, int dismissHours) {
+                          String backgroundColor, String textColor, DismissPolicy dismissPolicy, int dismissHours,
+                          BannerPosition position) {
         this.visible = visible;
         this.minimumSeverity = Objects.requireNonNull(minimumSeverity, "minimumSeverity");
         this.components = List.copyOf(components);
@@ -46,6 +60,7 @@ public final class BannerDecision {
         this.textColor = Objects.requireNonNull(textColor, "textColor");
         this.dismissPolicy = Objects.requireNonNull(dismissPolicy, "dismissPolicy");
         this.dismissHours = dismissHours;
+        this.position = Objects.requireNonNull(position, "position");
     }
 
     /**
@@ -53,7 +68,7 @@ public final class BannerDecision {
      */
     public static BannerDecision hidden() {
         return new BannerDecision(false, DEFAULT_MINIMUM_SEVERITY, Collections.emptyList(), Collections.emptyList(),
-                DEFAULT_BACKGROUND_COLOR, DEFAULT_TEXT_COLOR, DEFAULT_DISMISS_POLICY, DEFAULT_DISMISS_HOURS);
+                DEFAULT_BACKGROUND_COLOR, DEFAULT_TEXT_COLOR, DEFAULT_DISMISS_POLICY, DEFAULT_DISMISS_HOURS, DEFAULT_POSITION);
     }
 
     public boolean isVisible() {
@@ -91,5 +106,9 @@ public final class BannerDecision {
 
     public int getDismissHours() {
         return dismissHours;
+    }
+
+    public BannerPosition getPosition() {
+        return position;
     }
 }

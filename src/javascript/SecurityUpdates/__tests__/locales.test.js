@@ -53,13 +53,6 @@ describe('locales', () => {
         expect(tags(en.page.afterTable)).toEqual(['</manage>', '</upgrade>', '<manage>', '<upgrade>']);
     });
 
-    test('the glossary explains each term of the page in both languages', () => {
-        ['advisory', 'cve', 'store', 'catalogue'].forEach(term => [en, fr].forEach(locale => {
-            expect(locale.page.glossary[term].term).toBeTruthy();
-            expect(locale.page.glossary[term].definition).toBeTruthy();
-        }));
-    });
-
     test('texts use the typographic apostrophe in French', () => {
         keys(fr).forEach(key => expect([key, get(fr, key).includes('\'')]).toEqual([key, false]));
     });
@@ -121,7 +114,7 @@ describe('locales', () => {
         });
         // The message counts module owner reports too (when set to): it does not call them advisories. The text said
         // after hiding the banner names what makes it come back (a new advisory or component), and is not checked.
-        const shown = locale => JSON.stringify({message: locale.banner.message, threshold: locale.banner.threshold, link: locale.banner.link});
+        const shown = locale => JSON.stringify({message: locale.banner.message, threshold: locale.banner.threshold});
         expect(shown(en)).not.toMatch(/advisor/i);
         expect(shown(fr)).not.toMatch(/bulletin/i);
     });
@@ -152,6 +145,7 @@ describe('locales', () => {
             'bannerIncludeOwnerReports',
             'bannerBackgroundColor',
             'bannerTextColor',
+            'bannerPosition',
             'bannerDismissPolicy',
             'bannerDismissHours'];
         [en, fr].forEach(locale => {
@@ -180,6 +174,23 @@ describe('locales', () => {
             'REQUEST_FAILED'].forEach(code => expect(en.settings.errors[code]).toBeTruthy());
         ['SESSION', 'HOURS', 'UNTIL_CHANGE', 'NEVER'].forEach(policy => expect(en.settings.dismiss[policy]).toBeTruthy());
         expect(en.settings.errors.LOW_CONTRAST).toContain('{{ratio}}');
+    });
+
+    test('every banner position has a text in plain words, in both languages', () => {
+        expect(en.settings.fields.bannerPosition.label).toBe('Banner position');
+        expect(fr.settings.fields.bannerPosition.label).toBe('Position du bandeau');
+        expect(en.settings.position).toEqual({
+            TOP: 'Top of the window, full width',
+            BOTTOM: 'Bottom of the window, full width',
+            TOP_RIGHT: 'Top right corner',
+            BOTTOM_RIGHT: 'Bottom right corner'
+        });
+        expect(fr.settings.position).toEqual({
+            TOP: 'En haut de la fenêtre, sur toute la largeur',
+            BOTTOM: 'En bas de la fenêtre, sur toute la largeur',
+            TOP_RIGHT: 'Coin supérieur droit',
+            BOTTOM_RIGHT: 'Coin inférieur droit'
+        });
     });
 
     test('the session dismissal is described as the browser tab', () => {

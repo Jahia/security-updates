@@ -10,6 +10,17 @@ import type {Interception} from 'cypress/types/net-stubbing';
  */
 
 export const ADMIN_PATH = '/jahia/administration/securityUpdates';
+/** The page with its Settings tab open (the address keeps the selected tab). */
+export const SETTINGS_PATH = `${ADMIN_PATH}?tab=settings`;
+export const TAB_RESULTS = '[data-sel-role="security-updates-tab-results"]';
+export const TAB_SETTINGS = '[data-sel-role="security-updates-tab-settings"]';
+
+/** Selects a tab of the page by a click, and waits until its panel is shown. */
+export const openTab = (name: 'results' | 'settings'): void => {
+    cy.get(name === 'results' ? TAB_RESULTS : TAB_SETTINGS).click();
+    cy.get(`#security-updates-panel-${name}`).should('be.visible');
+};
+
 export const APP_PATH = '/jahia/dashboard';
 export const FIXTURE_STORE = 'https://storefixture';
 export const JAHIA_STORE = 'https://store.jahia.com';
@@ -100,6 +111,7 @@ export type Banner = {
     textColor: string;
     dismissPolicy: string;
     dismissHours: number;
+    position: string;
     username: string;
 };
 export type Settings = {
@@ -115,6 +127,7 @@ export type Settings = {
     bannerTextColor: string;
     bannerDismissPolicy: string;
     bannerDismissHours: number;
+    bannerPosition: string;
 };
 export type StoredSettings = Settings & { contrastRatio: number; canEdit: boolean };
 export type Suggestion = { field: string; value: string; ratio: string };
@@ -135,7 +148,8 @@ export const SETTINGS_KEYS: Array<keyof Settings> = [
     'bannerBackgroundColor',
     'bannerTextColor',
     'bannerDismissPolicy',
-    'bannerDismissHours'
+    'bannerDismissHours',
+    'bannerPosition'
 ];
 
 /** The settings of settings-fixture-defaults.yml. */
@@ -151,13 +165,14 @@ export const FIXTURE_SETTINGS: Settings = {
     bannerBackgroundColor: '#1B1B1B',
     bannerTextColor: '#FFFFFF',
     bannerDismissPolicy: 'SESSION',
-    bannerDismissHours: 24
+    bannerDismissHours: 24,
+    bannerPosition: 'TOP'
 };
 
 /** The module defaults (META-INF/configurations/org.jahia.community.securityupdates.cfg), set by resetSettings. */
 export const DEFAULT_SETTINGS: Settings = {...FIXTURE_SETTINGS, useForgeSettings: true, defaultStoreUrl: JAHIA_STORE};
 
-/** The twelve settings only (no contrastRatio, canEdit or __typename). */
+/** The thirteen settings only (no contrastRatio, canEdit or __typename). */
 export const settingsOf = (value: Partial<StoredSettings>): Settings => SETTINGS_KEYS.reduce(
     (settings, key) => ({...settings, [key]: value[key]}),
     {} as Settings

@@ -31,21 +31,26 @@ First release (1.0.0). It requires Jahia 8.2.3.7 or later.
 - GraphQL API under `Query.securityUpdates` (`report`, `banner`, `settings`) and `Mutation.securityUpdates`
   (`refresh`, `updateSettings`, `resetSettings`).
 - Admin page **Server settings > System components > Security updates** (English, French), built from
-  Moonstone, WCAG 2.2 AAA contrast.
+  Moonstone, WCAG 2.2 AAA contrast, with two tabs: **Check results** and **Settings** (`?tab=settings` in the
+  address opens the second).
 - Banner for `adminTemplates` users in the Jahia UI, decided server-side: counts distinct components at or
   above a configurable severity, with dismissal policies `SESSION` (browser tab), `HOURS`, `UNTIL_CHANGE`,
   `NEVER`, keyed on component and advisory. Colours are `#RRGGBB` with a contrast of at least 7:1, with
   suggestions.
-- Settings section on the page, with full server-side validation, a confirmation before reset, and a
+- Settings tab on the page, with full server-side validation, a confirmation before reset, and a
   read-only view for users who cannot change them. Settings are saved through ConfigurationAdmin into
   `karaf/etc`, which Jahia propagates across the cluster.
 - OSGi configuration `org.jahia.community.securityupdates` (`enabled`, `refreshIntervalHours`,
   `useForgeSettings`, `extraFeedUrls`, `defaultStoreUrl`, `bannerEnabled`, `bannerMinimumSeverity`,
   `bannerIncludeOwnerReports`, `bannerBackgroundColor`, `bannerTextColor`, `bannerDismissPolicy`,
-  `bannerDismissHours`, and the hidden `onDemandMinIntervalSeconds`).
+  `bannerDismissHours`, `bannerPosition`, and the hidden `onDemandMinIntervalSeconds`).
 - Each advisory shows the host of the store that published it (`storeHost`), as "(from <host>)" when it is
-  not `store.jahia.com`. The page has a glossary, and the banner sits last in the page body, with a compact
-  layout in a small window.
+  not `store.jahia.com`.
+- The banner is a full-width bar at the top of the window by default, and the Jahia UI is made shorter so
+  that the bar covers none of it. `bannerPosition` puts it at the bottom instead, or in a small box in the
+  top right or bottom right corner. Jahia's dialogs open over it. It has a compact layout in a small window.
+- The banner message is itself the link to the Security updates page, and the banner is closed with the usual
+  cross (×), named "Hide this banner".
 - A check has 5 minutes in all. An unexpected failure of one store does not stop the others, and the module
   list is not requested after a transport failure of the feed. Lists longer than 100 items are cut and
   reported.

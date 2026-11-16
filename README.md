@@ -38,6 +38,13 @@ The first check runs about one minute after the module starts. **Check now** sta
 
 ## What the page shows
 
+The page has two tabs: **Check results** (open first) and **Settings**. The address keeps the open tab:
+`/jahia/administration/securityUpdates?tab=settings` opens the settings. The arrow keys, Home and End move
+between the tabs. Changes not saved yet in the Settings tab are kept when you switch tabs. The status line
+of **Check now** sits under the tabs, outside them, so it is read whichever tab is open.
+
+**Check results** shows:
+
 - A status chip: **Up to date**, **Updates needed**, **Partly checked**, **No security data**,
   **Not available yet**, **Turned off** or **Not checked yet**. The chip is worded, never colour only.
 - A table of the components with security updates, most severe first. Each row gives the component, its
@@ -55,10 +62,9 @@ The first check runs about one minute after the module starts. **Check now** sta
   flagged on the store. They are not Jahia advisories.
 - The problems found during the last check, per store, in plain language. The technical text is in English
   and is labelled "Technical details (in English)".
-- A short glossary ("What these terms mean": advisory, CVE, store, module list), in plain words.
 - When a filter leaves no finding, the page says so.
 - The time of the last check and of the last check that reached every store, and when the next one is due.
-- After you save or reset the settings, the page loads the report again. If that fails, it keeps the last
+- After you save or reset the settings, the page loads the report again in the **Check results** tab. If that fails, it keeps the last
   report and says "The security report could not be updated: the last report loaded is shown. Reload the page
   to try again."
 
@@ -69,12 +75,28 @@ The first check runs about one minute after the module starts. **Check now** sta
 ## Banner
 
 Users with `adminTemplates` also get a notice (the banner) in the Jahia UI, for example
-"3 components need a security update (high severity or above).", with a link to the Security updates page.
-It is a fixed box at the bottom right of the window, and the last element of the page body, so it is the
-last stop of the Tab order. It moves to the top right only when the focused element would be covered and the
-focused element is clear of the top edge. It then stays there for 2 seconds for that element. In a window at
-most 40rem wide or high, it is a compact strip over the full width of the edge, at most 40% of the window
-high, and scrolls inside.
+"3 components need a security update (high severity or above)." The message is a link to the Security
+updates page. A close cross (×) next to it, named "Hide this banner" for screen readers and as a tooltip,
+hides the banner (see Dismissal below).
+Where it appears is set by `bannerPosition`:
+
+| `bannerPosition` | Where |
+|---|---|
+| `TOP` (default) | A bar across the whole width, at the top of the window. |
+| `BOTTOM` | A bar across the whole width, at the bottom of the window. |
+| `TOP_RIGHT` | A small box in the top right corner. |
+| `BOTTOM_RIGHT` | A small box in the bottom right corner. |
+
+- **A bar covers nothing.** The Jahia UI is made shorter by the height of the bar, so no button or menu
+  of Jahia is under it. Its text is at most 80 characters wide. A bar at the top is the first element of
+  the page body, so it is the first stop of the Tab order. A bar at the bottom is the last element, so it is
+  the last stop.
+- **A box is over the Jahia UI.** It is the last element of the page body, so it is the last stop of the Tab
+  order. It moves to the other corner (top or bottom) only when the focused element would be covered and the
+  focused element is clear of the other edge. It then stays there for 2 seconds for that element.
+- Jahia's dialogs, such as the content editor in full screen, open over the banner.
+- In a window at most 40rem wide or high, the banner is a compact strip over the full width of its edge, at
+  most 40% of the window high, and scrolls inside.
 
 The server decides whether it is shown, from the current report and the `banner*` settings (see
 [Configuration](#configuration)), and exposes the decision as `Query.securityUpdates.banner`:
@@ -85,7 +107,7 @@ The server decides whether it is shown, from the current report and the `banner*
 - `components` lists those components, distinct and sorted.
 - `dismissalKeys` lists one `<component>|<advisory id>` per counted advisory, distinct and sorted.
 - `visible` is `bannerEnabled && count > 0`.
-- `backgroundColor`, `textColor`, `dismissPolicy`, `dismissHours` are the validated presentation settings,
+- `backgroundColor`, `textColor`, `dismissPolicy`, `dismissHours`, `position` are the validated presentation settings,
   and `username` the current Jahia user.
 
 The browser only renders the decision. It never filters findings itself. A configuration change applies on
@@ -96,7 +118,7 @@ within 20 seconds) leaves the banner as it is, and the browser asks again after 
 The banner reads the server again every 15 minutes, when the browser tab becomes visible again (no request
 if the last one is less than 30 seconds old), and when the page changes the report or the settings. It is
 hidden on the Security updates page itself. A screen reader hears it only when its count or its dismissal
-keys change. After **Hide this banner**, a status message tells when it comes back. Focus goes to the last
+keys change. After the close cross, a status message tells when it comes back. Focus goes to the last
 element outside the banner that had it, else to the element focused when the banner appeared, else it stays
 on the page body.
 
@@ -104,11 +126,11 @@ For tests, the `<html>` element carries `data-security-updates-banner="pending"`
 server and `"ready"` after each decision. The attribute is removed when the banner stops.
 
 **Colours.** The background and text colours are configurable (`#RRGGBB`). Their contrast ratio must be at
-least 7:1 (WCAG 2.2 AAA, relative luminance formula). The link, the button border and the 3px focus ring
-use the text colour, so they keep that contrast. The settings form and the server suggest a colour that
+least 7:1 (WCAG 2.2 AAA, relative luminance formula). The link, the close cross, its hover outline and the
+3px focus ring use the text colour, so they keep that contrast. The settings form and the server suggest a colour that
 reaches 7:1 when a pair does not.
 
-**Dismissal** (`bannerDismissPolicy`; the **Hide this banner** button only, the Escape key does nothing):
+**Dismissal** (`bannerDismissPolicy`; the close cross only, the Escape key does nothing; `NEVER` shows no cross):
 
 | Policy | Hidden until | Stored in |
 |---|---|---|
@@ -422,6 +444,7 @@ changes survive restarts and redeployments.
 | `bannerTextColor` | `#FFFFFF` | `#RRGGBB` | Banner text (also link, button and focus ring). The pair needs a contrast of at least 7:1. |
 | `bannerDismissPolicy` | `SESSION` | `SESSION`, `HOURS`, `UNTIL_CHANGE`, `NEVER` | See [Banner](#banner). |
 | `bannerDismissHours` | `24` | 1 to 720 | Hours a dismissal lasts with `HOURS`. |
+| `bannerPosition` | `TOP` | `TOP`, `BOTTOM`, `TOP_RIGHT`, `BOTTOM_RIGHT` | Where the banner appears. See [Banner](#banner). |
 | `onDemandMinIntervalSeconds` | `30` | 0 to 3600 | Hidden key, not shown in the settings page. Seconds from the later of the start and the end of the previous check before **Check now** may start another. The e2e tests set it to 0, except the rate-limit test (3600). The page never changes it. |
 
 **A `.cfg` file edited by hand is read leniently**, so a typo never stops the module. The service reads the
@@ -436,8 +459,9 @@ raw values: an unreadable value takes its default and the module still starts.
 - A property with several values (an array) is joined with ", ".
 - `extraFeedUrls` accepts commas or spaces. Beyond 10 URLs only the first 10 are used, with one WARN.
 - An empty or unknown `bannerMinimumSeverity` means `HIGH`, an empty or unknown `bannerDismissPolicy` means
-  `SESSION`, and an invalid colour or a pair below 7:1 means the default pair. An unknown severity or policy
-  and an invalid colour give a WARN. An empty severity or policy gives none. An empty colour gives a WARN.
+  `SESSION`, an empty or unknown `bannerPosition` means `TOP`, and an invalid colour or a pair below 7:1 means
+  the default pair. An unknown severity, policy or position and an invalid colour give a WARN. An empty
+  severity, policy or position gives none. An empty colour gives a WARN.
 - An empty `defaultStoreUrl` means no default store: with no module manager store either, the report
   shows `NO_STORE`.
 - A URL that is not https is not an error of the file: it is reported at check time (`INVALID_URL`).
@@ -484,10 +508,10 @@ query {
         advisories { id title url cves severity storeHost }
       }
     }
-    banner { visible count minimumSeverity components dismissalKeys backgroundColor textColor dismissPolicy dismissHours username }
+    banner { visible count minimumSeverity components dismissalKeys backgroundColor textColor dismissPolicy dismissHours position username }
     settings { canEdit enabled refreshIntervalHours useForgeSettings defaultStoreUrl extraFeedUrls bannerEnabled
                bannerMinimumSeverity bannerIncludeOwnerReports bannerBackgroundColor bannerTextColor
-               bannerDismissPolicy bannerDismissHours contrastRatio }
+               bannerDismissPolicy bannerDismissHours bannerPosition contrastRatio }
   }
 }
 
@@ -519,7 +543,7 @@ Example of variables for `updateSettings`:
     "defaultStoreUrl": "https://store.jahia.com", "extraFeedUrls": "",
     "bannerEnabled": true, "bannerMinimumSeverity": "HIGH", "bannerIncludeOwnerReports": true,
     "bannerBackgroundColor": "#1B1B1B", "bannerTextColor": "#FFFFFF",
-    "bannerDismissPolicy": "SESSION", "bannerDismissHours": 24
+    "bannerDismissPolicy": "SESSION", "bannerDismissHours": 24, "bannerPosition": "TOP"
   }
 }
 ```
@@ -584,8 +608,8 @@ See [SECURITY.md](SECURITY.md) to report a vulnerability.
   screening and the proxy settings. Configure only stores that you trust.
 - **A third-party store can publish any advisory id.** The page shows `(from <store host>)` for an advisory that
   does not come from `store.jahia.com`. The official store wins for an id found in several feeds.
-- **Reading level.** The page uses the terms of a Jahia administrator (advisory, CVE, store, module list).
-  A glossary on the page defines them.
+- **Reading level.** The page uses the terms of a Jahia administrator (advisory, CVE, store, module list)
+  and does not define them.
 
 ## Upgrade
 

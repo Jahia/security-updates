@@ -19,11 +19,12 @@ public final class SettingsKeys {
     public static final String BANNER_TEXT_COLOR = "bannerTextColor";
     public static final String BANNER_DISMISS_POLICY = "bannerDismissPolicy";
     public static final String BANNER_DISMISS_HOURS = "bannerDismissHours";
+    public static final String BANNER_POSITION = "bannerPosition";
 
     /** Every key, in the order of the .cfg file. */
     public static final List<String> ALL = List.of(ENABLED, REFRESH_INTERVAL_HOURS, USE_FORGE_SETTINGS, EXTRA_FEED_URLS,
             DEFAULT_STORE_URL, BANNER_ENABLED, BANNER_MINIMUM_SEVERITY, BANNER_INCLUDE_OWNER_REPORTS, BANNER_BACKGROUND_COLOR,
-            BANNER_TEXT_COLOR, BANNER_DISMISS_POLICY, BANNER_DISMISS_HOURS);
+            BANNER_TEXT_COLOR, BANNER_DISMISS_POLICY, BANNER_DISMISS_HOURS, BANNER_POSITION);
 
     private SettingsKeys() {
     }

@@ -2,25 +2,10 @@
   "label": "Mises à jour de sécurité",
   "page": {
     "documentTitle": "{{title}} – Administration de Jahia",
-    "intro": "Cette page liste les composants installés (Jahia et ses modules) qui ont une mise à jour corrigeant un problème de sécurité, d’après les données de sécurité publiées par les stores.",
-    "glossary": {
-      "title": "Que signifient ces termes",
-      "advisory": {
-        "term": "Bulletin",
-        "definition": "Un message publié sur un problème de sécurité de Jahia ou d’un module. Il indique les versions qui ont le problème et la version qui le corrige."
-      },
-      "cve": {
-        "term": "CVE",
-        "definition": "Un numéro public donné à un problème de sécurité connu, comme CVE-2026-1234. Son lien ouvre la fiche du problème sur cve.org."
-      },
-      "store": {
-        "term": "Store",
-        "definition": "Un serveur qui propose des modules Jahia et publie leurs données de sécurité, comme le Jahia Store (store.jahia.com). Les stores vérifiés viennent de la gestion des modules et des paramètres ci-dessous."
-      },
-      "catalogue": {
-        "term": "Liste des modules (catalogue)",
-        "definition": "La liste des modules et des versions qu’un store propose. Cette page s’en sert pour dire si une mise à jour fonctionne avec votre version de Jahia."
-      }
+    "tabs": {
+      "label": "Sections des mises à jour de sécurité",
+      "results": "Résultats de la vérification",
+      "settings": "Paramètres"
     },
     "loading": "Chargement du rapport de sécurité…",
     "error": "Le rapport de sécurité n’a pas pu être chargé. Rechargez la page pour réessayer.",
@@ -70,12 +55,12 @@
     },
     "status": {
       "NOT_CHECKED": "Aucune vérification n’a encore eu lieu. La première a lieu environ une minute après le démarrage. Utilisez « Vérifier maintenant » pour la lancer tout de suite.",
-      "DISABLED": "Les vérifications sont désactivées : cette page n’affiche aucun résultat et aucun bandeau n’est affiché. Un administrateur du serveur peut les activer dans les paramètres ci-dessous.",
+      "DISABLED": "Les vérifications sont désactivées : cette page n’affiche aucun résultat et aucun bandeau n’est affiché. Un administrateur du serveur peut les activer dans l’onglet Paramètres.",
       "PARTIAL": "Certains stores n’ont pas pu être interrogés : cette liste peut être incomplète.",
       "PARTIAL_EMPTY": "Certains stores n’ont pas pu être interrogés. Les stores qui ont répondu ne signalent aucune mise à jour de sécurité pour ce Jahia, mais les autres pourraient en signaler.",
       "UNAVAILABLE": "Aucune donnée de sécurité n’a pu être lue : cette page ne peut pas dire si ce Jahia a besoin de mises à jour de sécurité.",
       "NOT_PUBLISHED": "Le Jahia Store ne publie pas encore de données de sécurité. Il n’y a rien à configurer : cette page affichera des résultats dès que ces données seront publiées.",
-      "NOT_PUBLISHED_OTHER": "Les adresses de store vérifiées n’ont pas encore de données de sécurité. Vérifiez-les dans les paramètres ci-dessous ou dans la gestion des modules. Si elles sont correctes, cette page affichera des résultats dès que les données seront publiées.",
+      "NOT_PUBLISHED_OTHER": "Les adresses de store vérifiées n’ont pas encore de données de sécurité. Vérifiez-les dans l’onglet Paramètres ou dans la gestion des modules. Si elles sont correctes, cette page affichera des résultats dès que les données seront publiées.",
       "STALE": "Les résultats ne sont peut-être plus à jour : aucune vérification n’a interrogé tous les stores depuis le {{date}}."
     },
     "errors": {
@@ -101,11 +86,11 @@
       "INVALID_URL": "Vérifiez l’adresse de ce store.",
       "CATALOGUE_UNAVAILABLE": "Les résultats restent listés, sans leur compatibilité.",
       "MALFORMED_VERSION": "La version de ce composant ne peut pas être comparée aux données de sécurité.",
-      "NO_STORE": "Ajoutez un store dans la gestion des modules, ou saisissez l’adresse d’un store par défaut dans les paramètres ci-dessous.",
+      "NO_STORE": "Ajoutez un store dans la gestion des modules, ou saisissez l’adresse d’un store par défaut dans l’onglet Paramètres.",
       "STALE": "Lancez une vérification, ou consultez les autres problèmes listés ici."
     },
     "errorDetail": {
-      "NOT_HTTPS": "L’adresse n’utilise pas https. Seules les adresses https sont acceptées : modifiez-la dans les paramètres ci-dessous ou dans la gestion des modules.",
+      "NOT_HTTPS": "L’adresse n’utilise pas https. Seules les adresses https sont acceptées : modifiez-la dans l’onglet Paramètres ou dans la gestion des modules.",
       "SSRF_BLOCKED": "Jahia a bloqué cette adresse car elle pointe vers un réseau interne. Si ce store est interne volontairement, un administrateur système peut autoriser son hôte avec la propriété jahia.httpClient.allowedInternalHosts.",
       "TIMEOUT": "Le store n’a pas répondu à temps. Réessayez plus tard.",
       "CONNECTION": "Jahia n’a pas pu se connecter au store. Vérifiez l’adresse, ainsi que les réglages réseau et proxy du serveur.",
@@ -179,7 +164,6 @@
       "HIGH": "gravité élevée ou supérieure",
       "CRITICAL": "gravité critique"
     },
-    "link": "Voir les mises à jour de sécurité",
     "dismiss": "Masquer ce bandeau",
     "hidden": {
       "SESSION": "Bandeau masqué jusqu’à la fermeture de cet onglet du navigateur. Il revient plus tôt si un nouveau bulletin ou un nouveau composant est compté.",
@@ -248,6 +232,10 @@
         "picker": "Choisir la couleur du texte du bandeau",
         "help": "Un code couleur comme #FFFFFF. Également utilisée pour le lien, le bouton et le contour de focus."
       },
+      "bannerPosition": {
+        "label": "Position du bandeau",
+        "help": "L’endroit où le bandeau apparaît dans l’interface Jahia : une barre sur toute la largeur de la fenêtre, ou un petit encadré dans un coin."
+      },
       "bannerDismissPolicy": {
         "label": "Quand un utilisateur masque le bandeau",
         "help": "Sauf avec « Ne peut pas être masqué », le bandeau revient dès qu’un nouveau bulletin ou un nouveau composant est compté."
@@ -263,6 +251,12 @@
       "HOURS": "Masqué pendant un nombre d’heures",
       "UNTIL_CHANGE": "Masqué jusqu’à ce qu’un nouveau bulletin ou un nouveau composant soit compté",
       "NEVER": "Ne peut pas être masqué"
+    },
+    "position": {
+      "TOP": "En haut de la fenêtre, sur toute la largeur",
+      "BOTTOM": "En bas de la fenêtre, sur toute la largeur",
+      "TOP_RIGHT": "Coin supérieur droit",
+      "BOTTOM_RIGHT": "Coin inférieur droit"
     },
     "preview": {
       "title": "Aperçu",

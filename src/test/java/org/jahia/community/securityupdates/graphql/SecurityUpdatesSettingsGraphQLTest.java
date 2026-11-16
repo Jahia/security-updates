@@ -1,6 +1,7 @@
 package org.jahia.community.securityupdates.graphql;
 
 import graphql.annotations.annotationTypes.GraphQLName;
+import org.jahia.community.securityupdates.model.BannerPosition;
 import org.jahia.community.securityupdates.model.DismissPolicy;
 import org.jahia.community.securityupdates.model.Severity;
 import org.jahia.community.securityupdates.service.SecurityUpdateService;
@@ -54,7 +55,8 @@ class SecurityUpdatesSettingsGraphQLTest {
     }
 
     private static GqlSettingsInput input(String background, String text, int interval, String url) {
-        return new GqlSettingsInput(true, interval, true, url, "", true, "HIGH", true, background, text, "HOURS", 12);
+        return new GqlSettingsInput(true, interval, true, url, "", true, "HIGH", true, background, text, "HOURS", 12,
+                "bottom_right");
     }
 
     @Test
@@ -74,6 +76,7 @@ class SecurityUpdatesSettingsGraphQLTest {
         assertThat(settings.getBannerTextColor()).isEqualTo("#FFFFFF");
         assertThat(settings.getBannerDismissPolicy()).isEqualTo(DismissPolicy.SESSION);
         assertThat(settings.getBannerDismissHours()).isEqualTo(24);
+        assertThat(settings.getBannerPosition()).isEqualTo(BannerPosition.TOP);
         assertThat(settings.getContrastRatio()).isBetween(17.2, 17.3);
         assertThat(settings.isCanEdit()).isTrue();
     }
@@ -123,8 +126,24 @@ class SecurityUpdatesSettingsGraphQLTest {
         assertThat(result.getSettings().getDefaultStoreUrl()).isEqualTo("https://store.jahia.com");
         ArgumentCaptor<Map<String, String>> written = ArgumentCaptor.forClass(Map.class);
         verify(store).save(written.capture(), eq("jdoe"));
-        assertThat(written.getValue()).hasSize(12).containsEntry("bannerDismissPolicy", "HOURS").containsEntry("bannerDismissHours", "12");
+        assertThat(written.getValue()).hasSize(13).containsEntry("bannerDismissPolicy", "HOURS").containsEntry("bannerDismissHours", "12")
+                .containsEntry("bannerPosition", "BOTTOM_RIGHT");
+        assertThat(result.getSettings().getBannerPosition()).isEqualTo(BannerPosition.BOTTOM_RIGHT);
         assertThat(result.getSettings().isCanEdit()).isTrue();
+    }
+
+    @Test
+    @DisplayName("an invalid banner position is a field error and writes nothing")
+    void invalidPosition() throws IOException {
+        GqlSettingsResult result = new SecurityUpdatesMutation().updateSettings(new GqlSettingsInput(true, 24, true, "", "",
+                true, "HIGH", true, "#1B1B1B", "#FFFFFF", "SESSION", 24, "LEFT"));
+
+        assertThat(result.isOk()).isFalse();
+        assertThat(result.getErrors()).singleElement().satisfies(e -> {
+            assertThat(e.getField()).isEqualTo("bannerPosition");
+            assertThat(e.getCode()).isEqualTo("INVALID_VALUE");
+        });
+        verify(store, never()).save(anyMap(), any());
     }
 
     @Test
@@ -182,6 +201,8 @@ class SecurityUpdatesSettingsGraphQLTest {
         verify(store).save(written.capture(), any());
         assertThat(written.getValue()).isEqualTo(SettingsTestSupport.defaults().toValues());
         assertThat(result.getSettings().getBannerDismissPolicy()).isEqualTo(DismissPolicy.SESSION);
+        assertThat(written.getValue()).containsEntry("bannerPosition", "TOP");
+        assertThat(result.getSettings().getBannerPosition()).isEqualTo(BannerPosition.TOP);
     }
 
     @Test
@@ -210,11 +231,11 @@ class SecurityUpdatesSettingsGraphQLTest {
     }
 
     @Test
-    @DisplayName("the banner exposes the validated colours and dismiss policy")
+    @DisplayName("the banner exposes the validated colours, dismiss policy and position")
     void bannerPresentation() {
         when(service.getBanner()).thenReturn(new org.jahia.community.securityupdates.model.BannerDecision(true, Severity.HIGH,
                 java.util.List.of("jahia-core"), java.util.List.of("jahia-core|JSA-1"), "#0B3D91", "#FFFFFF",
-                DismissPolicy.UNTIL_CHANGE, 24));
+                DismissPolicy.UNTIL_CHANGE, 24, BannerPosition.TOP_RIGHT));
 
         GqlBanner banner = new SecurityUpdatesQuery().getBanner();
 
@@ -222,6 +243,31 @@ class SecurityUpdatesSettingsGraphQLTest {
         assertThat(banner.getTextColor()).isEqualTo("#FFFFFF");
         assertThat(banner.getDismissPolicy()).isEqualTo(DismissPolicy.UNTIL_CHANGE);
         assertThat(banner.getDismissHours()).isEqualTo(24);
+        assertThat(banner.getPosition()).isEqualTo(BannerPosition.TOP_RIGHT);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    @DisplayName("the banner position goes from the saved settings to the banner decision")
+    void positionRoundTrip() throws IOException {
+        GqlSettingsResult saved = new SecurityUpdatesMutation().updateSettings(input("#1B1B1B", "#FFFFFF", 24, ""));
+        assertThat(saved.isOk()).isTrue();
+        ArgumentCaptor<Map<String, String>> written = ArgumentCaptor.forClass(Map.class);
+        verify(store).save(written.capture(), any());
+        org.jahia.community.securityupdates.service.BannerSettings banner =
+                SettingsTestSupport.fromValues(written.getValue()).getBanner();
+        when(service.getBanner()).thenReturn(org.jahia.community.securityupdates.service.BannerPolicy.decide(
+                org.jahia.community.securityupdates.model.SecurityReport.notChecked("8.2.0.0"), banner));
+
+        assertThat(new SecurityUpdatesQuery().getBanner().getPosition()).isEqualTo(BannerPosition.BOTTOM_RIGHT);
+    }
+
+    @Test
+    @DisplayName("the hidden banner, used when the service is not running, is at the top")
+    void hiddenBannerPosition() {
+        when(service.getBanner()).thenReturn(org.jahia.community.securityupdates.model.BannerDecision.hidden());
+
+        assertThat(new SecurityUpdatesQuery().getBanner().getPosition()).isEqualTo(BannerPosition.TOP);
     }
 
     @Test
@@ -273,13 +319,14 @@ class SecurityUpdatesSettingsGraphQLTest {
         assertThat(full.getBannerTextColor()).isEqualTo("#FFFFFF");
         assertThat(full.getBannerDismissPolicy()).isEqualTo("HOURS");
         assertThat(full.getBannerDismissHours()).isEqualTo(12);
+        assertThat(full.getBannerPosition()).isEqualTo("bottom_right");
     }
 
     @Test
     @DisplayName("a null input value is left out, so that the validator reports it MISSING")
     void nullValuesAreLeftOut() {
         GqlSettingsInput partial = new GqlSettingsInput(null, null, true, "", "", true, "HIGH", true, "#1B1B1B", "#FFFFFF",
-                "SESSION", 24);
+                "SESSION", 24, "TOP");
 
         assertThat(partial.toValues()).doesNotContainKeys("enabled", "refreshIntervalHours");
     }

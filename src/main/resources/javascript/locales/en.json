@@ -2,25 +2,10 @@
   "label": "Security updates",
   "page": {
     "documentTitle": "{{title}} – Jahia administration",
-    "intro": "This page lists the installed components (Jahia and its modules) that have an update fixing a security problem, from the security data that the stores publish.",
-    "glossary": {
-      "title": "What these terms mean",
-      "advisory": {
-        "term": "Advisory",
-        "definition": "A message published about a security problem in Jahia or in a module. It says which versions have the problem and which version fixes it."
-      },
-      "cve": {
-        "term": "CVE",
-        "definition": "A public number given to a known security problem, such as CVE-2026-1234. Its link opens the record of the problem on cve.org."
-      },
-      "store": {
-        "term": "Store",
-        "definition": "A server that offers Jahia modules and publishes their security data, such as the Jahia Store (store.jahia.com). The stores checked come from Manage modules and from the settings below."
-      },
-      "catalogue": {
-        "term": "Module list (catalogue)",
-        "definition": "The list of the modules and versions that a store offers. This page uses it to tell whether an update works with your Jahia version."
-      }
+    "tabs": {
+      "label": "Security updates sections",
+      "results": "Check results",
+      "settings": "Settings"
     },
     "loading": "Loading the security report…",
     "error": "The security report could not be loaded. Reload the page to try again.",
@@ -70,12 +55,12 @@
     },
     "status": {
       "NOT_CHECKED": "No check has run yet. The first check runs about one minute after startup. Use \"Check now\" to run it at once.",
-      "DISABLED": "Checks are turned off, so this page shows no results and no banner is shown. A server administrator can turn them on in the settings below.",
+      "DISABLED": "Checks are turned off, so this page shows no results and no banner is shown. A server administrator can turn them on in the Settings tab.",
       "PARTIAL": "Some stores could not be checked: this list may be incomplete.",
       "PARTIAL_EMPTY": "Some stores could not be checked. The stores that answered report no security update for this Jahia, but the others might.",
       "UNAVAILABLE": "No security data could be read, so this page cannot tell whether this Jahia needs security updates.",
       "NOT_PUBLISHED": "The Jahia Store does not publish security data yet. There is nothing to configure: this page will show results once the data is published.",
-      "NOT_PUBLISHED_OTHER": "The store addresses checked have no security data yet. Check them in the settings below or in Manage modules. If they are right, this page will show results once the data is published.",
+      "NOT_PUBLISHED_OTHER": "The store addresses checked have no security data yet. Check them in the Settings tab or in Manage modules. If they are right, this page will show results once the data is published.",
       "STALE": "The results may be out of date: no check has reached every store since {{date}}."
     },
     "errors": {
@@ -101,11 +86,11 @@
       "INVALID_URL": "Check the address of this store.",
       "CATALOGUE_UNAVAILABLE": "Findings are still listed, without their compatibility.",
       "MALFORMED_VERSION": "The version of this component cannot be compared with the security data.",
-      "NO_STORE": "Add a store in Manage modules, or enter a default store address in the settings below.",
+      "NO_STORE": "Add a store in Manage modules, or enter a default store address in the Settings tab.",
       "STALE": "Run a check, or see the other problems listed here."
     },
     "errorDetail": {
-      "NOT_HTTPS": "The address does not use https. Only https addresses are accepted: change it in the settings below or in Manage modules.",
+      "NOT_HTTPS": "The address does not use https. Only https addresses are accepted: change it in the Settings tab or in Manage modules.",
       "SSRF_BLOCKED": "Jahia blocked this address because it points to an internal network. If this store is internal on purpose, a system administrator can allow its host with the jahia.httpClient.allowedInternalHosts property.",
       "TIMEOUT": "The store did not answer in time. Try again later.",
       "CONNECTION": "Jahia could not connect to the store. Check the address, and the network and proxy settings of the server.",
@@ -179,7 +164,6 @@
       "HIGH": "high severity or above",
       "CRITICAL": "critical severity"
     },
-    "link": "View security updates",
     "dismiss": "Hide this banner",
     "hidden": {
       "SESSION": "Banner hidden until you close this browser tab. It comes back sooner if a new advisory or a new component is counted.",
@@ -248,6 +232,10 @@
         "picker": "Pick the banner text colour",
         "help": "A colour code such as #FFFFFF. Also used for the link, the button and the focus outline."
       },
+      "bannerPosition": {
+        "label": "Banner position",
+        "help": "Where the banner appears in the Jahia interface: a bar across the whole width of the window, or a small box in a corner."
+      },
       "bannerDismissPolicy": {
         "label": "After a user hides the banner",
         "help": "Except with \"Cannot be hidden\", the banner comes back as soon as a new advisory or a new component is counted."
@@ -263,6 +251,12 @@
       "HOURS": "Hidden for a number of hours",
       "UNTIL_CHANGE": "Hidden until a new advisory or a new component is counted",
       "NEVER": "Cannot be hidden"
+    },
+    "position": {
+      "TOP": "Top of the window, full width",
+      "BOTTOM": "Bottom of the window, full width",
+      "TOP_RIGHT": "Top right corner",
+      "BOTTOM_RIGHT": "Bottom right corner"
     },
     "preview": {
       "title": "Preview",

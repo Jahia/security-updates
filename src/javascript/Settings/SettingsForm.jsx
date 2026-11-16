@@ -2,7 +2,7 @@ import {useEffect, useRef, useState} from 'react';
 import PropTypes from 'prop-types';
 import {useMutation, useQuery} from '@apollo/client';
 import {useTranslation} from 'react-i18next';
-import {Button, Loader, Separator, Typography} from '@jahia/moonstone';
+import {Button, Loader, Typography} from '@jahia/moonstone';
 import styles from './SettingsForm.scss';
 import {GET_SETTINGS, RESET_SETTINGS, UPDATE_SETTINGS} from './Settings.gql';
 import {FIELDS, fromSettings, restartsSchedule, toInput} from './settingsValues';
@@ -14,6 +14,7 @@ import {SettingsSummary} from './SettingsSummary';
 import {ResetDialog} from './ResetDialog';
 import {StatusMessage} from '../SecurityUpdates/StatusMessage';
 import {
+    BANNER_POSITIONS,
     CHANGED_EVENT,
     DEFAULT_BANNER_BACKGROUND,
     DEFAULT_BANNER_TEXT,
@@ -42,7 +43,6 @@ const Section = ({children}) => {
     const {t} = useTranslation(NS);
     return (
         <section className={styles.settings} aria-labelledby={TITLE_ID}>
-            <Separator/>
             <Typography component="h2" variant="heading" id={TITLE_ID}>{t('settings.title')}</Typography>
             {children}
         </section>
@@ -288,6 +288,9 @@ export const SettingsForm = ({onSettingsChanged}) => {
                         <ColorField field="bannerBackgroundColor" ratio={ratio} {...fieldProps}/>
                         <ColorField field="bannerTextColor" ratio={ratio} {...fieldProps}/>
                         <BannerPreview form={form} applied={applied} onApply={onApply}/>
+                        <SelectField field="bannerPosition" {...fieldProps}>
+                            {BANNER_POSITIONS.map(position => <option key={position} value={position}>{t(`settings.position.${position}`)}</option>)}
+                        </SelectField>
                         <SelectField field="bannerDismissPolicy" {...fieldProps}>
                             {DISMISS_POLICIES.map(policy => <option key={policy} value={policy}>{t(`settings.dismiss.${policy}`)}</option>)}
                         </SelectField>

@@ -9,4 +9,9 @@ public final class SettingsTestSupport {
     public static Settings defaults() {
         return Settings.defaults();
     }
+
+    /** @return the settings the service applies for the given stored values */
+    public static Settings fromValues(java.util.Map<String, String> values) {
+        return Settings.fromProperties(values, warning -> { });
+    }
 }

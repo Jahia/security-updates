@@ -89,7 +89,8 @@ public final class Settings {
                 reader.bool(SettingsKeys.BANNER_INCLUDE_OWNER_REPORTS, true), colors[0], colors[1],
                 BannerSettings.parseDismissPolicy(reader.text(SettingsKeys.BANNER_DISMISS_POLICY, null), warnings),
                 reader.number(SettingsKeys.BANNER_DISMISS_HOURS, BannerSettings.DEFAULT_DISMISS_HOURS,
-                        SettingsValidator.MIN_HOURS, SettingsValidator.MAX_HOURS));
+                        SettingsValidator.MIN_HOURS, SettingsValidator.MAX_HOURS),
+                BannerSettings.parseBannerPosition(reader.text(SettingsKeys.BANNER_POSITION, null), warnings));
         int onDemandSeconds = reader.number(ON_DEMAND_MIN_INTERVAL_SECONDS, DEFAULT_ON_DEMAND_MIN_INTERVAL_SECONDS, 0,
                 MAX_ON_DEMAND_MIN_INTERVAL_SECONDS);
         return new Settings(enabled, refreshIntervalHours, useForgeSettings, extraFeedUrls, defaultStoreUrl, banner,
@@ -122,6 +123,7 @@ public final class Settings {
         values.put(SettingsKeys.BANNER_TEXT_COLOR, banner.getTextColor());
         values.put(SettingsKeys.BANNER_DISMISS_POLICY, banner.getDismissPolicy().name());
         values.put(SettingsKeys.BANNER_DISMISS_HOURS, String.valueOf(banner.getDismissHours()));
+        values.put(SettingsKeys.BANNER_POSITION, banner.getPosition().name());
         return values;
     }
 

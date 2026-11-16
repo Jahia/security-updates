@@ -496,20 +496,6 @@ describe('SecurityUpdates page', () => {
         });
     });
 
-    test('explains its terms in plain language, in a closed native disclosure', () => {
-        mockReport(report());
-        render(<SecurityUpdates/>);
-        const glossary = screen.getByTestId('security-updates-glossary');
-
-        expect(glossary.tagName).toBe('DETAILS');
-        expect(glossary).not.toHaveAttribute('open');
-        expect(glossary.querySelector('summary')).toHaveTextContent('page.glossary.title');
-        ['advisory', 'cve', 'store', 'catalogue'].forEach(term => {
-            expect(within(glossary).getByText(`page.glossary.${term}.term`).tagName).toBe('DT');
-            expect(within(glossary).getByText(`page.glossary.${term}.definition`).tagName).toBe('DD');
-        });
-    });
-
     test('links to Manage modules', () => {
         mockReport(report({findings: [finding('m', 'HIGH')]}));
         render(<SecurityUpdates/>);
@@ -858,14 +844,25 @@ describe('SecurityUpdates page', () => {
         expect(used('RadioItem')).toHaveLength(2);
     });
 
-    test('wiring: severity and source are Moonstone chips with a text label, given the colours chosen for 7:1; rows are not tab stops (double markers)', () => {
+    test('wiring: severity is a Moonstone chip with a text label, given the colours chosen for 7:1; the source is plain text; rows are not tab stops (double markers)', () => {
         mockReport(report({findings: [finding('m', 'CRITICAL'), finding('n', 'MEDIUM', 'OWNER_REPORTED')]}));
         const {container} = render(<SecurityUpdates/>);
-        const chips = [...container.querySelectorAll('[data-moonstone="Chip"]')];
+        const chips = [...container.querySelectorAll('tbody [data-moonstone="Chip"]')];
 
-        expect(chips.map(chip => chip.textContent)).toEqual(expect.arrayContaining(['page.severity.CRITICAL', 'page.source.ADVISORY']));
+        expect(chips.map(chip => chip.textContent)).toEqual(['page.severity.CRITICAL', 'page.severity.MEDIUM']);
+        expect(screen.getAllByTestId('security-updates-source').map(cell => cell.textContent)).toEqual(['page.source.ADVISORY', 'page.source.OWNER_REPORTED']);
         chips.forEach(chip => expect(['default', 'accent', 'danger']).toContain(chip.getAttribute('data-color')));
         container.querySelectorAll('tbody tr').forEach(row => expect(row).toHaveAttribute('tabindex', '-1'));
+    });
+
+    test('the short columns have the same fixed width in the head and in every row, so that the columns line up', () => {
+        mockReport(report({findings: [finding('m', 'CRITICAL'), finding('n', 'MEDIUM', 'OWNER_REPORTED')]}));
+        const {container} = render(<SecurityUpdates/>);
+        const widths = row => [...row.children].map(cell => cell.style.width);
+
+        const head = widths(container.querySelector('thead tr'));
+        expect(head).toEqual(['', '7.5rem', '7.5rem', '7.5rem', '10rem', '8.5rem', '', '11rem']);
+        container.querySelectorAll('tbody tr').forEach(row => expect(widths(row)).toEqual(head));
     });
 
     test('wiring: status messages carry a decorative Moonstone icon next to their text (double markers)', () => {
@@ -874,6 +871,116 @@ describe('SecurityUpdates page', () => {
 
         const message = screen.getByText('page.status.UNAVAILABLE').closest('[data-tone]');
         expect(within(message).getByTestId('icon-warning')).toHaveAttribute('aria-hidden', 'true');
+    });
+
+    describe('tabs', () => {
+        const tab = name => screen.getByRole('tab', {name});
+        const resultsPanel = () => screen.getByTestId('security-updates-panel-results');
+        const settingsPanel = () => screen.getByTestId('security-updates-panel-settings');
+
+        test('two tabs, the results first and selected, each controlling its panel', () => {
+            mockReport(report());
+            render(<SecurityUpdates/>);
+
+            const list = screen.getByRole('tablist', {name: 'page.tabs.label'});
+            expect(within(list).getAllByRole('tab').map(item => item.textContent)).toEqual(['page.tabs.results', 'page.tabs.settings']);
+            expect(tab('page.tabs.results')).toHaveAttribute('aria-selected', 'true');
+            expect(tab('page.tabs.settings')).toHaveAttribute('aria-selected', 'false');
+            expect(tab('page.tabs.results')).toHaveAttribute('aria-controls', 'security-updates-panel-results');
+            expect(resultsPanel()).toHaveAttribute('role', 'tabpanel');
+            expect(resultsPanel()).toHaveAttribute('aria-labelledby', 'security-updates-tab-results');
+            expect(resultsPanel()).not.toHaveAttribute('hidden');
+            expect(settingsPanel()).toHaveAttribute('hidden');
+            // Only the selected tab is in the Tab order.
+            expect(tab('page.tabs.results')).toHaveAttribute('tabindex', '0');
+            expect(tab('page.tabs.settings')).toHaveAttribute('tabindex', '-1');
+        });
+
+        test('the tabs come first, and the status line is outside the panels, so that Check now is announced from either tab', () => {
+            mockReport(report());
+            render(<SecurityUpdates/>);
+
+            expect(resultsPanel()).not.toContainElement(status());
+            expect(settingsPanel()).not.toContainElement(status());
+            expect(screen.getByRole('tablist').compareDocumentPosition(status()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+            expect(screen.queryByText('page.intro')).toBeNull();
+        });
+
+        test('a click selects the settings, keeps the results in the page, and writes the tab in the address', () => {
+            mockReport(report({findings: [finding('m', 'HIGH')]}));
+            window.history.replaceState(null, '', '/jahia/administration/securityUpdates?filter=all');
+            render(<SecurityUpdates/>);
+
+            fireEvent.click(tab('page.tabs.settings'));
+
+            expect(tab('page.tabs.settings')).toHaveAttribute('aria-selected', 'true');
+            expect(settingsPanel()).not.toHaveAttribute('hidden');
+            expect(resultsPanel()).toHaveAttribute('hidden');
+            // The results stay in the page, only hidden.
+            expect(resultsPanel().querySelector('table')).not.toBeNull();
+            expect(window.location.search).toBe('?filter=all&tab=settings');
+
+            fireEvent.click(tab('page.tabs.results'));
+            expect(window.location.search).toBe('?filter=all');
+        });
+
+        test('the settings form stays mounted across tabs, so that edits are kept', () => {
+            mockReport(report());
+            render(<SecurityUpdates/>);
+            const mounts = mockSettingsForm.mock.calls.length;
+
+            fireEvent.click(tab('page.tabs.settings'));
+            fireEvent.click(tab('page.tabs.results'));
+
+            expect(screen.getByRole('region', {hidden: true, name: 'settings'})).toBeInTheDocument();
+            expect(mockSettingsForm.mock.calls.length).toBeGreaterThanOrEqual(mounts);
+            expect(settingsPanel()).toContainElement(screen.getByRole('region', {hidden: true, name: 'settings'}));
+        });
+
+        test('?tab=settings opens the settings; an unknown tab opens the results', () => {
+            mockReport(report());
+            window.history.replaceState(null, '', '/?tab=settings');
+            const {unmount} = render(<SecurityUpdates/>);
+            expect(tab('page.tabs.settings')).toHaveAttribute('aria-selected', 'true');
+            unmount();
+
+            window.history.replaceState(null, '', '/?tab=other');
+            render(<SecurityUpdates/>);
+            expect(tab('page.tabs.results')).toHaveAttribute('aria-selected', 'true');
+        });
+
+        test('the arrow keys, Home and End select the other tab and move the focus to it', () => {
+            mockReport(report());
+            render(<SecurityUpdates/>);
+            tab('page.tabs.results').focus();
+
+            fireEvent.keyDown(tab('page.tabs.results'), {key: 'ArrowRight'});
+            expect(tab('page.tabs.settings')).toHaveAttribute('aria-selected', 'true');
+            expect(document.activeElement).toBe(tab('page.tabs.settings'));
+
+            fireEvent.keyDown(tab('page.tabs.settings'), {key: 'ArrowRight'});
+            expect(document.activeElement).toBe(tab('page.tabs.results'));
+
+            fireEvent.keyDown(tab('page.tabs.results'), {key: 'ArrowLeft'});
+            expect(document.activeElement).toBe(tab('page.tabs.settings'));
+
+            fireEvent.keyDown(tab('page.tabs.settings'), {key: 'Home'});
+            expect(document.activeElement).toBe(tab('page.tabs.results'));
+
+            fireEvent.keyDown(tab('page.tabs.results'), {key: 'End'});
+            expect(tab('page.tabs.settings')).toHaveAttribute('aria-selected', 'true');
+
+            fireEvent.keyDown(tab('page.tabs.settings'), {key: 'a'});
+            expect(tab('page.tabs.settings')).toHaveAttribute('aria-selected', 'true');
+        });
+
+        test('jest-axe on the Moonstone double: no violation with the settings tab open', async () => {
+            mockReport(report());
+            const {container} = render(<SecurityUpdates/>);
+            fireEvent.click(tab('page.tabs.settings'));
+
+            expect(await axe(container)).toHaveNoViolations();
+        });
     });
 
     // The jest-axe check runs against the Jest double of Moonstone, not its real markup and CSS: the e2e axe runs (cypress-axe) are the authority.

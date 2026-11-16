@@ -50,6 +50,7 @@ class DefaultConfigurationTest {
         assertThat(properties.getProperty("bannerMinimumSeverity")).isEqualTo(defaults.getBanner().getMinimumSeverity().name());
         assertThat(properties.getProperty("bannerIncludeOwnerReports"))
                 .isEqualTo(String.valueOf(defaults.getBanner().isIncludeOwnerReports()));
+        assertThat(properties.getProperty("bannerPosition")).isEqualTo(defaults.getBanner().getPosition().name());
     }
 
     @Test

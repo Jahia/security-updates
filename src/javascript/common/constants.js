@@ -12,6 +12,15 @@ export const THRESHOLD_SEVERITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 /** Banner dismissal policies (setting bannerDismissPolicy). */
 export const DISMISS_POLICIES = ['SESSION', 'HOURS', 'UNTIL_CHANGE', 'NEVER'];
 
+/**
+ * Banner positions (setting bannerPosition): a full-width bar at the top or bottom of the window, or a small box in
+ * the top right or bottom right corner.
+ */
+export const BANNER_POSITIONS = ['TOP', 'BOTTOM', 'TOP_RIGHT', 'BOTTOM_RIGHT'];
+
+/** Default banner position (same as the server default). */
+export const DEFAULT_BANNER_POSITION = 'TOP';
+
 /** Default banner colours (same as the server defaults). */
 export const DEFAULT_BANNER_BACKGROUND = '#1B1B1B';
 export const DEFAULT_BANNER_TEXT = '#FFFFFF';

@@ -12,6 +12,7 @@ const SETTINGS_FIELDS = gql`
         bannerIncludeOwnerReports
         bannerBackgroundColor
         bannerTextColor
+        bannerPosition
         bannerDismissPolicy
         bannerDismissHours
         contrastRatio

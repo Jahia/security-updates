@@ -11,6 +11,15 @@ import {findingShape} from './propTypes';
 
 const COLUMNS = ['component', 'severity', 'installed', 'recommended', 'compatibility', 'source', 'advisories', 'action'];
 
+/**
+ * Moonstone shares a row equally between its cells (the rows are flex boxes, laid out one by one): the columns with
+ * short values get a fixed width, the same in every row so that the columns line up; the component and the advisories
+ * share the rest, the advisories twice as much (see .wide).
+ */
+const WIDTHS = {severity: '7.5rem', installed: '7.5rem', recommended: '7.5rem', compatibility: '10rem', source: '8.5rem', action: '11rem'};
+
+const cellProps = column => (WIDTHS[column] ? {width: WIDTHS[column], className: styles.fixed} : {className: column === 'advisories' ? styles.wide : undefined});
+
 const SeverityChip = ({severity}) => {
     const {t} = useTranslation(NS);
     // The severity is written out; the colour and the icon only reinforce it.
@@ -74,7 +83,7 @@ export const FindingsTable = ({findings, labelledBy}) => {
                 <TableHead role="rowgroup">
                     {/* Moonstone makes every row a tab stop; these rows have no action of their own, their links do. */}
                     <TableRow role="row" className={styles.row} tabIndex={-1}>
-                        {COLUMNS.map(column => <TableHeadCell key={column} role="columnheader" scope="col">{t(`page.table.${column}`)}</TableHeadCell>)}
+                        {COLUMNS.map(column => <TableHeadCell key={column} role="columnheader" scope="col" {...cellProps(column)}>{t(`page.table.${column}`)}</TableHeadCell>)}
                     </TableRow>
                 </TableHead>
                 <TableBody role="rowgroup">
@@ -84,17 +93,18 @@ export const FindingsTable = ({findings, labelledBy}) => {
                                 <Typography component="span" weight="bold">{finding.component}</Typography>
                                 {finding.groupId && <Typography component="span" variant="caption" className={styles.block}>{finding.groupId}</Typography>}
                             </TableBodyCell>
-                            <TableBodyCell role="cell" verticalAlign="top"><SeverityChip severity={finding.severity}/></TableBodyCell>
-                            <TableBodyCell role="cell" verticalAlign="top">{finding.installedVersion}</TableBodyCell>
-                            <TableBodyCell role="cell" verticalAlign="top">{finding.recommendedVersion}</TableBodyCell>
-                            <TableBodyCell role="cell" verticalAlign="top"><Compatibility finding={finding}/></TableBodyCell>
-                            <TableBodyCell role="cell" verticalAlign="top">
-                                <Chip color={chipColor(finding.source === 'ADVISORY' ? 'MEDIUM' : 'other')} label={t(`page.source.${finding.source}`)}/>
+                            <TableBodyCell role="cell" verticalAlign="top" {...cellProps('severity')}><SeverityChip severity={finding.severity}/></TableBodyCell>
+                            <TableBodyCell role="cell" verticalAlign="top" {...cellProps('installed')}>{finding.installedVersion}</TableBodyCell>
+                            <TableBodyCell role="cell" verticalAlign="top" {...cellProps('recommended')}>{finding.recommendedVersion}</TableBodyCell>
+                            <TableBodyCell role="cell" verticalAlign="top" {...cellProps('compatibility')}><Compatibility finding={finding}/></TableBodyCell>
+                            {/* Plain text, not a chip: a chip in the colours of a severity would read as one. */}
+                            <TableBodyCell role="cell" verticalAlign="top" {...cellProps('source')} data-testid="security-updates-source">
+                                {t(`page.source.${finding.source}`)}
                             </TableBodyCell>
-                            <TableBodyCell role="cell" verticalAlign="top">
+                            <TableBodyCell role="cell" verticalAlign="top" {...cellProps('advisories')}>
                                 <AdvisoryList advisories={finding.advisories} isOwner={finding.source !== 'ADVISORY'}/>
                             </TableBodyCell>
-                            <TableBodyCell role="cell" verticalAlign="top"><Action finding={finding}/></TableBodyCell>
+                            <TableBodyCell role="cell" verticalAlign="top" {...cellProps('action')}><Action finding={finding}/></TableBodyCell>
                         </TableRow>
                     ))}
                 </TableBody>

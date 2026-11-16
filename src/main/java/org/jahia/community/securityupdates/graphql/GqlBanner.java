@@ -5,6 +5,7 @@ import graphql.annotations.annotationTypes.GraphQLField;
 import graphql.annotations.annotationTypes.GraphQLName;
 import graphql.annotations.annotationTypes.GraphQLNonNull;
 import org.jahia.community.securityupdates.model.BannerDecision;
+import org.jahia.community.securityupdates.model.BannerPosition;
 import org.jahia.community.securityupdates.model.DismissPolicy;
 import org.jahia.community.securityupdates.model.Severity;
 
@@ -108,5 +109,14 @@ public class GqlBanner {
     @GraphQLDescription("Hours a dismissal lasts with the HOURS policy")
     public int getDismissHours() {
         return decision.getDismissHours();
+    }
+
+    @GraphQLField
+    @GraphQLName("position")
+    @GraphQLNonNull
+    @GraphQLDescription("Where the notice appears: TOP or BOTTOM (a full-width bar), TOP_RIGHT or BOTTOM_RIGHT (a small box in "
+            + "that corner)")
+    public BannerPosition getPosition() {
+        return decision.getPosition();
     }
 }

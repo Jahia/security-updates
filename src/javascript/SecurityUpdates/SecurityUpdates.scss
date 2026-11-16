@@ -37,9 +37,28 @@ $focus-color: var(--color-accent_dark_contrast, #004781);
     align-items: flex-start;
   }
 
-  // Columns keep a readable width: the focusable region around the table scrolls instead of squeezing them.
+  // Columns keep a readable width: the focusable region around the table scrolls instead of squeezing them. The fixed
+  // columns take 52rem (FindingsTable WIDTHS); the component and the advisories share the rest.
   .table {
-    min-width: 60rem;
+    min-width: 72rem;
+  }
+
+  // A column of fixed width keeps it (Moonstone's cells are flex items that may shrink).
+  .fixed {
+    flex: none;
+  }
+
+  // The advisories take twice the share of the component (two classes: more specific than Moonstone's flexFluid).
+  .table .wide {
+    flex: 2 1 0;
+    min-width: 0;
+  }
+
+  // Links in the table flow as text and wrap between words. Their inline-flex layout (.link) made each part of the
+  // label a separate box, broken letter by letter in a narrow column; inline-block keeps the 44px height.
+  .table .link {
+    display: inline-block;
+    min-height: 2.75rem;
   }
 }
 
@@ -70,7 +89,6 @@ $focus-color: var(--color-accent_dark_contrast, #004781);
 }
 
 .announcement {
-  min-height: 1.5em;
   margin: 0;
   font-family: var(--moon-font-family, inherit);
 }
@@ -163,6 +181,34 @@ $focus-color: var(--color-accent_dark_contrast, #004781);
   overflow-x: auto;
 }
 
+// Moonstone's TableHeadCell and TableBodyCell put their content in a Typography with isNowrap (white-space: nowrap,
+// text-overflow: ellipsis, overflow: hidden): a long component name, version, compatibility or advisory list would be
+// cut, with no way to read the rest. Here the text wraps inside its cell and the row grows (WCAG 1.4.10 and 1.4.4).
+// Attribute selectors: Moonstone's class names carry a build hash. Element + two classes: more specific than
+// Moonstone's two classes.
+.table :is(td, th) [class*='moonstone-nowrap'] {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: break-word;
+}
+
+// Moonstone's body cells scroll (overflow-y: auto) and its chips are 16px high whatever their label: a chip whose label
+// wraps (a long severity name in a large text size) would spill out of its chip, and its cell would show a scroll
+// bar. In the findings table the rows grow with their content, so a cell never scrolls, and a chip grows with
+// its label. Three classes: more specific than Moonstone's two.
+.table .row [class~='moonstone-tableBodyCell'] {
+  overflow: visible;
+}
+
+.table :is(td, th) [class~='moonstone-chip'] {
+  height: auto;
+  min-height: 1rem;
+  padding-top: 0.125rem;
+  padding-bottom: 0.125rem;
+  border-radius: 0.75rem;
+}
+
 .caption {
   text-align: left;
   padding: var(--spacing-small, 8px) 0;
@@ -184,35 +230,6 @@ $focus-color: var(--color-accent_dark_contrast, #004781);
   vertical-align: middle;
 }
 
-.glossary {
-  max-width: 80ch;
-}
-
-// The summary is a 44 by 44 pixel target, with the native disclosure marker.
-.glossarySummary {
-  display: list-item;
-  min-height: 2.75rem;
-  line-height: 2.75rem;
-  cursor: pointer;
-}
-
-.glossaryList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-small, 8px);
-  margin: 0 0 0 var(--spacing-medium, 16px);
-
-  dd {
-    margin: 0;
-  }
-}
-
-.glossaryEntry {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-nano, 4px);
-}
-
 .advisories {
   margin: 0;
   padding-left: var(--spacing-medium, 16px);
@@ -228,5 +245,33 @@ $focus-color: var(--color-accent_dark_contrast, #004781);
   .page [class*='moonstone-loader'] * {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+// The tabs, then the status line of Check now, which takes room only when it says something.
+.tabsHeader {
+  display: flex;
+  flex-direction: column;
+}
+
+.tabsHeader .announcement:not(:empty) {
+  padding-top: var(--spacing-small, 8px);
+}
+
+// The tab list, with a line under it across the whole page, as in the other Jahia pages.
+.tabs {
+  align-self: stretch;
+  justify-content: flex-start;
+  gap: var(--spacing-small, 8px);
+  border-bottom: 1px solid var(--color-gray_light40, #d1d1d1);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-medium, 16px);
+
+  &[hidden] {
+    display: none;
   }
 }

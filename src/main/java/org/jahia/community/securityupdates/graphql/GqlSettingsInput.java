@@ -30,6 +30,7 @@ public class GqlSettingsInput {
     private final String bannerTextColor;
     private final String bannerDismissPolicy;
     private final Integer bannerDismissHours;
+    private final String bannerPosition;
 
     @SuppressWarnings("java:S107") // one argument per configuration key
     public GqlSettingsInput(
@@ -44,7 +45,8 @@ public class GqlSettingsInput {
             @GraphQLName("bannerBackgroundColor") @GraphQLNonNull @GraphQLDescription("#RRGGBB, at least 7:1 against the text colour") String bannerBackgroundColor,
             @GraphQLName("bannerTextColor") @GraphQLNonNull @GraphQLDescription("#RRGGBB, at least 7:1 against the background colour") String bannerTextColor,
             @GraphQLName("bannerDismissPolicy") @GraphQLNonNull @GraphQLDescription("SESSION, HOURS, UNTIL_CHANGE or NEVER") String bannerDismissPolicy,
-            @GraphQLName("bannerDismissHours") @GraphQLNonNull @GraphQLDescription("Hours a dismissal lasts with HOURS, 1 to 720") Integer bannerDismissHours) {
+            @GraphQLName("bannerDismissHours") @GraphQLNonNull @GraphQLDescription("Hours a dismissal lasts with HOURS, 1 to 720") Integer bannerDismissHours,
+            @GraphQLName("bannerPosition") @GraphQLNonNull @GraphQLDescription("TOP, BOTTOM, TOP_RIGHT or BOTTOM_RIGHT") String bannerPosition) {
         this.enabled = enabled;
         this.refreshIntervalHours = refreshIntervalHours;
         this.useForgeSettings = useForgeSettings;
@@ -57,6 +59,7 @@ public class GqlSettingsInput {
         this.bannerTextColor = bannerTextColor;
         this.bannerDismissPolicy = bannerDismissPolicy;
         this.bannerDismissHours = bannerDismissHours;
+        this.bannerPosition = bannerPosition;
     }
 
     /** @return the submitted values as configuration strings (a null value is left out) */
@@ -74,6 +77,7 @@ public class GqlSettingsInput {
         put(values, SettingsKeys.BANNER_TEXT_COLOR, bannerTextColor);
         put(values, SettingsKeys.BANNER_DISMISS_POLICY, bannerDismissPolicy);
         put(values, SettingsKeys.BANNER_DISMISS_HOURS, bannerDismissHours);
+        put(values, SettingsKeys.BANNER_POSITION, bannerPosition);
         return values;
     }
 
@@ -177,5 +181,13 @@ public class GqlSettingsInput {
     @GraphQLDescription("Hours a dismissal lasts with HOURS, 1 to 720")
     public Integer getBannerDismissHours() {
         return bannerDismissHours;
+    }
+
+    @GraphQLField
+    @GraphQLName("bannerPosition")
+    @GraphQLNonNull
+    @GraphQLDescription("TOP, BOTTOM, TOP_RIGHT or BOTTOM_RIGHT")
+    public String getBannerPosition() {
+        return bannerPosition;
     }
 }
