@@ -10,6 +10,7 @@ query getSecurityUpdatesBanner {
             textColor
             dismissPolicy
             dismissHours
+            position
             username
         }
     }

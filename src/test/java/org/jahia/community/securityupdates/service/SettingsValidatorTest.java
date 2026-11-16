@@ -37,6 +37,7 @@ class SettingsValidatorTest {
         input.put(SettingsKeys.ENABLED, "TRUE");
         input.put(SettingsKeys.BANNER_MINIMUM_SEVERITY, "critical");
         input.put(SettingsKeys.BANNER_DISMISS_POLICY, "until_change");
+        input.put(SettingsKeys.BANNER_POSITION, " top_right ");
 
         ValidationResult result = SettingsValidator.validate(input);
 
@@ -46,6 +47,7 @@ class SettingsValidatorTest {
                 .containsEntry(SettingsKeys.BANNER_BACKGROUND_COLOR, "#0B3D91")
                 .containsEntry(SettingsKeys.BANNER_MINIMUM_SEVERITY, "CRITICAL")
                 .containsEntry(SettingsKeys.BANNER_DISMISS_POLICY, "UNTIL_CHANGE")
+                .containsEntry(SettingsKeys.BANNER_POSITION, "TOP_RIGHT")
                 .containsEntry(SettingsKeys.EXTRA_FEED_URLS, "https://a.example.org/f.json, https://b.example.org/g.json");
         assertThat(result.getValues()).containsOnlyKeys(SettingsKeys.ALL);
     }
@@ -70,6 +72,8 @@ class SettingsValidatorTest {
             "bannerMinimumSeverity, UNKNOWN, INVALID_VALUE",
             "bannerMinimumSeverity, SEVERE, INVALID_VALUE",
             "bannerDismissPolicy, FOREVER, INVALID_VALUE",
+            "bannerPosition, LEFT, INVALID_VALUE",
+            "bannerPosition, '', INVALID_VALUE",
             "bannerBackgroundColor, #FFF, INVALID_COLOR",
             "bannerTextColor, white, INVALID_COLOR"
     })

@@ -23,7 +23,8 @@ describe('Security updates: settings persistence', () => {
         bannerMinimumSeverity: 'CRITICAL',
         bannerBackgroundColor: '#0B3D91',
         bannerDismissPolicy: 'HOURS',
-        bannerDismissHours: 6
+        bannerDismissHours: 6,
+        bannerPosition: 'BOTTOM_RIGHT'
     };
 
     const isAvailable = (result: unknown) => errorsOf(result).length === 0 &&

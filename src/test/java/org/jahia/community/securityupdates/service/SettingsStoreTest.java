@@ -84,7 +84,8 @@ class SettingsStoreTest {
 
         Path file = etc.resolve(SecurityUpdateService.PID + ".cfg");
         String content = Files.readString(file, StandardCharsets.UTF_8);
-        assertThat(content).startsWith("# default configuration - won't be overridden").contains("bannerDismissPolicy=SESSION");
+        assertThat(content).startsWith("# default configuration - won't be overridden").contains("bannerDismissPolicy=SESSION")
+                .contains("bannerPosition=TOP");
         assertThat(written().get("felix.fileinstall.filename")).isEqualTo(file.toUri().toString());
     }
 

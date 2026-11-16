@@ -15,6 +15,7 @@ const settings = {
     bannerIncludeOwnerReports: true,
     bannerBackgroundColor: '#1B1B1B',
     bannerTextColor: '#FFFFFF',
+    bannerPosition: 'TOP',
     bannerDismissPolicy: 'SESSION',
     bannerDismissHours: 24,
     contrastRatio: 17.22,
@@ -80,6 +81,7 @@ describe('SettingsForm', () => {
         expect(field('bannerBackgroundColor')).toHaveValue('#1B1B1B');
         expect(within(section()).getByLabelText('settings.fields.bannerBackgroundColor.picker')).toHaveValue('#1b1b1b');
         expect(field('bannerTextColor')).toHaveValue('#FFFFFF');
+        expect(field('bannerPosition')).toHaveValue('TOP');
         expect(field('bannerDismissPolicy')).toHaveValue('SESSION');
         expect(field('bannerDismissHours')).toHaveValue(24);
     });
@@ -105,7 +107,7 @@ describe('SettingsForm', () => {
 
     describe('read only', () => {
         test('a user who cannot change the settings sees them as text, at full contrast, with an explanation and no buttons', () => {
-            useQuery.mockReturnValue(loaded({...settings, canEdit: false, extraFeedUrls: '', bannerDismissPolicy: 'HOURS'}));
+            useQuery.mockReturnValue(loaded({...settings, canEdit: false, extraFeedUrls: '', bannerDismissPolicy: 'HOURS', bannerPosition: 'BOTTOM_RIGHT'}));
             render(<SettingsForm/>);
 
             expect(within(section()).getByText('settings.readOnly')).toBeInTheDocument();
@@ -119,6 +121,8 @@ describe('SettingsForm', () => {
             expect(value('extraFeedUrls').querySelector('dd')).toHaveTextContent('settings.value.none');
             expect(value('bannerMinimumSeverity').querySelector('dd')).toHaveTextContent('page.severity.HIGH');
             expect(value('bannerDismissPolicy').querySelector('dd')).toHaveTextContent('settings.dismiss.HOURS');
+            expect(value('bannerPosition')).toHaveTextContent('settings.fields.bannerPosition.labelsettings.position.BOTTOM_RIGHT');
+            expect(value('bannerPosition').querySelector('dd').textContent).toBe('settings.position.BOTTOM_RIGHT');
             expect(value('bannerBackgroundColor').querySelector('dd')).toHaveTextContent('#1B1B1B');
             expect(value('bannerBackgroundColor').querySelector('[aria-hidden="true"]').style.backgroundColor).toBe('rgb(27, 27, 27)');
             expect(screen.getAllByRole('heading', {level: 3}).map(heading => heading.textContent))
@@ -221,7 +225,7 @@ describe('SettingsForm', () => {
             const input = update.mock.calls[0][0].variables.input;
             expect(input.refreshIntervalHours).toBe(6);
             expect(input.enabled).toBe(true);
-            expect(Object.keys(input)).toHaveLength(12);
+            expect(Object.keys(input)).toHaveLength(13);
             expect(field('defaultStoreUrl')).toHaveValue('https://saved.example');
             expect(query.refetch).not.toHaveBeenCalled();
             expect(changed).toHaveBeenCalledTimes(1);
@@ -567,6 +571,81 @@ describe('SettingsForm', () => {
         fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', {name: 'settings.resetConfirm.confirm'}));
 
         await waitFor(() => expect(status().textContent).toBe('settings.resetDone'));
+    });
+
+    describe('banner position', () => {
+        test('the select lists the four positions with their labels, after the colours and before the dismissal policy', () => {
+            render(<SettingsForm/>);
+            const select = screen.getByRole('combobox', {name: 'settings.fields.bannerPosition.label'});
+
+            expect(within(select).getAllByRole('option').map(option => [option.value, option.textContent])).toEqual([
+                ['TOP', 'settings.position.TOP'],
+                ['BOTTOM', 'settings.position.BOTTOM'],
+                ['TOP_RIGHT', 'settings.position.TOP_RIGHT'],
+                ['BOTTOM_RIGHT', 'settings.position.BOTTOM_RIGHT']
+            ]);
+            const order = ['bannerTextColor', 'bannerPosition', 'bannerDismissPolicy']
+                .map(name => field(name))
+                .map((control, index, all) => index === 0 || Boolean(all[index - 1].compareDocumentPosition(control) & Node.DOCUMENT_POSITION_FOLLOWING));
+            expect(order).toEqual([true, true, true]);
+            const help = document.getElementById(select.getAttribute('aria-describedby').split(' ')[0]);
+            expect(help).toHaveTextContent('settings.fields.bannerPosition.help');
+        });
+
+        test('the chosen position is sent in the mutation and, alone, applies at once', async () => {
+            const changed = jest.fn();
+            window.addEventListener(CHANGED_EVENT, changed);
+            update.mockImplementation(({variables}) => Promise.resolve({data: {securityUpdates: {updateSettings: {
+                ok: true, errors: [], settings: {...settings, bannerPosition: variables.input.bannerPosition}
+            }}}}));
+            render(<SettingsForm/>);
+
+            fireEvent.change(field('bannerPosition'), {target: {value: 'BOTTOM_RIGHT'}});
+            fireEvent.click(save());
+
+            await waitFor(() => expect(status().textContent).toBe('settings.savedNow'));
+            expect(update.mock.calls[0][0].variables.input.bannerPosition).toBe('BOTTOM_RIGHT');
+            expect(field('bannerPosition')).toHaveValue('BOTTOM_RIGHT');
+            expect(changed).toHaveBeenCalledTimes(1);
+            window.removeEventListener(CHANGED_EVENT, changed);
+        });
+
+        test('a server that returns no position shows, and saves, the default top position', async () => {
+            const {bannerPosition, ...withoutPosition} = settings;
+            expect(bannerPosition).toBe('TOP');
+            useQuery.mockReturnValue(loaded(withoutPosition));
+            render(<SettingsForm/>);
+
+            expect(field('bannerPosition')).toHaveValue('TOP');
+            fireEvent.click(save());
+
+            await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+            expect(update.mock.calls[0][0].variables.input.bannerPosition).toBe('TOP');
+        });
+
+        test('a reset shows the default position returned by the server', async () => {
+            useQuery.mockReturnValue(loaded({...settings, bannerPosition: 'BOTTOM'}));
+            render(<SettingsForm/>);
+            expect(field('bannerPosition')).toHaveValue('BOTTOM');
+            fireEvent.click(screen.getByRole('button', {name: 'settings.reset'}));
+
+            fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', {name: 'settings.resetConfirm.confirm'}));
+
+            await waitFor(() => expect(status().textContent).toBe('settings.resetDoneNow'));
+            expect(field('bannerPosition')).toHaveValue('TOP');
+        });
+
+        test('a refused position is marked on its field and listed in the alert', async () => {
+            update.mockImplementation(() => Promise.resolve({data: {securityUpdates: {updateSettings: {
+                ok: false, errors: [{field: 'bannerPosition', code: 'INVALID_VALUE', message: 'bannerPosition is not valid'}], settings: null
+            }}}}));
+            render(<SettingsForm/>);
+
+            fireEvent.click(save());
+
+            await waitFor(() => expect(field('bannerPosition')).toHaveAttribute('aria-invalid', 'true'));
+            expect(screen.getByRole('alert')).toHaveTextContent('settings.fields.bannerPosition.label');
+        });
     });
 
     test('the dismissal duration is only offered with the HOURS policy, and says so while it is disabled', () => {

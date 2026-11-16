@@ -4,6 +4,7 @@ import graphql.annotations.annotationTypes.GraphQLDescription;
 import graphql.annotations.annotationTypes.GraphQLField;
 import graphql.annotations.annotationTypes.GraphQLName;
 import graphql.annotations.annotationTypes.GraphQLNonNull;
+import org.jahia.community.securityupdates.model.BannerPosition;
 import org.jahia.community.securityupdates.model.DismissPolicy;
 import org.jahia.community.securityupdates.model.Severity;
 import org.jahia.community.securityupdates.service.Colors;
@@ -131,6 +132,14 @@ public class GqlSettings {
     @GraphQLDescription("Hours a dismissal lasts with the HOURS policy")
     public int getBannerDismissHours() {
         return Integer.parseInt(values.get(SettingsKeys.BANNER_DISMISS_HOURS));
+    }
+
+    @GraphQLField
+    @GraphQLName("bannerPosition")
+    @GraphQLNonNull
+    @GraphQLDescription("Where the notice appears in the Jahia UI")
+    public BannerPosition getBannerPosition() {
+        return BannerPosition.valueOf(values.get(SettingsKeys.BANNER_POSITION));
     }
 
     @GraphQLField

@@ -92,6 +92,7 @@ describe('Security updates: settings', () => {
         cy.get(field('bannerTextColor')).should('have.value', '#FFFFFF');
         cy.get(field('bannerDismissPolicy')).should('have.value', 'SESSION');
         cy.get(field('bannerDismissHours')).should('have.value', '24').and('be.disabled');
+        cy.get(field('bannerPosition')).should('have.value', 'TOP');
         cy.get('[data-testid="security-updates-contrast"]').should('contain', '17.22:1');
 
         cy.get('label[for="security-updates-setting-defaultStoreUrl"]').should('contain', 'Default store address');

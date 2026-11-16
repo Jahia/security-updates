@@ -1,4 +1,5 @@
 import {FIELDS, fromSettings, restartsSchedule, SCHEDULE_FIELDS, toInput} from '../settingsValues';
+import {BANNER_POSITIONS, DEFAULT_BANNER_POSITION} from '../../common/constants';
 
 const settings = {
     enabled: true,
@@ -11,6 +12,7 @@ const settings = {
     bannerIncludeOwnerReports: true,
     bannerBackgroundColor: '#1B1B1B',
     bannerTextColor: '#FFFFFF',
+    bannerPosition: 'BOTTOM_RIGHT',
     bannerDismissPolicy: 'SESSION',
     bannerDismissHours: 24,
     contrastRatio: 17.22
@@ -29,6 +31,7 @@ describe('settings form values', () => {
             'bannerIncludeOwnerReports',
             'bannerBackgroundColor',
             'bannerTextColor',
+            'bannerPosition',
             'bannerDismissPolicy',
             'bannerDismissHours'
         ]);
@@ -54,6 +57,29 @@ describe('settings form values', () => {
         expect(Object.keys(input)).toEqual(FIELDS);
     });
 
+    test('the banner positions are those of the server, top by default', () => {
+        expect(BANNER_POSITIONS).toEqual(['TOP', 'BOTTOM', 'TOP_RIGHT', 'BOTTOM_RIGHT']);
+        expect(DEFAULT_BANNER_POSITION).toBe('TOP');
+    });
+
+    test('the banner position is kept as returned and sent as text', () => {
+        const form = fromSettings(settings);
+
+        expect(form.bannerPosition).toBe('BOTTOM_RIGHT');
+        expect(toInput(form).input.bannerPosition).toBe('BOTTOM_RIGHT');
+    });
+
+    test.each([undefined, null])('a banner position the server does not return (%s) takes the default, so a save sends a valid value', missing => {
+        const form = fromSettings({...settings, bannerPosition: missing});
+
+        expect(form.bannerPosition).toBe('TOP');
+        expect(toInput(form).input.bannerPosition).toBe('TOP');
+    });
+
+    test('a text setting the server does not return stays empty (no default)', () => {
+        expect(fromSettings({...settings, extraFeedUrls: null}).extraFeedUrls).toBe('');
+    });
+
     test.each(['', 'ten', '2.5', '1e3'])('a number field holding [%s] is refused before sending', value => {
         const {input, errors} = toInput({...fromSettings(settings), bannerDismissHours: value});
 
@@ -75,6 +101,7 @@ describe('restartsSchedule', () => {
 
     test('a banner change, or no change, does not', () => {
         expect(restartsSchedule(before, {...before, bannerMinimumSeverity: 'LOW'})).toBe(false);
+        expect(restartsSchedule({...before, bannerPosition: 'TOP'}, {...before, bannerPosition: 'BOTTOM'})).toBe(false);
         expect(restartsSchedule(before, before)).toBe(false);
     });
 

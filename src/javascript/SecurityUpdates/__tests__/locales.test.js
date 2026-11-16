@@ -145,6 +145,7 @@ describe('locales', () => {
             'bannerIncludeOwnerReports',
             'bannerBackgroundColor',
             'bannerTextColor',
+            'bannerPosition',
             'bannerDismissPolicy',
             'bannerDismissHours'];
         [en, fr].forEach(locale => {
@@ -173,6 +174,23 @@ describe('locales', () => {
             'REQUEST_FAILED'].forEach(code => expect(en.settings.errors[code]).toBeTruthy());
         ['SESSION', 'HOURS', 'UNTIL_CHANGE', 'NEVER'].forEach(policy => expect(en.settings.dismiss[policy]).toBeTruthy());
         expect(en.settings.errors.LOW_CONTRAST).toContain('{{ratio}}');
+    });
+
+    test('every banner position has a text in plain words, in both languages', () => {
+        expect(en.settings.fields.bannerPosition.label).toBe('Banner position');
+        expect(fr.settings.fields.bannerPosition.label).toBe('Position du bandeau');
+        expect(en.settings.position).toEqual({
+            TOP: 'Top of the window, full width',
+            BOTTOM: 'Bottom of the window, full width',
+            TOP_RIGHT: 'Top right corner',
+            BOTTOM_RIGHT: 'Bottom right corner'
+        });
+        expect(fr.settings.position).toEqual({
+            TOP: 'En haut de la fenêtre, sur toute la largeur',
+            BOTTOM: 'En bas de la fenêtre, sur toute la largeur',
+            TOP_RIGHT: 'Coin supérieur droit',
+            BOTTOM_RIGHT: 'Coin inférieur droit'
+        });
     });
 
     test('the session dismissal is described as the browser tab', () => {

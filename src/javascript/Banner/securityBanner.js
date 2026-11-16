@@ -26,6 +26,20 @@ export const FLIP_HOLD_MS = 2000;
  * dismissal, not authorised, page open, or request failed). It has no other use.
  */
 export const READY_ATTRIBUTE = 'data-security-updates-banner';
+/**
+ * Where the banner is (setting bannerPosition): TOP and BOTTOM are full-width bars that take their own space from the
+ * Jahia UI, TOP_RIGHT and BOTTOM_RIGHT small boxes over it, in that corner. Any other value means DEFAULT_POSITION.
+ */
+export const POSITIONS = {
+    TOP: {layout: 'bar', edge: 'top'},
+    BOTTOM: {layout: 'bar', edge: 'bottom'},
+    TOP_RIGHT: {layout: 'box', edge: 'top'},
+    BOTTOM_RIGHT: {layout: 'box', edge: 'bottom'}
+};
+export const DEFAULT_POSITION = 'TOP';
+/** On <html> while a bar is shown: the edge it takes ("top" or "bottom"), and its height in a CSS variable. */
+export const SPACE_ATTRIBUTE = 'data-security-updates-banner-edge';
+export const SPACE_VARIABLE = '--security-updates-banner-space';
 const STYLE_ID = 'security-updates-banner-style';
 const DISMISS_SELECTOR = '[data-sel-role="security-updates-banner-dismiss"]';
 const ANNOUNCE_DELAY_MS = 1000;
@@ -35,7 +49,7 @@ const FEEDBACK_DELAY_MS = 100;
 // decision of the server, which validates the presentation: the client only renders.
 const BANNER_QUERY = 'query SecurityUpdatesBanner { jcr { nodeByPath(path: "/") { hasPermission(permissionName: "adminTemplates") } } ' +
     'securityUpdates { banner { visible count minimumSeverity components dismissalKeys backgroundColor textColor ' +
-    'dismissPolicy dismissHours username } } }';
+    'dismissPolicy dismissHours position username } } }';
 
 // The colours come from the settings, validated server-side to a contrast of at least 7:1 (WCAG AAA). The text, the
 // link, the button border and the focus ring all use the text colour, so each of them keeps that contrast against
@@ -46,8 +60,13 @@ const BANNER_QUERY = 'query SecurityUpdatesBanner { jcr { nodeByPath(path: "/") 
 // when it cannot be hidden; its padding keeps the 5px focus ring of the link and the button inside the scrolling box.
 // It stays fixed rather than in the flow: the Jahia interface fills the viewport and scrolls
 // inside its own containers, so an element after it in the body would be out of view.
+// Its z-index is above the Jahia layout and its drawers (Material UI: 1200 at most), below the dialogs (1300), menus
+// and tooltips: a full-screen dialog such as the content editor opens over the banner, never under it.
+// A bar (TOP, BOTTOM) spans the window and covers nothing: the body gets a padding as tall as the bar on its edge, and
+// the Jahia layout (Moonstone's LayoutApp, 100vh high) is shortened by as much. Its text is at most 80 characters
+// wide (WCAG 1.4.8).
 const CSS = `
-#${BANNER_ID} { position: fixed; right: 1rem; bottom: 1rem; z-index: 9999;
+#${BANNER_ID} { position: fixed; right: 1rem; bottom: 1rem; z-index: 1250;
   max-width: min(30rem, calc(100vw - 2rem)); display: flex; flex-wrap: wrap; gap: 0.5rem 1rem;
   align-items: center; padding: 0.5rem 1rem; border-radius: 4px;
   background: var(--security-updates-banner-bg, ${DEFAULT_BANNER_BACKGROUND}); color: var(--security-updates-banner-fg, ${DEFAULT_BANNER_TEXT});
@@ -66,6 +85,14 @@ const CSS = `
   outline: 3px solid var(--security-updates-banner-fg, ${DEFAULT_BANNER_TEXT}); outline-offset: 2px; }
 #${BANNER_ID} .security-updates-banner-sr, #${FEEDBACK_ID} { position: absolute; width: 1px; height: 1px; margin: -1px;
   padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+#${BANNER_ID}[data-layout="bar"] { left: 0; right: 0; max-width: none; max-height: 40vh; overflow-y: auto;
+  justify-content: center; border-radius: 0; box-shadow: none; }
+#${BANNER_ID}[data-layout="bar"][data-position="top"] { top: 0; bottom: auto; }
+#${BANNER_ID}[data-layout="bar"][data-position="bottom"] { top: auto; bottom: 0; }
+#${BANNER_ID}[data-layout="bar"] p { flex: 1 1 20rem; max-width: 80ch; }
+html[${SPACE_ATTRIBUTE}="top"] body { padding-top: var(${SPACE_VARIABLE}, 0px); }
+html[${SPACE_ATTRIBUTE}="bottom"] body { padding-bottom: var(${SPACE_VARIABLE}, 0px); }
+html[${SPACE_ATTRIBUTE}] .moonstone-layoutApp { height: calc(100vh - var(${SPACE_VARIABLE}, 0px)); }
 @media (max-width: 40rem), (max-height: 40rem) {
   #${BANNER_ID} { left: 0; right: 0; bottom: 0; max-width: none; max-height: 40vh; overflow-y: auto; border-radius: 0;
     gap: 0.25rem 0.75rem; padding: 0.5rem 0.75rem; box-shadow: 0 -2px 8px rgba(0, 0, 0, .35); }
@@ -164,6 +191,8 @@ let focusAtInsert = null;
 // The page's own scroll-padding values, restored when the banner goes, and the last values written (not written again).
 let savedScrollPadding = null;
 let writtenScrollPadding = null;
+// The space last reserved for a bar (edge and height), not written again while it is the same.
+let writtenSpace = null;
 let frame = null;
 // The last move to the other edge (time and focused element), and the check planned for the end of its hold.
 let lastFlip = null;
@@ -212,6 +241,39 @@ const clearScrollPadding = () => {
     writtenScrollPadding = null;
 };
 
+const isBar = element => element.getAttribute('data-layout') === 'bar';
+
+// A bar takes its own space at its edge, so that it covers nothing of the Jahia UI (see CSS).
+const reserveSpace = element => {
+    const edge = element.getAttribute('data-position');
+    const value = `${Math.ceil(element.getBoundingClientRect().height)}px`;
+    if (writtenSpace?.edge === edge && writtenSpace.value === value) {
+        return;
+    }
+
+    const root = document.documentElement;
+    root.setAttribute(SPACE_ATTRIBUTE, edge);
+    root.style.setProperty(SPACE_VARIABLE, value);
+    writtenSpace = {edge, value};
+};
+
+const releaseSpace = () => {
+    if (writtenSpace) {
+        document.documentElement.removeAttribute(SPACE_ATTRIBUTE);
+        document.documentElement.style.removeProperty(SPACE_VARIABLE);
+        writtenSpace = null;
+    }
+};
+
+// A bar reserves its space; a box keeps elements scrolled into view clear of it.
+const updateLayout = element => {
+    if (isBar(element)) {
+        reserveSpace(element);
+    } else {
+        updateScrollPadding(element);
+    }
+};
+
 // Where the banner would be at the other edge: the same box, mirrored across the middle of the viewport (it keeps the
 // same distance to its edge).
 const mirrored = rect => {
@@ -233,7 +295,8 @@ const scheduleCheckAfterHold = delay => {
  */
 const keepFocusVisible = (target, isNewFocus) => {
     const element = document.getElementById(BANNER_ID);
-    if (!element || !target || target === document.body || element.contains(target) || typeof target.getBoundingClientRect !== 'function') {
+    // A bar covers nothing: it never has to move.
+    if (!element || isBar(element) || !target || target === document.body || element.contains(target) || typeof target.getBoundingClientRect !== 'function') {
         return;
     }
 
@@ -266,7 +329,7 @@ const scheduleCheck = () => {
         frame = null;
         const element = document.getElementById(BANNER_ID);
         if (element) {
-            updateScrollPadding(element);
+            updateLayout(element);
             keepFocusVisible(document.activeElement, false);
         }
     });
@@ -306,6 +369,7 @@ export const removeBanner = () => {
     holdTimer = null;
     announceTimer = null;
     clearScrollPadding();
+    releaseSpace();
 };
 
 const clearFeedbackTimer = () => {
@@ -333,14 +397,19 @@ const feedbackElement = () => {
     return feedback;
 };
 
-const createElement = t => {
+const placementOf = position => (Object.prototype.hasOwnProperty.call(POSITIONS, position) ? position : DEFAULT_POSITION);
+
+const createElement = (t, position) => {
+    const {layout, edge} = POSITIONS[position];
     ensureStyle();
     const element = document.createElement('div');
     element.id = BANNER_ID;
     element.setAttribute('role', 'region');
     element.setAttribute('aria-label', t('banner.label'));
     element.setAttribute('data-sel-role', 'security-updates-banner');
-    element.setAttribute('data-position', 'bottom');
+    element.setAttribute('data-placement', position);
+    element.setAttribute('data-layout', layout);
+    element.setAttribute('data-position', edge);
 
     const text = document.createElement('p');
     // The region is not live; this hidden status line announces the banner, after it is in the page, when what it
@@ -355,13 +424,19 @@ const createElement = t => {
     link.setAttribute('data-sel-role', 'security-updates-banner-link');
     element.append(text, link, live);
 
-    // Last in the page, where it is drawn (at an edge, after the content): the tab order follows the reading order
-    // (WCAG 2.4.3). Its status line announces it, so users of screen readers learn of it wherever they are.
+    // Where it is drawn, so that the tab order follows the reading order (WCAG 2.4.3): first in the page for a bar at
+    // the top, last otherwise (at an edge, after the content). Its status line announces it, so users of screen
+    // readers learn of it wherever they are.
     const active = document.activeElement;
     focusAtInsert = active && active !== document.body ? active : null;
     clearFeedbackTimer();
     feedbackElement().textContent = '';
-    document.body.append(element);
+    if (layout === 'bar' && edge === 'top') {
+        document.body.prepend(element);
+    } else {
+        document.body.append(element);
+    }
+
     listen(true);
     return element;
 };
@@ -463,7 +538,15 @@ const announce = (element, text, banner, dismissal) => {
 
 /** Creates the banner, or updates the one shown (keeping the focus where it is). */
 const render = (t, language, banner, dismissal) => {
-    const element = document.getElementById(BANNER_ID) || createElement(t);
+    const position = placementOf(banner.position);
+    let element = document.getElementById(BANNER_ID);
+    if (element && element.getAttribute('data-placement') !== position) {
+        // The position setting changed: the banner is drawn again at its new place.
+        removeBanner();
+        element = null;
+    }
+
+    element = element || createElement(t, position);
     if (language) {
         element.setAttribute('lang', language);
     }
@@ -477,7 +560,7 @@ const render = (t, language, banner, dismissal) => {
     }
 
     renderDismiss(t, element, dismissal, language);
-    updateScrollPadding(element);
+    updateLayout(element);
     announce(element, text, banner, dismissal);
 };
 

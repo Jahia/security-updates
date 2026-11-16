@@ -100,6 +100,7 @@ export type Banner = {
     textColor: string;
     dismissPolicy: string;
     dismissHours: number;
+    position: string;
     username: string;
 };
 export type Settings = {
@@ -115,6 +116,7 @@ export type Settings = {
     bannerTextColor: string;
     bannerDismissPolicy: string;
     bannerDismissHours: number;
+    bannerPosition: string;
 };
 export type StoredSettings = Settings & { contrastRatio: number; canEdit: boolean };
 export type Suggestion = { field: string; value: string; ratio: string };
@@ -135,7 +137,8 @@ export const SETTINGS_KEYS: Array<keyof Settings> = [
     'bannerBackgroundColor',
     'bannerTextColor',
     'bannerDismissPolicy',
-    'bannerDismissHours'
+    'bannerDismissHours',
+    'bannerPosition'
 ];
 
 /** The settings of settings-fixture-defaults.yml. */
@@ -151,13 +154,14 @@ export const FIXTURE_SETTINGS: Settings = {
     bannerBackgroundColor: '#1B1B1B',
     bannerTextColor: '#FFFFFF',
     bannerDismissPolicy: 'SESSION',
-    bannerDismissHours: 24
+    bannerDismissHours: 24,
+    bannerPosition: 'TOP'
 };
 
 /** The module defaults (META-INF/configurations/org.jahia.community.securityupdates.cfg), set by resetSettings. */
 export const DEFAULT_SETTINGS: Settings = {...FIXTURE_SETTINGS, useForgeSettings: true, defaultStoreUrl: JAHIA_STORE};
 
-/** The twelve settings only (no contrastRatio, canEdit or __typename). */
+/** The thirteen settings only (no contrastRatio, canEdit or __typename). */
 export const settingsOf = (value: Partial<StoredSettings>): Settings => SETTINGS_KEYS.reduce(
     (settings, key) => ({...settings, [key]: value[key]}),
     {} as Settings

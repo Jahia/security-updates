@@ -1,6 +1,7 @@
 package org.jahia.community.securityupdates.service;
 
 import org.jahia.community.securityupdates.model.BannerDecision;
+import org.jahia.community.securityupdates.model.BannerPosition;
 import org.jahia.community.securityupdates.model.DismissPolicy;
 import org.jahia.community.securityupdates.model.Severity;
 
@@ -11,7 +12,7 @@ import java.util.function.Consumer;
 
 /**
  * Settings of the notice shown in the Jahia UI: whether it is shown, from which severity, whether owner-reported
- * findings count, its colours and how long a dismissal lasts.
+ * findings count, its colours, how long a dismissal lasts and where it appears.
  */
 public final class BannerSettings {
 
@@ -20,6 +21,7 @@ public final class BannerSettings {
     static final String DEFAULT_TEXT_COLOR = BannerDecision.DEFAULT_TEXT_COLOR;
     static final DismissPolicy DEFAULT_DISMISS_POLICY = BannerDecision.DEFAULT_DISMISS_POLICY;
     static final int DEFAULT_DISMISS_HOURS = BannerDecision.DEFAULT_DISMISS_HOURS;
+    static final BannerPosition DEFAULT_POSITION = BannerDecision.DEFAULT_POSITION;
 
     private final boolean enabled;
     private final Severity minimumSeverity;
@@ -28,6 +30,7 @@ public final class BannerSettings {
     private final String textColor;
     private final DismissPolicy dismissPolicy;
     private final int dismissHours;
+    private final BannerPosition position;
 
     public BannerSettings(boolean enabled, Severity minimumSeverity, boolean includeOwnerReports) {
         this(enabled, minimumSeverity, includeOwnerReports, DEFAULT_BACKGROUND_COLOR, DEFAULT_TEXT_COLOR,
@@ -35,13 +38,24 @@ public final class BannerSettings {
     }
 
     /**
-     * @param backgroundColor validated {@code #RRGGBB} background (see {@link #parseColors})
-     * @param textColor       validated {@code #RRGGBB} text colour
-     * @param dismissHours    clamped to 1..720
+     * Settings of a banner shown at the {@link #DEFAULT_POSITION}.
      */
     @SuppressWarnings("java:S107") // a plain value object mirroring the configuration
     public BannerSettings(boolean enabled, Severity minimumSeverity, boolean includeOwnerReports, String backgroundColor,
                           String textColor, DismissPolicy dismissPolicy, int dismissHours) {
+        this(enabled, minimumSeverity, includeOwnerReports, backgroundColor, textColor, dismissPolicy, dismissHours,
+                DEFAULT_POSITION);
+    }
+
+    /**
+     * @param backgroundColor validated {@code #RRGGBB} background (see {@link #parseColors})
+     * @param textColor       validated {@code #RRGGBB} text colour
+     * @param dismissHours    clamped to 1..720
+     * @param position        where the banner appears (see {@link #parseBannerPosition})
+     */
+    @SuppressWarnings("java:S107") // a plain value object mirroring the configuration
+    public BannerSettings(boolean enabled, Severity minimumSeverity, boolean includeOwnerReports, String backgroundColor,
+                          String textColor, DismissPolicy dismissPolicy, int dismissHours, BannerPosition position) {
         this.enabled = enabled;
         this.minimumSeverity = Objects.requireNonNull(minimumSeverity, "minimumSeverity");
         this.includeOwnerReports = includeOwnerReports;
@@ -49,6 +63,7 @@ public final class BannerSettings {
         this.textColor = Objects.requireNonNull(textColor, "textColor");
         this.dismissPolicy = Objects.requireNonNull(dismissPolicy, "dismissPolicy");
         this.dismissHours = Math.max(SettingsValidator.MIN_HOURS, Math.min(SettingsValidator.MAX_HOURS, dismissHours));
+        this.position = Objects.requireNonNull(position, "position");
     }
 
     public static BannerSettings defaults() {
@@ -84,6 +99,24 @@ public final class BannerSettings {
             warnings.accept("Invalid bannerDismissPolicy '" + Settings.shown(value)
                     + "' (expected SESSION, HOURS, UNTIL_CHANGE or NEVER): using " + DEFAULT_DISMISS_POLICY);
             return DEFAULT_DISMISS_POLICY;
+        }
+    }
+
+    /**
+     * @param value    the configured value: TOP, BOTTOM, TOP_RIGHT or BOTTOM_RIGHT, in any case
+     * @param warnings receives one message when the value is not one of those
+     * @return the position, or {@link BannerPosition#TOP} when the value is absent or invalid
+     */
+    static BannerPosition parseBannerPosition(String value, Consumer<String> warnings) {
+        if (value == null || value.trim().isEmpty()) {
+            return DEFAULT_POSITION;
+        }
+        try {
+            return BannerPosition.valueOf(value.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            warnings.accept("Invalid bannerPosition '" + Settings.shown(value)
+                    + "' (expected TOP, BOTTOM, TOP_RIGHT or BOTTOM_RIGHT): using " + DEFAULT_POSITION);
+            return DEFAULT_POSITION;
         }
     }
 
@@ -131,5 +164,9 @@ public final class BannerSettings {
 
     public int getDismissHours() {
         return dismissHours;
+    }
+
+    public BannerPosition getPosition() {
+        return position;
     }
 }

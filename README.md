@@ -69,11 +69,25 @@ The first check runs about one minute after the module starts. **Check now** sta
 
 Users with `adminTemplates` also get a notice (the banner) in the Jahia UI, for example
 "3 components need a security update (high severity or above).", with a link to the Security updates page.
-It is a fixed box at the bottom right of the window, and the last element of the page body, so it is the
-last stop of the Tab order. It moves to the top right only when the focused element would be covered and the
-focused element is clear of the top edge. It then stays there for 2 seconds for that element. In a window at
-most 40rem wide or high, it is a compact strip over the full width of the edge, at most 40% of the window
-high, and scrolls inside.
+Where it appears is set by `bannerPosition`:
+
+| `bannerPosition` | Where |
+|---|---|
+| `TOP` (default) | A bar across the whole width, at the top of the window. |
+| `BOTTOM` | A bar across the whole width, at the bottom of the window. |
+| `TOP_RIGHT` | A small box in the top right corner. |
+| `BOTTOM_RIGHT` | A small box in the bottom right corner. |
+
+- **A bar covers nothing.** The Jahia UI is made shorter by the height of the bar, so no button or menu
+  of Jahia is under it. Its text is at most 80 characters wide. A bar at the top is the first element of
+  the page body, so it is the first stop of the Tab order. A bar at the bottom is the last element, so it is
+  the last stop.
+- **A box is over the Jahia UI.** It is the last element of the page body, so it is the last stop of the Tab
+  order. It moves to the other corner (top or bottom) only when the focused element would be covered and the
+  focused element is clear of the other edge. It then stays there for 2 seconds for that element.
+- Jahia's dialogs, such as the content editor in full screen, open over the banner.
+- In a window at most 40rem wide or high, the banner is a compact strip over the full width of its edge, at
+  most 40% of the window high, and scrolls inside.
 
 The server decides whether it is shown, from the current report and the `banner*` settings (see
 [Configuration](#configuration)), and exposes the decision as `Query.securityUpdates.banner`:
@@ -84,7 +98,7 @@ The server decides whether it is shown, from the current report and the `banner*
 - `components` lists those components, distinct and sorted.
 - `dismissalKeys` lists one `<component>|<advisory id>` per counted advisory, distinct and sorted.
 - `visible` is `bannerEnabled && count > 0`.
-- `backgroundColor`, `textColor`, `dismissPolicy`, `dismissHours` are the validated presentation settings,
+- `backgroundColor`, `textColor`, `dismissPolicy`, `dismissHours`, `position` are the validated presentation settings,
   and `username` the current Jahia user.
 
 The browser only renders the decision. It never filters findings itself. A configuration change applies on
@@ -421,6 +435,7 @@ changes survive restarts and redeployments.
 | `bannerTextColor` | `#FFFFFF` | `#RRGGBB` | Banner text (also link, button and focus ring). The pair needs a contrast of at least 7:1. |
 | `bannerDismissPolicy` | `SESSION` | `SESSION`, `HOURS`, `UNTIL_CHANGE`, `NEVER` | See [Banner](#banner). |
 | `bannerDismissHours` | `24` | 1 to 720 | Hours a dismissal lasts with `HOURS`. |
+| `bannerPosition` | `TOP` | `TOP`, `BOTTOM`, `TOP_RIGHT`, `BOTTOM_RIGHT` | Where the banner appears. See [Banner](#banner). |
 | `onDemandMinIntervalSeconds` | `30` | 0 to 3600 | Hidden key, not shown in the settings page. Seconds from the later of the start and the end of the previous check before **Check now** may start another. The e2e tests set it to 0, except the rate-limit test (3600). The page never changes it. |
 
 **A `.cfg` file edited by hand is read leniently**, so a typo never stops the module. The service reads the
@@ -435,8 +450,9 @@ raw values: an unreadable value takes its default and the module still starts.
 - A property with several values (an array) is joined with ", ".
 - `extraFeedUrls` accepts commas or spaces. Beyond 10 URLs only the first 10 are used, with one WARN.
 - An empty or unknown `bannerMinimumSeverity` means `HIGH`, an empty or unknown `bannerDismissPolicy` means
-  `SESSION`, and an invalid colour or a pair below 7:1 means the default pair. An unknown severity or policy
-  and an invalid colour give a WARN. An empty severity or policy gives none. An empty colour gives a WARN.
+  `SESSION`, an empty or unknown `bannerPosition` means `TOP`, and an invalid colour or a pair below 7:1 means
+  the default pair. An unknown severity, policy or position and an invalid colour give a WARN. An empty
+  severity, policy or position gives none. An empty colour gives a WARN.
 - An empty `defaultStoreUrl` means no default store: with no module manager store either, the report
   shows `NO_STORE`.
 - A URL that is not https is not an error of the file: it is reported at check time (`INVALID_URL`).
@@ -483,10 +499,10 @@ query {
         advisories { id title url cves severity storeHost }
       }
     }
-    banner { visible count minimumSeverity components dismissalKeys backgroundColor textColor dismissPolicy dismissHours username }
+    banner { visible count minimumSeverity components dismissalKeys backgroundColor textColor dismissPolicy dismissHours position username }
     settings { canEdit enabled refreshIntervalHours useForgeSettings defaultStoreUrl extraFeedUrls bannerEnabled
                bannerMinimumSeverity bannerIncludeOwnerReports bannerBackgroundColor bannerTextColor
-               bannerDismissPolicy bannerDismissHours contrastRatio }
+               bannerDismissPolicy bannerDismissHours bannerPosition contrastRatio }
   }
 }
 
@@ -518,7 +534,7 @@ Example of variables for `updateSettings`:
     "defaultStoreUrl": "https://store.jahia.com", "extraFeedUrls": "",
     "bannerEnabled": true, "bannerMinimumSeverity": "HIGH", "bannerIncludeOwnerReports": true,
     "bannerBackgroundColor": "#1B1B1B", "bannerTextColor": "#FFFFFF",
-    "bannerDismissPolicy": "SESSION", "bannerDismissHours": 24
+    "bannerDismissPolicy": "SESSION", "bannerDismissHours": 24, "bannerPosition": "TOP"
   }
 }
 ```

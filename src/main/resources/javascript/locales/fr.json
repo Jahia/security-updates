@@ -229,6 +229,10 @@
         "picker": "Choisir la couleur du texte du bandeau",
         "help": "Un code couleur comme #FFFFFF. Également utilisée pour le lien, le bouton et le contour de focus."
       },
+      "bannerPosition": {
+        "label": "Position du bandeau",
+        "help": "L’endroit où le bandeau apparaît dans l’interface Jahia : une barre sur toute la largeur de la fenêtre, ou un petit encadré dans un coin."
+      },
       "bannerDismissPolicy": {
         "label": "Quand un utilisateur masque le bandeau",
         "help": "Sauf avec « Ne peut pas être masqué », le bandeau revient dès qu’un nouveau bulletin ou un nouveau composant est compté."
@@ -244,6 +248,12 @@
       "HOURS": "Masqué pendant un nombre d’heures",
       "UNTIL_CHANGE": "Masqué jusqu’à ce qu’un nouveau bulletin ou un nouveau composant soit compté",
       "NEVER": "Ne peut pas être masqué"
+    },
+    "position": {
+      "TOP": "En haut de la fenêtre, sur toute la largeur",
+      "BOTTOM": "En bas de la fenêtre, sur toute la largeur",
+      "TOP_RIGHT": "Coin supérieur droit",
+      "BOTTOM_RIGHT": "Coin inférieur droit"
     },
     "preview": {
       "title": "Aperçu",

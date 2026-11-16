@@ -1,5 +1,6 @@
 package org.jahia.community.securityupdates.service;
 
+import org.jahia.community.securityupdates.model.BannerPosition;
 import org.jahia.community.securityupdates.model.DismissPolicy;
 import org.jahia.community.securityupdates.model.Severity;
 import org.junit.jupiter.api.DisplayName;
@@ -55,6 +56,7 @@ class BannerSettingsTest {
         assertThat(defaults.getTextColor()).isEqualTo("#FFFFFF");
         assertThat(defaults.getDismissPolicy()).isEqualTo(DismissPolicy.SESSION);
         assertThat(defaults.getDismissHours()).isEqualTo(24);
+        assertThat(defaults.getPosition()).isEqualTo(BannerPosition.TOP);
     }
 
     @Test
@@ -91,6 +93,43 @@ class BannerSettingsTest {
         List<String> warnings = new ArrayList<>();
         assertThat(BannerSettings.parseDismissPolicy("FOREVER", warnings::add)).isEqualTo(DismissPolicy.SESSION);
         assertThat(warnings).hasSize(1);
+    }
+
+    @ParameterizedTest(name = "position [{0}] -> {1}")
+    @CsvSource({"TOP, TOP", "bottom, BOTTOM", "Top_Right, TOP_RIGHT", "' BOTTOM_RIGHT ', BOTTOM_RIGHT"})
+    void positions(String value, BannerPosition expected) {
+        List<String> warnings = new ArrayList<>();
+        assertThat(BannerSettings.parseBannerPosition(value, warnings::add)).isEqualTo(expected);
+        assertThat(warnings).isEmpty();
+    }
+
+    @ParameterizedTest(name = "position [{0}] means TOP, silently")
+    @NullAndEmptySource
+    @ValueSource(strings = {"  "})
+    void absentPositionIsTop(String value) {
+        List<String> warnings = new ArrayList<>();
+        assertThat(BannerSettings.parseBannerPosition(value, warnings::add)).isEqualTo(BannerPosition.TOP);
+        assertThat(warnings).isEmpty();
+    }
+
+    @ParameterizedTest(name = "position [{0}] falls back to TOP with one warning")
+    @ValueSource(strings = {"LEFT", "TOP-RIGHT", "middle"})
+    void invalidPositionFallsBackToTop(String value) {
+        List<String> warnings = new ArrayList<>();
+
+        assertThat(BannerSettings.parseBannerPosition(value, warnings::add)).isEqualTo(BannerPosition.TOP);
+
+        assertThat(warnings).singleElement().satisfies(w -> assertThat(w).contains("bannerPosition").contains("TOP"));
+    }
+
+    @Test
+    @DisplayName("the short constructors keep the default position")
+    void shortConstructorsKeepTheDefaultPosition() {
+        assertThat(new BannerSettings(true, Severity.HIGH, true).getPosition()).isEqualTo(BannerPosition.TOP);
+        assertThat(new BannerSettings(true, Severity.HIGH, true, "#1B1B1B", "#FFFFFF", DismissPolicy.HOURS, 12).getPosition())
+                .isEqualTo(BannerPosition.TOP);
+        assertThat(new BannerSettings(true, Severity.HIGH, true, "#1B1B1B", "#FFFFFF", DismissPolicy.HOURS, 12,
+                BannerPosition.BOTTOM_RIGHT).getPosition()).isEqualTo(BannerPosition.BOTTOM_RIGHT);
     }
 
     @Test
@@ -137,6 +176,20 @@ class BannerSettingsTest {
     }
 
     @Test
+    @DisplayName("Settings.fromProperties reads the banner position: absent means TOP, an invalid one TOP with one warning")
+    void fromConfigurationPosition() {
+        List<String> warnings = new ArrayList<>();
+        assertThat(Settings.fromProperties(config(), warnings::add).getBanner().getPosition()).isEqualTo(BannerPosition.TOP);
+        assertThat(Settings.fromProperties(config("bannerPosition", "bottom_right"), warnings::add).getBanner().getPosition())
+                .isEqualTo(BannerPosition.BOTTOM_RIGHT);
+        assertThat(warnings).isEmpty();
+
+        assertThat(Settings.fromProperties(config("bannerPosition", "CENTER"), warnings::add).getBanner().getPosition())
+                .isEqualTo(BannerPosition.TOP);
+        assertThat(warnings).singleElement().satisfies(w -> assertThat(w).contains("bannerPosition"));
+    }
+
+    @Test
     @DisplayName("toValues gives every configuration key, as written in the .cfg")
     void toValues() {
         Map<String, String> values = Settings.defaults().toValues();
@@ -147,7 +200,8 @@ class BannerSettingsTest {
                 .containsEntry("extraFeedUrls", "")
                 .containsEntry("bannerBackgroundColor", "#1B1B1B")
                 .containsEntry("bannerDismissPolicy", "SESSION")
-                .containsEntry("bannerDismissHours", "24");
+                .containsEntry("bannerDismissHours", "24")
+                .containsEntry("bannerPosition", "TOP");
     }
 
     /** Component properties holding the given values (typed, as DS may deliver them); other keys are missing. */

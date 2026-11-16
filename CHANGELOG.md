@@ -42,9 +42,12 @@ First release (1.0.0). It requires Jahia 8.2.3.7 or later.
 - OSGi configuration `org.jahia.community.securityupdates` (`enabled`, `refreshIntervalHours`,
   `useForgeSettings`, `extraFeedUrls`, `defaultStoreUrl`, `bannerEnabled`, `bannerMinimumSeverity`,
   `bannerIncludeOwnerReports`, `bannerBackgroundColor`, `bannerTextColor`, `bannerDismissPolicy`,
-  `bannerDismissHours`, and the hidden `onDemandMinIntervalSeconds`).
+  `bannerDismissHours`, `bannerPosition`, and the hidden `onDemandMinIntervalSeconds`).
 - Each advisory shows the host of the store that published it (`storeHost`), as "(from <host>)" when it is
-  not `store.jahia.com`. The banner sits last in the page body, with a compact layout in a small window.
+  not `store.jahia.com`.
+- The banner is a full-width bar at the top of the window by default, and the Jahia UI is made shorter so
+  that the bar covers none of it. `bannerPosition` puts it at the bottom instead, or in a small box in the
+  top right or bottom right corner. Jahia's dialogs open over it. It has a compact layout in a small window.
 - A check has 5 minutes in all. An unexpected failure of one store does not stop the others, and the module
   list is not requested after a transport failure of the feed. Lists longer than 100 items are cut and
   reported.

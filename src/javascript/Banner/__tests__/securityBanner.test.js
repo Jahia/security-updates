@@ -5,11 +5,14 @@ import {
     FEEDBACK_ID,
     FLIP_HOLD_MS,
     READY_ATTRIBUTE,
+    POSITIONS,
     REFRESH_INTERVAL_MS,
     REQUEST_TIMEOUT_MS,
     RETRY_INTERVAL_MS,
     removeBanner,
     showSecurityBanner,
+    SPACE_ATTRIBUTE,
+    SPACE_VARIABLE,
     startSecurityBanner,
     VISIBILITY_MIN_INTERVAL_MS
 } from '../securityBanner';
@@ -35,6 +38,8 @@ const answer = (overrides = {}, hasPermission = true) => ({
                 textColor: '#FFFFFF',
                 dismissPolicy: 'SESSION',
                 dismissHours: 24,
+                // Most tests check the box in a corner; the bars have their own tests ('bar').
+                position: 'BOTTOM_RIGHT',
                 username: 'jdoe',
                 ...overrides
             }
@@ -81,7 +86,7 @@ describe('showSecurityBanner', () => {
         expect(fetchImpl).toHaveBeenCalledTimes(1);
         expect(fetchImpl.mock.calls[0][0]).toBe('/ctx/modules/graphql');
         const query = queryOf(fetchImpl, 0);
-        ['hasPermission', 'banner', 'dismissalKeys', 'backgroundColor', 'textColor', 'dismissPolicy', 'dismissHours', 'username']
+        ['hasPermission', 'banner', 'dismissalKeys', 'backgroundColor', 'textColor', 'dismissPolicy', 'dismissHours', 'position', 'username']
             .forEach(field => expect(query).toContain(field));
         expect(query).not.toContain('findings');
     });
@@ -488,6 +493,119 @@ describe('showSecurityBanner', () => {
             button.blur();
             button.focus();
             expect(banner().getAttribute('data-position')).toBe('top');
+        });
+    });
+    describe('bar', () => {
+        const root = () => document.documentElement;
+        const sizeBanner = height => {
+            banner().getBoundingClientRect = () => ({top: 0, bottom: height, left: 0, right: 1024, height});
+        };
+
+        test('TOP is a full-width bar, first in the page, that reserves its height at the top of the window', async () => {
+            jest.useFakeTimers();
+            await show(fetchAnswering(answer({position: 'TOP'})));
+
+            const element = banner();
+            expect(element.getAttribute('data-layout')).toBe('bar');
+            expect(element.getAttribute('data-position')).toBe('top');
+            expect(document.body.firstElementChild).toBe(element);
+            expect(root().getAttribute(SPACE_ATTRIBUTE)).toBe('top');
+
+            sizeBanner(48.2);
+            window.dispatchEvent(new Event('resize'));
+            jest.advanceTimersByTime(20);
+            expect(root().style.getPropertyValue(SPACE_VARIABLE)).toBe('49px');
+            // A bar covers nothing: no scroll padding is needed.
+            expect(root().style.getPropertyValue('scroll-padding-top')).toBe('');
+        });
+
+        test('BOTTOM is a full-width bar, last in the page, that reserves its height at the bottom', async () => {
+            await show(fetchAnswering(answer({position: 'BOTTOM'})));
+
+            expect(banner().getAttribute('data-layout')).toBe('bar');
+            expect(banner().getAttribute('data-position')).toBe('bottom');
+            expect(document.body.lastElementChild).toBe(banner());
+            expect(root().getAttribute(SPACE_ATTRIBUTE)).toBe('bottom');
+        });
+
+        test.each([['TOP_RIGHT', 'top'], ['BOTTOM_RIGHT', 'bottom']])('%s is a box in that corner, over the page, last in it', async (position, edge) => {
+            await show(fetchAnswering(answer({position})));
+
+            expect(banner().getAttribute('data-layout')).toBe('box');
+            expect(banner().getAttribute('data-position')).toBe(edge);
+            expect(document.body.lastElementChild).toBe(banner());
+            expect(root().hasAttribute(SPACE_ATTRIBUTE)).toBe(false);
+        });
+
+        test.each([[undefined], ['LEFT'], ['toString']])('an unknown position (%s) gives the default bar at the top', async position => {
+            await show(fetchAnswering(answer({position})));
+
+            expect(banner().getAttribute('data-placement')).toBe('TOP');
+            expect(banner().getAttribute('data-layout')).toBe('bar');
+        });
+
+        test('a bar never moves, even over the focused element', async () => {
+            await show(fetchAnswering(answer({position: 'TOP'})));
+            sizeBanner(100);
+            const button = document.querySelector('main button');
+            button.getBoundingClientRect = () => ({top: 10, bottom: 40, left: 10, right: 100});
+
+            button.focus();
+
+            expect(banner().getAttribute('data-position')).toBe('top');
+        });
+
+        test('gives the space back when it goes', async () => {
+            await show(fetchAnswering(answer({position: 'TOP'})));
+
+            removeBanner();
+
+            expect(root().hasAttribute(SPACE_ATTRIBUTE)).toBe(false);
+            expect(root().style.getPropertyValue(SPACE_VARIABLE)).toBe('');
+        });
+
+        test('is drawn again at its new place when the position setting changes', async () => {
+            await show(fetchAnswering(answer({position: 'TOP'})));
+            await show(fetchAnswering(answer({position: 'BOTTOM_RIGHT'})));
+
+            expect(document.querySelectorAll(`#${BANNER_ID}`)).toHaveLength(1);
+            expect(banner().getAttribute('data-layout')).toBe('box');
+            expect(document.body.lastElementChild).toBe(banner());
+            expect(root().hasAttribute(SPACE_ATTRIBUTE)).toBe(false);
+        });
+
+        test('keeps the same element, and the focus in it, while the position stays', async () => {
+            await show(fetchAnswering(answer({position: 'TOP'})));
+            const element = banner();
+            dismissButton().focus();
+
+            await show(fetchAnswering(answer({position: 'TOP', count: 3})));
+
+            expect(banner()).toBe(element);
+            expect(document.activeElement).toBe(dismissButton());
+        });
+
+        test('the CSS shortens the Jahia layout by the reserved space and keeps the bar text at most 80 characters wide', async () => {
+            await show(fetchAnswering(answer({position: 'TOP'})));
+
+            const css = document.getElementById('security-updates-banner-style').textContent;
+            expect(css).toContain(`html[${SPACE_ATTRIBUTE}="top"] body { padding-top: var(${SPACE_VARIABLE}, 0px); }`);
+            expect(css).toContain(`html[${SPACE_ATTRIBUTE}="bottom"] body { padding-bottom: var(${SPACE_VARIABLE}, 0px); }`);
+            expect(css).toContain(`.moonstone-layoutApp { height: calc(100vh - var(${SPACE_VARIABLE}, 0px)); }`);
+            expect(css).toMatch(/\[data-layout="bar"\] p \{[^}]*max-width: 80ch/);
+        });
+
+        test('sits under the Jahia dialogs (z-index 1300), so that a full-screen dialog is never covered', async () => {
+            await show(fetchAnswering(answer({position: 'TOP'})));
+
+            const css = document.getElementById('security-updates-banner-style').textContent;
+            const zIndex = Number(css.match(/z-index: (\d+)/)[1]);
+            expect(zIndex).toBeGreaterThan(1200);
+            expect(zIndex).toBeLessThan(1300);
+        });
+
+        test('lists the four positions', () => {
+            expect(Object.keys(POSITIONS)).toEqual(['TOP', 'BOTTOM', 'TOP_RIGHT', 'BOTTOM_RIGHT']);
         });
     });
 });

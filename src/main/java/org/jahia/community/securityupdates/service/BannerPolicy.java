@@ -42,7 +42,7 @@ public final class BannerPolicy {
         }
         return new BannerDecision(settings.isEnabled() && !components.isEmpty(), minimum, new ArrayList<>(components),
                 new ArrayList<>(keys), settings.getBackgroundColor(), settings.getTextColor(), settings.getDismissPolicy(),
-                settings.getDismissHours());
+                settings.getDismissHours(), settings.getPosition());
     }
 
     private static boolean reaches(Severity severity, Severity minimum) {

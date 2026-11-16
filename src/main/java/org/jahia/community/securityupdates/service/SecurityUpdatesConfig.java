@@ -59,6 +59,13 @@ public @interface SecurityUpdatesConfig {
     @AttributeDefinition(name = "%bannerDismissHours", description = "%bannerDismissHours.desc", min = "1", max = "720")
     int bannerDismissHours() default BannerSettings.DEFAULT_DISMISS_HOURS;
 
+    @AttributeDefinition(name = "%bannerPosition", description = "%bannerPosition.desc", options = {
+            @Option(label = "%position.TOP", value = "TOP"),
+            @Option(label = "%position.BOTTOM", value = "BOTTOM"),
+            @Option(label = "%position.TOP_RIGHT", value = "TOP_RIGHT"),
+            @Option(label = "%position.BOTTOM_RIGHT", value = "BOTTOM_RIGHT")})
+    String bannerPosition() default "TOP";
+
     @AttributeDefinition(name = "%onDemandMinIntervalSeconds", description = "%onDemandMinIntervalSeconds.desc", min = "0",
             max = "3600")
     int onDemandMinIntervalSeconds() default Settings.DEFAULT_ON_DEMAND_MIN_INTERVAL_SECONDS;

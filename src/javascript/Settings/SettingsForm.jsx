@@ -14,6 +14,7 @@ import {SettingsSummary} from './SettingsSummary';
 import {ResetDialog} from './ResetDialog';
 import {StatusMessage} from '../SecurityUpdates/StatusMessage';
 import {
+    BANNER_POSITIONS,
     CHANGED_EVENT,
     DEFAULT_BANNER_BACKGROUND,
     DEFAULT_BANNER_TEXT,
@@ -288,6 +289,9 @@ export const SettingsForm = ({onSettingsChanged}) => {
                         <ColorField field="bannerBackgroundColor" ratio={ratio} {...fieldProps}/>
                         <ColorField field="bannerTextColor" ratio={ratio} {...fieldProps}/>
                         <BannerPreview form={form} applied={applied} onApply={onApply}/>
+                        <SelectField field="bannerPosition" {...fieldProps}>
+                            {BANNER_POSITIONS.map(position => <option key={position} value={position}>{t(`settings.position.${position}`)}</option>)}
+                        </SelectField>
                         <SelectField field="bannerDismissPolicy" {...fieldProps}>
                             {DISMISS_POLICIES.map(policy => <option key={policy} value={policy}>{t(`settings.dismiss.${policy}`)}</option>)}
                         </SelectField>

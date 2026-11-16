@@ -1,6 +1,7 @@
 package org.jahia.community.securityupdates.service;
 
 import org.jahia.community.securityupdates.feed.StoreUrls;
+import org.jahia.community.securityupdates.model.BannerPosition;
 import org.jahia.community.securityupdates.model.DismissPolicy;
 import org.jahia.community.securityupdates.model.Severity;
 
@@ -23,7 +24,8 @@ import java.util.Optional;
  *     ({@code NOT_HTTPS} for a plain http URL, {@code INVALID_URL} otherwise); at most
  *     {@value Settings#MAX_EXTRA_FEED_URLS} extra feed URLs ({@code TOO_MANY}), separated by commas or white space;</li>
  *     <li>{@code bannerMinimumSeverity} is LOW, MEDIUM, HIGH or CRITICAL; {@code bannerDismissPolicy} a
- *     {@link DismissPolicy};</li>
+ *     {@link DismissPolicy}; {@code bannerPosition} a {@link BannerPosition} (TOP, BOTTOM, TOP_RIGHT or
+ *     BOTTOM_RIGHT); these three in any case, stored in upper case;</li>
  *     <li>colours are {@code #RRGGBB} and their contrast ratio is at least 7:1.</li>
  * </ul>
  */
@@ -33,6 +35,7 @@ public final class SettingsValidator {
     static final int MAX_HOURS = 720;
     private static final String TRUE = "true";
     private static final String FALSE = "false";
+    private static final String INVALID_VALUE = "INVALID_VALUE";
     private static final String INVALID_URL = "INVALID_URL";
     private static final String INVALID_URL_MESSAGE = "Must be an absolute https URL without credentials, query or fragment";
     private static final String NOT_HTTPS = "NOT_HTTPS";
@@ -62,6 +65,7 @@ public final class SettingsValidator {
         extraFeedUrls(input, values, errors);
         minimumSeverity(input, values, errors);
         dismissPolicy(input, values, errors);
+        position(input, values, errors);
         colors(input, values, errors);
         return new ValidationResult(values, errors);
     }
@@ -134,7 +138,7 @@ public final class SettingsValidator {
     private static void minimumSeverity(Map<String, String> input, Map<String, String> values, List<FieldError> errors) {
         Severity severity = Severity.parse(input.get(SettingsKeys.BANNER_MINIMUM_SEVERITY));
         if (severity == Severity.UNKNOWN) {
-            errors.add(new FieldError(SettingsKeys.BANNER_MINIMUM_SEVERITY, "INVALID_VALUE", "Must be LOW, MEDIUM, HIGH or CRITICAL"));
+            errors.add(new FieldError(SettingsKeys.BANNER_MINIMUM_SEVERITY, INVALID_VALUE, "Must be LOW, MEDIUM, HIGH or CRITICAL"));
         } else {
             values.put(SettingsKeys.BANNER_MINIMUM_SEVERITY, severity.name());
         }
@@ -145,8 +149,18 @@ public final class SettingsValidator {
             DismissPolicy policy = DismissPolicy.valueOf(input.get(SettingsKeys.BANNER_DISMISS_POLICY).trim().toUpperCase(Locale.ROOT));
             values.put(SettingsKeys.BANNER_DISMISS_POLICY, policy.name());
         } catch (IllegalArgumentException e) {
-            errors.add(new FieldError(SettingsKeys.BANNER_DISMISS_POLICY, "INVALID_VALUE",
+            errors.add(new FieldError(SettingsKeys.BANNER_DISMISS_POLICY, INVALID_VALUE,
                     "Must be SESSION, HOURS, UNTIL_CHANGE or NEVER"));
+        }
+    }
+
+    private static void position(Map<String, String> input, Map<String, String> values, List<FieldError> errors) {
+        try {
+            BannerPosition position = BannerPosition.valueOf(input.get(SettingsKeys.BANNER_POSITION).trim().toUpperCase(Locale.ROOT));
+            values.put(SettingsKeys.BANNER_POSITION, position.name());
+        } catch (IllegalArgumentException e) {
+            errors.add(new FieldError(SettingsKeys.BANNER_POSITION, INVALID_VALUE,
+                    "Must be TOP, BOTTOM, TOP_RIGHT or BOTTOM_RIGHT"));
         }
     }
 

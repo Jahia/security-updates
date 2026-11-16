@@ -229,6 +229,10 @@
         "picker": "Pick the banner text colour",
         "help": "A colour code such as #FFFFFF. Also used for the link, the button and the focus outline."
       },
+      "bannerPosition": {
+        "label": "Banner position",
+        "help": "Where the banner appears in the Jahia interface: a bar across the whole width of the window, or a small box in a corner."
+      },
       "bannerDismissPolicy": {
         "label": "After a user hides the banner",
         "help": "Except with \"Cannot be hidden\", the banner comes back as soon as a new advisory or a new component is counted."
@@ -244,6 +248,12 @@
       "HOURS": "Hidden for a number of hours",
       "UNTIL_CHANGE": "Hidden until a new advisory or a new component is counted",
       "NEVER": "Cannot be hidden"
+    },
+    "position": {
+      "TOP": "Top of the window, full width",
+      "BOTTOM": "Bottom of the window, full width",
+      "TOP_RIGHT": "Top right corner",
+      "BOTTOM_RIGHT": "Bottom right corner"
     },
     "preview": {
       "title": "Preview",
