@@ -150,6 +150,9 @@ describe('SettingsForm', () => {
             expect(preview.style.backgroundColor).toBe('rgb(11, 61, 145)');
             expect(preview.style.color).toBe('rgb(255, 255, 255)');
             expect(preview).toHaveTextContent('banner.message.other {n=3, threshold=banner.threshold.HIGH}');
+            // As in the banner: the message, then the close cross (the whole sample is hidden from screen readers).
+            expect(preview).toHaveAttribute('aria-hidden', 'true');
+            expect(preview.lastElementChild.tagName.toLowerCase()).toBe('svg');
             expect(screen.getByTestId('security-updates-contrast')).toHaveTextContent('10.04');
             expect(screen.getByTestId('security-updates-contrast')).toHaveTextContent('settings.preview.pass');
         });

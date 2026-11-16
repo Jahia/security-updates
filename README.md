@@ -68,7 +68,9 @@ The first check runs about one minute after the module starts. **Check now** sta
 ## Banner
 
 Users with `adminTemplates` also get a notice (the banner) in the Jahia UI, for example
-"3 components need a security update (high severity or above).", with a link to the Security updates page.
+"3 components need a security update (high severity or above)." The message is a link to the Security
+updates page. A close cross (×) next to it, named "Hide this banner" for screen readers and as a tooltip,
+hides the banner (see Dismissal below).
 Where it appears is set by `bannerPosition`:
 
 | `bannerPosition` | Where |
@@ -109,7 +111,7 @@ within 20 seconds) leaves the banner as it is, and the browser asks again after 
 The banner reads the server again every 15 minutes, when the browser tab becomes visible again (no request
 if the last one is less than 30 seconds old), and when the page changes the report or the settings. It is
 hidden on the Security updates page itself. A screen reader hears it only when its count or its dismissal
-keys change. After **Hide this banner**, a status message tells when it comes back. Focus goes to the last
+keys change. After the close cross, a status message tells when it comes back. Focus goes to the last
 element outside the banner that had it, else to the element focused when the banner appeared, else it stays
 on the page body.
 
@@ -117,11 +119,11 @@ For tests, the `<html>` element carries `data-security-updates-banner="pending"`
 server and `"ready"` after each decision. The attribute is removed when the banner stops.
 
 **Colours.** The background and text colours are configurable (`#RRGGBB`). Their contrast ratio must be at
-least 7:1 (WCAG 2.2 AAA, relative luminance formula). The link, the button border and the 3px focus ring
-use the text colour, so they keep that contrast. The settings form and the server suggest a colour that
+least 7:1 (WCAG 2.2 AAA, relative luminance formula). The link, the close cross, its hover outline and the
+3px focus ring use the text colour, so they keep that contrast. The settings form and the server suggest a colour that
 reaches 7:1 when a pair does not.
 
-**Dismissal** (`bannerDismissPolicy`; the **Hide this banner** button only, the Escape key does nothing):
+**Dismissal** (`bannerDismissPolicy`; the close cross only, the Escape key does nothing; `NEVER` shows no cross):
 
 | Policy | Hidden until | Stored in |
 |---|---|---|

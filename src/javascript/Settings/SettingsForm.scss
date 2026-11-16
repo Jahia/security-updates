@@ -169,6 +169,9 @@ $focus-color: var(--color-accent_dark_contrast, #004781);
 }
 
 .sample {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-medium, 16px);
   border-radius: 4px;
   padding: var(--spacing-small, 8px) var(--spacing-medium, 16px);
   max-width: 30rem;
@@ -176,13 +179,20 @@ $focus-color: var(--color-accent_dark_contrast, #004781);
   font-size: 0.875rem;
 
   p {
-    margin: 0 0 var(--spacing-nano, 4px);
+    flex: 1 1 auto;
+    margin: 0;
   }
 }
 
 .sampleLink {
   font-weight: 700;
   text-decoration: underline;
+}
+
+.sampleClose {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 .suggestionList {

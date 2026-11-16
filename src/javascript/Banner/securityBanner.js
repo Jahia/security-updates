@@ -42,6 +42,8 @@ export const SPACE_ATTRIBUTE = 'data-security-updates-banner-edge';
 export const SPACE_VARIABLE = '--security-updates-banner-space';
 const STYLE_ID = 'security-updates-banner-style';
 const DISMISS_SELECTOR = '[data-sel-role="security-updates-banner-dismiss"]';
+const LINK_SELECTOR = '[data-sel-role="security-updates-banner-link"]';
+const SVG_NS = 'http://www.w3.org/2000/svg';
 const ANNOUNCE_DELAY_MS = 1000;
 const FEEDBACK_DELAY_MS = 100;
 
@@ -55,6 +57,8 @@ const BANNER_QUERY = 'query SecurityUpdatesBanner { jcr { nodeByPath(path: "/") 
 // link, the button border and the focus ring all use the text colour, so each of them keeps that contrast against
 // the background (the focus ring needs 3:1). The banner never relies on colour alone: the message says what it is.
 // Sizes are in rem (they follow the user's text size); the link and the button are 44 by 44 pixel targets.
+// The message itself is the link to the page; the close button is a cross (an icon in the text colour, so at least
+// 7:1), named by its aria-label and its title, with an outline on hover.
 // On a small viewport (a phone, or a 400% zoom: 40rem wide or high at most), the box becomes a compact strip across
 // the edge, at most 40% of the height (scrolling inside beyond that), so that it never covers most of the screen, even
 // when it cannot be hidden; its padding keeps the 5px focus ring of the link and the button inside the scrolling box.
@@ -72,15 +76,17 @@ const CSS = `
   background: var(--security-updates-banner-bg, ${DEFAULT_BANNER_BACKGROUND}); color: var(--security-updates-banner-fg, ${DEFAULT_BANNER_TEXT});
   font-family: var(--moon-font-family, 'Nunito Sans', sans-serif); font-size: 0.875rem; line-height: 1.5;
   box-shadow: 0 4px 16px rgba(0, 0, 0, .35); }
+#${BANNER_ID}[data-layout="box"] { flex-wrap: nowrap; align-items: flex-start; }
 #${BANNER_ID}[data-position="top"] { top: 1rem; bottom: auto; }
-#${BANNER_ID} p { margin: 0; flex: 1 1 100%; }
+#${BANNER_ID} p { margin: 0; flex: 1 1 auto; min-width: 0; }
 #${BANNER_ID} a, #${BANNER_ID} button { display: inline-flex; align-items: center; justify-content: center;
   min-height: 2.75rem; min-width: 2.75rem; box-sizing: border-box; }
-#${BANNER_ID} a { color: var(--security-updates-banner-fg, ${DEFAULT_BANNER_TEXT}); font-weight: 700; text-decoration: underline;
-  padding: 0 0.25rem; }
-#${BANNER_ID} button { background: transparent; color: var(--security-updates-banner-fg, ${DEFAULT_BANNER_TEXT});
-  border: 1px solid var(--security-updates-banner-fg, ${DEFAULT_BANNER_TEXT}); border-radius: 4px;
-  padding: 0.25rem 0.75rem; font: inherit; cursor: pointer; }
+#${BANNER_ID} a { display: flex; justify-content: flex-start; color: var(--security-updates-banner-fg, ${DEFAULT_BANNER_TEXT});
+  font-weight: 700; text-decoration: underline; padding: 0 0.25rem; }
+#${BANNER_ID} button { flex: none; background: transparent; color: var(--security-updates-banner-fg, ${DEFAULT_BANNER_TEXT});
+  border: 0; border-radius: 4px; padding: 0; font: inherit; cursor: pointer; }
+#${BANNER_ID} button:hover { box-shadow: inset 0 0 0 1px var(--security-updates-banner-fg, ${DEFAULT_BANNER_TEXT}); }
+#${BANNER_ID} button svg { width: 1.25rem; height: 1.25rem; }
 #${BANNER_ID} a:focus-visible, #${BANNER_ID} button:focus-visible {
   outline: 3px solid var(--security-updates-banner-fg, ${DEFAULT_BANNER_TEXT}); outline-offset: 2px; }
 #${BANNER_ID} .security-updates-banner-sr, #${FEEDBACK_ID} { position: absolute; width: 1px; height: 1px; margin: -1px;
@@ -89,7 +95,8 @@ const CSS = `
   justify-content: center; border-radius: 0; box-shadow: none; }
 #${BANNER_ID}[data-layout="bar"][data-position="top"] { top: 0; bottom: auto; }
 #${BANNER_ID}[data-layout="bar"][data-position="bottom"] { top: auto; bottom: 0; }
-#${BANNER_ID}[data-layout="bar"] p { flex: 1 1 20rem; max-width: 80ch; }
+#${BANNER_ID}[data-layout="bar"] p { flex: 0 1 80ch; max-width: 80ch; margin: 0 auto; }
+#${BANNER_ID}[data-layout="bar"] a { justify-content: center; text-align: center; }
 html[${SPACE_ATTRIBUTE}="top"] body { padding-top: var(${SPACE_VARIABLE}, 0px); }
 html[${SPACE_ATTRIBUTE}="bottom"] body { padding-bottom: var(${SPACE_VARIABLE}, 0px); }
 html[${SPACE_ATTRIBUTE}] .moonstone-layoutApp { height: calc(100vh - var(${SPACE_VARIABLE}, 0px)); }
@@ -411,18 +418,19 @@ const createElement = (t, position) => {
     element.setAttribute('data-layout', layout);
     element.setAttribute('data-position', edge);
 
+    // The message is the link to the Security updates page.
     const text = document.createElement('p');
+    const link = document.createElement('a');
+    link.href = adminUrl(ROUTE_KEY);
+    link.setAttribute('data-sel-role', 'security-updates-banner-link');
+    text.append(link);
     // The region is not live; this hidden status line announces the banner, after it is in the page, when what it
     // counts has changed.
     const live = document.createElement('span');
     live.setAttribute('role', 'status');
     live.className = 'security-updates-banner-sr';
 
-    const link = document.createElement('a');
-    link.href = adminUrl(ROUTE_KEY);
-    link.textContent = t('banner.link');
-    link.setAttribute('data-sel-role', 'security-updates-banner-link');
-    element.append(text, link, live);
+    element.append(text, live);
 
     // Where it is drawn, so that the tab order follows the reading order (WCAG 2.4.3): first in the page for a bar at
     // the top, last otherwise (at an edge, after the content). Its status line announces it, so users of screen
@@ -471,6 +479,22 @@ const hide = element => {
     }, FEEDBACK_DELAY_MS);
 };
 
+// The usual cross of a close button, decorative: the button is named by its aria-label.
+const closeIcon = () => {
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', 'M6 6l12 12M18 6L6 18');
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', 'currentColor');
+    path.setAttribute('stroke-width', '2.5');
+    path.setAttribute('stroke-linecap', 'round');
+    svg.append(path);
+    return svg;
+};
+
 // The button is created once and updated in place, so that a refresh never takes the keyboard focus away from it.
 const renderDismiss = (t, element, dismissal, language) => {
     dismissals.set(element, {t, language, dismissal});
@@ -484,13 +508,15 @@ const renderDismiss = (t, element, dismissal, language) => {
         dismiss = document.createElement('button');
         dismiss.type = 'button';
         dismiss.setAttribute('data-sel-role', 'security-updates-banner-dismiss');
+        dismiss.append(closeIcon());
         dismiss.addEventListener('click', () => hide(element));
         element.append(dismiss);
     }
 
     const label = t('banner.dismiss');
-    if (dismiss.textContent !== label) {
-        dismiss.textContent = label;
+    if (dismiss.getAttribute('aria-label') !== label) {
+        dismiss.setAttribute('aria-label', label);
+        dismiss.title = label;
     }
 };
 
@@ -554,9 +580,9 @@ const render = (t, language, banner, dismissal) => {
     element.setAttribute('data-count', String(banner.count));
     applyColors(element, banner);
     const text = message(t, banner, language);
-    const paragraph = element.querySelector('p');
-    if (paragraph.textContent !== text) {
-        paragraph.textContent = text;
+    const link = element.querySelector(LINK_SELECTOR);
+    if (link.textContent !== text) {
+        link.textContent = text;
     }
 
     renderDismiss(t, element, dismissal, language);

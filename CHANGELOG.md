@@ -48,6 +48,8 @@ First release (1.0.0). It requires Jahia 8.2.3.7 or later.
 - The banner is a full-width bar at the top of the window by default, and the Jahia UI is made shorter so
   that the bar covers none of it. `bannerPosition` puts it at the bottom instead, or in a small box in the
   top right or bottom right corner. Jahia's dialogs open over it. It has a compact layout in a small window.
+- The banner message is itself the link to the Security updates page, and the banner is closed with the usual
+  cross (×), named "Hide this banner".
 - A check has 5 minutes in all. An unexpected failure of one store does not stop the others, and the module
   list is not requested after a transport failure of the feed. Lists longer than 100 items are cut and
   reported.

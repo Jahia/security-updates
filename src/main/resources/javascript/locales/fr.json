@@ -160,7 +160,6 @@
       "HIGH": "gravité élevée ou supérieure",
       "CRITICAL": "gravité critique"
     },
-    "link": "Voir les mises à jour de sécurité",
     "dismiss": "Masquer ce bandeau",
     "hidden": {
       "SESSION": "Bandeau masqué jusqu’à la fermeture de cet onglet du navigateur. Il revient plus tôt si un nouveau bulletin ou un nouveau composant est compté.",

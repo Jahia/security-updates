@@ -114,7 +114,7 @@ describe('locales', () => {
         });
         // The message counts module owner reports too (when set to): it does not call them advisories. The text said
         // after hiding the banner names what makes it come back (a new advisory or component), and is not checked.
-        const shown = locale => JSON.stringify({message: locale.banner.message, threshold: locale.banner.threshold, link: locale.banner.link});
+        const shown = locale => JSON.stringify({message: locale.banner.message, threshold: locale.banner.threshold});
         expect(shown(en)).not.toMatch(/advisor/i);
         expect(shown(fr)).not.toMatch(/bulletin/i);
     });

@@ -160,7 +160,6 @@
       "HIGH": "high severity or above",
       "CRITICAL": "critical severity"
     },
-    "link": "View security updates",
     "dismiss": "Hide this banner",
     "hidden": {
       "SESSION": "Banner hidden until you close this browser tab. It comes back sooner if a new advisory or a new component is counted.",

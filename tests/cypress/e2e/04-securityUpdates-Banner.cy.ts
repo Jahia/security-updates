@@ -106,11 +106,24 @@ describe('Security updates: banner', () => {
         cy.get(BANNER).should('have.attr', 'role', 'region').and('have.attr', 'lang');
         // A child of <body>, outside the React tree of the Jahia UI (which would remove it when it renders again).
         cy.get(BANNER).parent().should('match', 'body');
+        // The message itself is the link to the page.
         cy.get(BANNER_LINK)
-            .should('contain', 'View security updates')
+            .should('have.text', '2 components need a security update (high severity or above).')
             .and('have.attr', 'href')
             .and('match', /\/jahia\/administration\/securityUpdates$/);
-        cy.get(BANNER_DISMISS).should('contain', 'Hide this banner');
+        cy.get(BANNER).find('a').should('have.length', 1);
+        // The close button is a cross, named "Hide this banner", a 44 by 44 pixel target.
+        cy.get(BANNER_DISMISS)
+            .should('have.attr', 'aria-label', 'Hide this banner')
+            .and('have.attr', 'title', 'Hide this banner')
+            .and('have.text', '')
+            .find('svg')
+            .should('have.attr', 'aria-hidden', 'true');
+        cy.get(BANNER_DISMISS).should($button => {
+            const rect = $button[0].getBoundingClientRect();
+            expect(rect.width, 'width').to.be.at.least(44);
+            expect(rect.height, 'height').to.be.at.least(44);
+        });
     });
 
     it('is not shown on the Security updates page, and comes back on the other pages', () => {

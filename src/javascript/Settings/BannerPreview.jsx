@@ -119,8 +119,11 @@ export const BannerPreview = ({form, onApply, isReadOnly, applied}) => {
                 className={styles.sample}
                 style={{backgroundColor: isValid ? background : DEFAULT_BANNER_BACKGROUND, color: isValid ? text : DEFAULT_BANNER_TEXT}}
             >
-                <p>{t('banner.message.other', values({n: 3, threshold}))}</p>
-                <span className={styles.sampleLink}>{t('banner.link')}</span>
+                {/* As in the banner: the message is the link, then the close cross. */}
+                <p className={styles.sampleLink}>{t('banner.message.other', values({n: 3, threshold}))}</p>
+                <svg className={styles.sampleClose} viewBox="0 0 24 24" focusable="false">
+                    <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+                </svg>
             </div>
             <StatusMessage tone={verdict === 'pass' ? 'info' : 'warning'} data-testid="security-updates-contrast">
                 {isValid && <>{t('settings.preview.ratio')} <strong>{formatRatio(ratio)}:1</strong> </>}

@@ -100,10 +100,21 @@ describe('showSecurityBanner', () => {
         expect(element.getAttribute('lang')).toBe('fr');
         expect(element.getAttribute('data-count')).toBe('2');
         expect(element.querySelector('p').textContent).toBe('banner.message.other {n=2, threshold=banner.threshold.HIGH}');
-        const link = element.querySelector('[data-sel-role="security-updates-banner-link"]');
+        // The message itself is the link to the page.
+        const link = element.querySelector('p > [data-sel-role="security-updates-banner-link"]');
+        expect(link.textContent).toBe('banner.message.other {n=2, threshold=banner.threshold.HIGH}');
         expect(link.getAttribute('href')).toBe('/ctx/jahia/administration/securityUpdates');
+        expect(element.querySelectorAll('a')).toHaveLength(1);
+        // The close button is a cross, named by its aria-label (and its title for the mouse).
         expect(dismissButton().tagName).toBe('BUTTON');
-        expect(dismissButton().textContent).toBe('banner.dismiss');
+        expect(dismissButton().getAttribute('aria-label')).toBe('banner.dismiss');
+        expect(dismissButton().title).toBe('banner.dismiss');
+        expect(dismissButton().textContent).toBe('');
+        const icon = dismissButton().querySelector('svg');
+        expect(icon.getAttribute('aria-hidden')).toBe('true');
+        expect(icon.getAttribute('focusable')).toBe('false');
+        expect(icon.querySelector('path').getAttribute('stroke')).toBe('currentColor');
+        expect(element.lastElementChild).toBe(dismissButton());
     });
 
     test('one component uses the singular form', async () => {
@@ -308,7 +319,7 @@ describe('showSecurityBanner', () => {
             expect(dismissButton()).toBeNull();
 
             await show(fetchAnswering(answer()));
-            expect(dismissButton().textContent).toBe('banner.dismiss');
+            expect(dismissButton().getAttribute('aria-label')).toBe('banner.dismiss');
         });
 
         test('a new advisory for a component already hidden shows the banner again', async () => {
