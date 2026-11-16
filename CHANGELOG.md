@@ -44,8 +44,7 @@ First release (1.0.0). It requires Jahia 8.2.3.7 or later.
   `bannerIncludeOwnerReports`, `bannerBackgroundColor`, `bannerTextColor`, `bannerDismissPolicy`,
   `bannerDismissHours`, and the hidden `onDemandMinIntervalSeconds`).
 - Each advisory shows the host of the store that published it (`storeHost`), as "(from <host>)" when it is
-  not `store.jahia.com`. The page has a glossary, and the banner sits last in the page body, with a compact
-  layout in a small window.
+  not `store.jahia.com`. The banner sits last in the page body, with a compact layout in a small window.
 - A check has 5 minutes in all. An unexpected failure of one store does not stop the others, and the module
   list is not requested after a transport failure of the feed. Lists longer than 100 items are cut and
   reported.

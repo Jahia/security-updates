@@ -53,13 +53,6 @@ describe('locales', () => {
         expect(tags(en.page.afterTable)).toEqual(['</manage>', '</upgrade>', '<manage>', '<upgrade>']);
     });
 
-    test('the glossary explains each term of the page in both languages', () => {
-        ['advisory', 'cve', 'store', 'catalogue'].forEach(term => [en, fr].forEach(locale => {
-            expect(locale.page.glossary[term].term).toBeTruthy();
-            expect(locale.page.glossary[term].definition).toBeTruthy();
-        }));
-    });
-
     test('texts use the typographic apostrophe in French', () => {
         keys(fr).forEach(key => expect([key, get(fr, key).includes('\'')]).toEqual([key, false]));
     });

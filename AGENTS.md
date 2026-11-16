@@ -117,7 +117,7 @@ Error kinds and details: `model.StoreErrorKind`, `model.StoreErrorDetail`; the R
   known-key map, never by arbitrary object keys), `settingsValues.js`, `colorUtils.js` (same formula as
   `Colors.java`), `contrastSuggestions.js`, `Settings.gql.js`. `canEdit=false` renders the values as text, in a `<dl>` per group, with no control.
 - The report and settings queries use the Apollo fetch policy `no-cache`: both write to `ROOT_QUERY.securityUpdates` and the app shell defines no merge for it.
-- Page extras: a glossary in a `<details>` ("What these terms mean"), and the `filteredEmpty` text announced when a filter leaves nothing.
+- Page extras: the `filteredEmpty` text announced when a filter leaves nothing.
 - Settings form: after a colour suggestion focus moves to the changed field and the confirmation shows next to the preview; editing a field clears its error and the status message; during a save the text inputs are read-only and the fieldset has `aria-busy`; a refused save lists links to the failing fields ("Settings to correct:"); the disabled hours field shows a note; the saved message depends on whether a check setting changed (`saved` or `savedNow` in `en.json`). The reset dialog has Cancel first (focused when it opens) then the danger button "Reset to defaults", and `aria-describedby` on its body.
 - Plurals use `Intl.PluralRules` with `.one/.other` keys, not i18next suffixes.
 - Locales: `src/main/resources/javascript/locales/{en,fr}.json` (same keys and placeholders, checked by a test).

@@ -496,20 +496,6 @@ describe('SecurityUpdates page', () => {
         });
     });
 
-    test('explains its terms in plain language, in a closed native disclosure', () => {
-        mockReport(report());
-        render(<SecurityUpdates/>);
-        const glossary = screen.getByTestId('security-updates-glossary');
-
-        expect(glossary.tagName).toBe('DETAILS');
-        expect(glossary).not.toHaveAttribute('open');
-        expect(glossary.querySelector('summary')).toHaveTextContent('page.glossary.title');
-        ['advisory', 'cve', 'store', 'catalogue'].forEach(term => {
-            expect(within(glossary).getByText(`page.glossary.${term}.term`).tagName).toBe('DT');
-            expect(within(glossary).getByText(`page.glossary.${term}.definition`).tagName).toBe('DD');
-        });
-    });
-
     test('links to Manage modules', () => {
         mockReport(report({findings: [finding('m', 'HIGH')]}));
         render(<SecurityUpdates/>);

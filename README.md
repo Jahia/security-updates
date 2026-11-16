@@ -55,7 +55,6 @@ The first check runs about one minute after the module starts. **Check now** sta
   flagged on the store. They are not Jahia advisories.
 - The problems found during the last check, per store, in plain language. The technical text is in English
   and is labelled "Technical details (in English)".
-- A short glossary ("What these terms mean": advisory, CVE, store, module list), in plain words.
 - When a filter leaves no finding, the page says so.
 - The time of the last check and of the last check that reached every store, and when the next one is due.
 - After you save or reset the settings, the page loads the report again. If that fails, it keeps the last
@@ -584,8 +583,8 @@ See [SECURITY.md](SECURITY.md) to report a vulnerability.
   screening and the proxy settings. Configure only stores that you trust.
 - **A third-party store can publish any advisory id.** The page shows `(from <store host>)` for an advisory that
   does not come from `store.jahia.com`. The official store wins for an id found in several feeds.
-- **Reading level.** The page uses the terms of a Jahia administrator (advisory, CVE, store, module list).
-  A glossary on the page defines them.
+- **Reading level.** The page uses the terms of a Jahia administrator (advisory, CVE, store, module list)
+  and does not define them.
 
 ## Upgrade
 
