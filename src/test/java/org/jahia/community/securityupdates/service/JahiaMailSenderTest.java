@@ -5,9 +5,14 @@ import org.jahia.services.mail.MailSettings;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -91,5 +96,27 @@ class JahiaMailSenderTest {
                 .sendMessage(any(), any(), any(), any(), anyString(), anyString(), anyString());
 
         assertThat(new JahiaMailSender(() -> mail).send(MESSAGE)).isFalse();
+    }
+
+    @Test
+    @DisplayName("a mail service that does not answer within the limit is reported as not sent, without blocking the caller")
+    void sendTimeout() throws InterruptedException {
+        legacy(true, "admin@example.org");
+        CountDownLatch release = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            release.await(10, TimeUnit.SECONDS);
+            return null;
+        }).when(mail).sendMessage(any(), any(), any(), any(), anyString(), anyString(), anyString());
+        JahiaMailSender sender = new JahiaMailSender(() -> mail, Duration.ofMillis(200));
+        try {
+            long start = System.nanoTime();
+
+            assertThat(sender.send(MESSAGE)).isFalse();
+
+            assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(5));
+        } finally {
+            release.countDown();
+            sender.deactivate();
+        }
     }
 }

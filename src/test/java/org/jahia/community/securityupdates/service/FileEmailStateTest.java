@@ -67,4 +67,19 @@ class FileEmailStateTest {
 
         assertThat(state.lastSentAt()).contains(SENT);
     }
+
+    @Test
+    // Regression guard: Files.newOutputStream passes this test too on JDK 17; FileOutputStream keeps it on any JDK.
+    @DisplayName("an interrupt of the check thread (the module stops) does not lose the time of an email already sent")
+    void interruptedThreadStillWrites() {
+        Path file = dir.resolve("email-state.properties");
+        try {
+            Thread.currentThread().interrupt();
+            new FileEmailState(file).recordSent(SENT);
+        } finally {
+            Thread.interrupted();
+        }
+
+        assertThat(new FileEmailState(file).lastSentAt()).contains(SENT);
+    }
 }

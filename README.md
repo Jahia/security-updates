@@ -264,7 +264,9 @@ administration learn about the updates. It is **off by default**: turn it on in 
 - The Settings tab shows whether the mail service can send, where the email goes (the address is shown to
   server administrators, when the mail service gives it), whether this node is the processing server, and when
   this node sent the last email.
-- "Sent" means that Jahia's mail service accepted the email; its delivery is not known. When a due email cannot
+- "Sent" means that Jahia's mail service accepted the email; its delivery is not known. The module waits at most
+  60 seconds for the mail service: an email still being sent then counts as not sent (it may still arrive), and
+  the check ends. When a due email cannot
   be sent, one WARN in the log says why, until the cause changes.
 
 ## When checks run

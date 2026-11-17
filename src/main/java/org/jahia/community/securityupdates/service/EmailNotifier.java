@@ -80,7 +80,8 @@ final class EmailNotifier {
             return EmailOutcome.NOT_PROCESSING_SERVER;
         }
         Instant now = clock.instant();
-        Optional<Instant> last = state.lastSentAt();
+        // a time in the future (the clock was set back) would hold the email back until then: ignored
+        Optional<Instant> last = state.lastSentAt().filter(at -> !at.isAfter(now));
         if (last.isPresent() && now.isBefore(last.get().plus(settings.getFrequency().getPeriod()).minus(DUE_MARGIN))) {
             return EmailOutcome.NOT_DUE;
         }

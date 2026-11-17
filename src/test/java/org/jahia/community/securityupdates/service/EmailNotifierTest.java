@@ -206,4 +206,13 @@ class EmailNotifierTest {
             last.set(at);
         }
     }
+
+    @Test
+    @DisplayName("a last email dated in the future (clock set back) does not hold the email back")
+    void lastSentInTheFuture() {
+        state.recordSent(clock.instant().plus(Duration.ofDays(20)));
+
+        assertThat(notifier.afterCheck(withFindings(HIGH), new EmailSettings(true, EmailFrequency.MONTHLY, Severity.HIGH)))
+                .isEqualTo(EmailOutcome.SENT);
+    }
 }

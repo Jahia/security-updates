@@ -551,8 +551,8 @@ public class SecurityUpdateService {
         }
     }
 
-    /** @return the email notifier, or null while a mail reference is missing */
-    private EmailNotifier emailNotifier() {
+    /** @return the email notifier, or null while a mail reference is missing; built once (UI and check thread) */
+    private synchronized EmailNotifier emailNotifier() {
         EmailNotifier notifier = emailNotifier;
         if (notifier == null && mailSender != null && emailState != null) {
             notifier = new EmailNotifier(clock, mailSender, emailState, processingServer, serverName);

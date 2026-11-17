@@ -6,6 +6,7 @@ import org.osgi.service.component.annotations.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -73,7 +74,9 @@ public class FileEmailState implements EmailState {
         Path temp = null;
         try {
             temp = Files.createTempFile(file.toAbsolutePath().getParent(), FILE_NAME, ".tmp");
-            try (OutputStream out = Files.newOutputStream(temp)) {
+            // a FileOutputStream is never closed by an interrupt of the check thread (the module stops), so the time of an
+            // email already sent is kept; whether a FileChannel is depends on the JDK
+            try (OutputStream out = new FileOutputStream(temp.toFile())) {
                 properties.store(out, "Security updates: time of the last security email");
             }
             Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
