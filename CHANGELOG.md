@@ -10,6 +10,12 @@ First release (1.0.0). It requires Jahia 8.2.3.7 or later.
 
 ### Added
 
+- Security email (off by default): after a check, the processing server emails the components that need a
+  security update to the address that receives Jahia's notifications, through Jahia's mail service, at most
+  once per `emailFrequency` (`DAILY`, `WEEKLY`, `MONTHLY`) and only when a finding reaches
+  `emailMinimumSeverity`. The Settings tab shows where the email goes and when the last one went out, and a
+  **Send a test email** button (server administrators, one a minute). GraphQL: `securityUpdates.email` and
+  `securityUpdates.sendTestEmail`.
 - Security check of the installed Jahia core and modules against the store security feed
   (`modules-repository.securityUpdates.json`, schema version 1), on a schedule and on demand. On a standard
   Jahia, the module reads the store of the module manager.
