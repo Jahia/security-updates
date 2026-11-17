@@ -74,7 +74,9 @@ const GQL = {
     settings: 'graphql/query/getSecurityUpdatesSettings.graphql',
     refresh: 'graphql/mutation/refreshSecurityUpdates.graphql',
     update: 'graphql/mutation/updateSecurityUpdatesSettings.graphql',
-    reset: 'graphql/mutation/resetSecurityUpdatesSettings.graphql'
+    reset: 'graphql/mutation/resetSecurityUpdatesSettings.graphql',
+    email: 'graphql/query/getSecurityUpdatesEmail.graphql',
+    sendTestEmail: 'graphql/mutation/sendSecurityUpdatesTestEmail.graphql'
 };
 
 export type Advisory = { id: string; title: string | null; url: string | null; cves: string[]; severity: string };
@@ -128,6 +130,16 @@ export type Settings = {
     bannerDismissPolicy: string;
     bannerDismissHours: number;
     bannerPosition: string;
+    emailEnabled: boolean;
+    emailFrequency: string;
+    emailMinimumSeverity: string;
+};
+export type EmailStatus = {
+    mailServerReady: boolean;
+    recipient: string | null;
+    recipientMissing: boolean;
+    processingServer: boolean;
+    lastSentAt: string | null;
 };
 export type StoredSettings = Settings & { contrastRatio: number; canEdit: boolean };
 export type Suggestion = { field: string; value: string; ratio: string };
@@ -149,7 +161,10 @@ export const SETTINGS_KEYS: Array<keyof Settings> = [
     'bannerTextColor',
     'bannerDismissPolicy',
     'bannerDismissHours',
-    'bannerPosition'
+    'bannerPosition',
+    'emailEnabled',
+    'emailFrequency',
+    'emailMinimumSeverity'
 ];
 
 /** The settings of settings-fixture-defaults.yml. */
@@ -166,13 +181,16 @@ export const FIXTURE_SETTINGS: Settings = {
     bannerTextColor: '#FFFFFF',
     bannerDismissPolicy: 'SESSION',
     bannerDismissHours: 24,
-    bannerPosition: 'TOP'
+    bannerPosition: 'TOP',
+    emailEnabled: false,
+    emailFrequency: 'WEEKLY',
+    emailMinimumSeverity: 'HIGH'
 };
 
 /** The module defaults (META-INF/configurations/org.jahia.community.securityupdates.cfg), set by resetSettings. */
 export const DEFAULT_SETTINGS: Settings = {...FIXTURE_SETTINGS, useForgeSettings: true, defaultStoreUrl: JAHIA_STORE};
 
-/** The thirteen settings only (no contrastRatio, canEdit or __typename). */
+/** The sixteen settings only (no contrastRatio, canEdit or __typename). */
 export const settingsOf = (value: Partial<StoredSettings>): Settings => SETTINGS_KEYS.reduce(
     (settings, key) => ({...settings, [key]: value[key]}),
     {} as Settings
@@ -216,6 +234,13 @@ export const saveSettings = (overrides: Partial<Settings>): Cypress.Chainable<Se
     cy.apollo({mutationFile: GQL.update, variables: {input: {...FIXTURE_SETTINGS, ...overrides}}})
         .then(result => namespaceOf(result).updateSettings as SettingsResult);
 
+export const readEmailStatus = (): Cypress.Chainable<EmailStatus> =>
+    cy.apollo({queryFile: GQL.email, fetchPolicy: 'no-cache'}).then(result => namespaceOf(result).email as EmailStatus);
+
+/** The sendTestEmail mutation: yields its outcome (SENT, RATE_LIMITED, ...). */
+export const sendTestEmail = (): Cypress.Chainable<string> =>
+    cy.apollo({mutationFile: GQL.sendTestEmail}).then(result => namespaceOf(result).sendTestEmail as string);
+
 export const resetSettings = (): Cypress.Chainable<SettingsResult> =>
     cy.apollo({mutationFile: GQL.reset}).then(result => namespaceOf(result).resetSettings as SettingsResult);
 
@@ -230,7 +255,9 @@ export const raw = {
         variables: {input: {...FIXTURE_SETTINGS, ...overrides}},
         errorPolicy: 'all'
     }),
-    reset: (): Cypress.Chainable<unknown> => cy.apollo({mutationFile: GQL.reset, errorPolicy: 'all'})
+    reset: (): Cypress.Chainable<unknown> => cy.apollo({mutationFile: GQL.reset, errorPolicy: 'all'}),
+    email: (): Cypress.Chainable<unknown> => cy.apollo({queryFile: GQL.email, errorPolicy: 'all'}),
+    sendTestEmail: (): Cypress.Chainable<unknown> => cy.apollo({mutationFile: GQL.sendTestEmail, errorPolicy: 'all'})
 };
 
 const matches = <T>(value: T, expected: Partial<T>): boolean => Object.entries(expected)
@@ -410,7 +437,11 @@ export const waitForBannerDecision = (): void => {
 export const interceptPageOperations = (): void => {
     cy.intercept('POST', '**/modules/graphql', req => {
         const operations: GraphqlOperation[] = Array.isArray(req.body) ? req.body : [req.body];
-        const name = operations.map(op => op?.operationName).find(n => typeof n === 'string' && n.startsWith('SecurityUpdates'));
+        const ours = operations.filter(op => typeof op?.operationName === 'string' && op.operationName.startsWith('SecurityUpdates'));
+        // A request has one alias, and the Jahia UI may batch several operations in one request: a mutation of the
+        // module names it, so that a wait for the mutation never misses it behind a query of the same batch.
+        const mutation = ours.find(op => typeof op.query === 'string' && /^\s*mutation\b/.test(op.query));
+        const name = (mutation ?? ours[0])?.operationName;
         if (name) {
             req.alias = name;
         }

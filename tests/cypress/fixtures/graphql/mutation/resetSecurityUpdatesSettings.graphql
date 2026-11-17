@@ -26,6 +26,9 @@ mutation resetSecurityUpdatesSettings {
                 bannerDismissPolicy
                 bannerDismissHours
                 bannerPosition
+                emailEnabled
+                emailFrequency
+                emailMinimumSeverity
                 contrastRatio
                 canEdit
             }

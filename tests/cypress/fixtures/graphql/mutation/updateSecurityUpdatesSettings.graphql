@@ -26,6 +26,9 @@ mutation updateSecurityUpdatesSettings($input: InputSecurityUpdatesSettingsValue
                 bannerDismissPolicy
                 bannerDismissHours
                 bannerPosition
+                emailEnabled
+                emailFrequency
+                emailMinimumSeverity
                 contrastRatio
                 canEdit
             }

@@ -1,0 +1,11 @@
+query getSecurityUpdatesEmail {
+    securityUpdates {
+        email {
+            mailServerReady
+            recipient
+            recipientMissing
+            processingServer
+            lastSentAt
+        }
+    }
+}

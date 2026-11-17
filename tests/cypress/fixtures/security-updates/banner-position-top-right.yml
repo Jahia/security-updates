@@ -15,4 +15,7 @@
     bannerDismissPolicy: "SESSION"
     bannerDismissHours: "24"
     bannerPosition: "TOP_RIGHT"
+    emailEnabled: "false"
+    emailFrequency: "WEEKLY"
+    emailMinimumSeverity: "HIGH"
     onDemandMinIntervalSeconds: "0"
