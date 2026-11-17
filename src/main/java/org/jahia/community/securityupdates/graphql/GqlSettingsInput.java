@@ -31,6 +31,9 @@ public class GqlSettingsInput {
     private final String bannerDismissPolicy;
     private final Integer bannerDismissHours;
     private final String bannerPosition;
+    private final Boolean emailEnabled;
+    private final String emailFrequency;
+    private final String emailMinimumSeverity;
 
     @SuppressWarnings("java:S107") // one argument per configuration key
     public GqlSettingsInput(
@@ -46,7 +49,10 @@ public class GqlSettingsInput {
             @GraphQLName("bannerTextColor") @GraphQLNonNull @GraphQLDescription("#RRGGBB, at least 7:1 against the background colour") String bannerTextColor,
             @GraphQLName("bannerDismissPolicy") @GraphQLNonNull @GraphQLDescription("SESSION, HOURS, UNTIL_CHANGE or NEVER") String bannerDismissPolicy,
             @GraphQLName("bannerDismissHours") @GraphQLNonNull @GraphQLDescription("Hours a dismissal lasts with HOURS, 1 to 720") Integer bannerDismissHours,
-            @GraphQLName("bannerPosition") @GraphQLNonNull @GraphQLDescription("TOP, BOTTOM, TOP_RIGHT or BOTTOM_RIGHT") String bannerPosition) {
+            @GraphQLName("bannerPosition") @GraphQLNonNull @GraphQLDescription("TOP, BOTTOM, TOP_RIGHT or BOTTOM_RIGHT") String bannerPosition,
+            @GraphQLName("emailEnabled") @GraphQLNonNull @GraphQLDescription("Whether the security updates email is sent") Boolean emailEnabled,
+            @GraphQLName("emailFrequency") @GraphQLNonNull @GraphQLDescription("DAILY, WEEKLY or MONTHLY") String emailFrequency,
+            @GraphQLName("emailMinimumSeverity") @GraphQLNonNull @GraphQLDescription("LOW, MEDIUM, HIGH or CRITICAL") String emailMinimumSeverity) {
         this.enabled = enabled;
         this.refreshIntervalHours = refreshIntervalHours;
         this.useForgeSettings = useForgeSettings;
@@ -60,6 +66,9 @@ public class GqlSettingsInput {
         this.bannerDismissPolicy = bannerDismissPolicy;
         this.bannerDismissHours = bannerDismissHours;
         this.bannerPosition = bannerPosition;
+        this.emailEnabled = emailEnabled;
+        this.emailFrequency = emailFrequency;
+        this.emailMinimumSeverity = emailMinimumSeverity;
     }
 
     /** @return the submitted values as configuration strings (a null value is left out) */
@@ -78,6 +87,9 @@ public class GqlSettingsInput {
         put(values, SettingsKeys.BANNER_DISMISS_POLICY, bannerDismissPolicy);
         put(values, SettingsKeys.BANNER_DISMISS_HOURS, bannerDismissHours);
         put(values, SettingsKeys.BANNER_POSITION, bannerPosition);
+        put(values, SettingsKeys.EMAIL_ENABLED, emailEnabled);
+        put(values, SettingsKeys.EMAIL_FREQUENCY, emailFrequency);
+        put(values, SettingsKeys.EMAIL_MINIMUM_SEVERITY, emailMinimumSeverity);
         return values;
     }
 
@@ -189,5 +201,29 @@ public class GqlSettingsInput {
     @GraphQLDescription("TOP, BOTTOM, TOP_RIGHT or BOTTOM_RIGHT")
     public String getBannerPosition() {
         return bannerPosition;
+    }
+
+    @GraphQLField
+    @GraphQLName("emailEnabled")
+    @GraphQLNonNull
+    @GraphQLDescription("Whether the security updates email is sent")
+    public Boolean getEmailEnabled() {
+        return emailEnabled;
+    }
+
+    @GraphQLField
+    @GraphQLName("emailFrequency")
+    @GraphQLNonNull
+    @GraphQLDescription("DAILY, WEEKLY or MONTHLY")
+    public String getEmailFrequency() {
+        return emailFrequency;
+    }
+
+    @GraphQLField
+    @GraphQLName("emailMinimumSeverity")
+    @GraphQLNonNull
+    @GraphQLDescription("LOW, MEDIUM, HIGH or CRITICAL")
+    public String getEmailMinimumSeverity() {
+        return emailMinimumSeverity;
     }
 }

@@ -43,6 +43,7 @@ public final class Settings {
     private final List<String> extraFeedUrls;
     private final String defaultStoreUrl;
     private final BannerSettings banner;
+    private final EmailSettings email;
     private final int onDemandMinIntervalSeconds;
 
     Settings(boolean enabled, int refreshIntervalHours, boolean useForgeSettings, String extraFeedUrls,
@@ -59,7 +60,15 @@ public final class Settings {
     @SuppressWarnings("java:S107") // one argument per configuration key
     Settings(boolean enabled, int refreshIntervalHours, boolean useForgeSettings, List<String> extraFeedUrls,
              String defaultStoreUrl, BannerSettings banner, int onDemandMinIntervalSeconds) {
+        this(enabled, refreshIntervalHours, useForgeSettings, extraFeedUrls, defaultStoreUrl, banner, EmailSettings.defaults(),
+                onDemandMinIntervalSeconds);
+    }
+
+    @SuppressWarnings("java:S107") // one argument per configuration key
+    Settings(boolean enabled, int refreshIntervalHours, boolean useForgeSettings, List<String> extraFeedUrls,
+             String defaultStoreUrl, BannerSettings banner, EmailSettings email, int onDemandMinIntervalSeconds) {
         this.banner = Objects.requireNonNull(banner, "banner");
+        this.email = Objects.requireNonNull(email, "email");
         this.enabled = enabled;
         this.refreshIntervalHours = clamp(refreshIntervalHours, MIN_REFRESH_INTERVAL_HOURS, MAX_REFRESH_INTERVAL_HOURS);
         this.useForgeSettings = useForgeSettings;
@@ -91,9 +100,12 @@ public final class Settings {
                 reader.number(SettingsKeys.BANNER_DISMISS_HOURS, BannerSettings.DEFAULT_DISMISS_HOURS,
                         SettingsValidator.MIN_HOURS, SettingsValidator.MAX_HOURS),
                 BannerSettings.parseBannerPosition(reader.text(SettingsKeys.BANNER_POSITION, null), warnings));
+        EmailSettings email = new EmailSettings(reader.bool(SettingsKeys.EMAIL_ENABLED, false),
+                EmailSettings.parseFrequency(reader.text(SettingsKeys.EMAIL_FREQUENCY, null), warnings),
+                EmailSettings.parseMinimumSeverity(reader.text(SettingsKeys.EMAIL_MINIMUM_SEVERITY, null), warnings));
         int onDemandSeconds = reader.number(ON_DEMAND_MIN_INTERVAL_SECONDS, DEFAULT_ON_DEMAND_MIN_INTERVAL_SECONDS, 0,
                 MAX_ON_DEMAND_MIN_INTERVAL_SECONDS);
-        return new Settings(enabled, refreshIntervalHours, useForgeSettings, extraFeedUrls, defaultStoreUrl, banner,
+        return new Settings(enabled, refreshIntervalHours, useForgeSettings, extraFeedUrls, defaultStoreUrl, banner, email,
                 onDemandSeconds);
     }
 
@@ -103,6 +115,10 @@ public final class Settings {
 
     public BannerSettings getBanner() {
         return banner;
+    }
+
+    public EmailSettings getEmail() {
+        return email;
     }
 
     /**
@@ -124,12 +140,15 @@ public final class Settings {
         values.put(SettingsKeys.BANNER_DISMISS_POLICY, banner.getDismissPolicy().name());
         values.put(SettingsKeys.BANNER_DISMISS_HOURS, String.valueOf(banner.getDismissHours()));
         values.put(SettingsKeys.BANNER_POSITION, banner.getPosition().name());
+        values.put(SettingsKeys.EMAIL_ENABLED, String.valueOf(email.isEnabled()));
+        values.put(SettingsKeys.EMAIL_FREQUENCY, email.getFrequency().name());
+        values.put(SettingsKeys.EMAIL_MINIMUM_SEVERITY, email.getMinimumSeverity().name());
         return values;
     }
 
     /**
-     * @return true when {@code other} checks the same stores on the same schedule: a change of the banner keys or
-     * of the on-demand interval does not restart the schedule
+     * @return true when {@code other} checks the same stores on the same schedule: a change of the banner keys, of
+     * the email keys or of the on-demand interval does not restart the schedule
      */
     public boolean sameSchedule(Settings other) {
         return other != null && enabled == other.enabled && refreshIntervalHours == other.refreshIntervalHours

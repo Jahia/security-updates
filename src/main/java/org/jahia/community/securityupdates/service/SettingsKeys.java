@@ -20,11 +20,15 @@ public final class SettingsKeys {
     public static final String BANNER_DISMISS_POLICY = "bannerDismissPolicy";
     public static final String BANNER_DISMISS_HOURS = "bannerDismissHours";
     public static final String BANNER_POSITION = "bannerPosition";
+    public static final String EMAIL_ENABLED = "emailEnabled";
+    public static final String EMAIL_FREQUENCY = "emailFrequency";
+    public static final String EMAIL_MINIMUM_SEVERITY = "emailMinimumSeverity";
 
     /** Every key, in the order of the .cfg file. */
     public static final List<String> ALL = List.of(ENABLED, REFRESH_INTERVAL_HOURS, USE_FORGE_SETTINGS, EXTRA_FEED_URLS,
             DEFAULT_STORE_URL, BANNER_ENABLED, BANNER_MINIMUM_SEVERITY, BANNER_INCLUDE_OWNER_REPORTS, BANNER_BACKGROUND_COLOR,
-            BANNER_TEXT_COLOR, BANNER_DISMISS_POLICY, BANNER_DISMISS_HOURS, BANNER_POSITION);
+            BANNER_TEXT_COLOR, BANNER_DISMISS_POLICY, BANNER_DISMISS_HOURS, BANNER_POSITION, EMAIL_ENABLED, EMAIL_FREQUENCY,
+            EMAIL_MINIMUM_SEVERITY);
 
     private SettingsKeys() {
     }

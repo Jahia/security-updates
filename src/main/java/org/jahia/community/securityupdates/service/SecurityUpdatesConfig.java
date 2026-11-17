@@ -66,6 +66,22 @@ public @interface SecurityUpdatesConfig {
             @Option(label = "%position.BOTTOM_RIGHT", value = "BOTTOM_RIGHT")})
     String bannerPosition() default "TOP";
 
+    @AttributeDefinition(name = "%emailEnabled", description = "%emailEnabled.desc")
+    boolean emailEnabled() default false;
+
+    @AttributeDefinition(name = "%emailFrequency", description = "%emailFrequency.desc", options = {
+            @Option(label = "%frequency.DAILY", value = "DAILY"),
+            @Option(label = "%frequency.WEEKLY", value = "WEEKLY"),
+            @Option(label = "%frequency.MONTHLY", value = "MONTHLY")})
+    String emailFrequency() default "WEEKLY";
+
+    @AttributeDefinition(name = "%emailMinimumSeverity", description = "%emailMinimumSeverity.desc", options = {
+            @Option(label = "%severity.LOW", value = "LOW"),
+            @Option(label = "%severity.MEDIUM", value = "MEDIUM"),
+            @Option(label = "%severity.HIGH", value = "HIGH"),
+            @Option(label = "%severity.CRITICAL", value = "CRITICAL")})
+    String emailMinimumSeverity() default "HIGH";
+
     @AttributeDefinition(name = "%onDemandMinIntervalSeconds", description = "%onDemandMinIntervalSeconds.desc", min = "0",
             max = "3600")
     int onDemandMinIntervalSeconds() default Settings.DEFAULT_ON_DEMAND_MIN_INTERVAL_SECONDS;

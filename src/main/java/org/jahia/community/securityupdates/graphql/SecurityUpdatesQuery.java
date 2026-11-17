@@ -5,6 +5,7 @@ import graphql.annotations.annotationTypes.GraphQLField;
 import graphql.annotations.annotationTypes.GraphQLName;
 import graphql.annotations.annotationTypes.GraphQLNonNull;
 import org.jahia.community.securityupdates.model.BannerDecision;
+import org.jahia.community.securityupdates.service.EmailStatus;
 import org.jahia.community.securityupdates.service.SecurityUpdateService;
 import org.jahia.community.securityupdates.service.SettingsStore;
 import org.jahia.modules.graphql.provider.dxm.DataFetchingException;
@@ -42,6 +43,18 @@ public class SecurityUpdatesQuery {
     public GqlBanner getBanner() {
         return new GqlBanner(ServiceLocator.withService(SecurityUpdateService::getBanner, BannerDecision::hidden),
                 ServiceLocator.username());
+    }
+
+    @GraphQLField
+    @GraphQLName("email")
+    @GraphQLNonNull
+    @GraphQLDescription("Whether the security updates email can be sent through Jahia's mail service; the recipient "
+            + "is shown to server administrators only")
+    @GraphQLRequiresPermission(Permissions.ADMIN_TEMPLATES)
+    public GqlEmailStatus getEmail() {
+        EmailStatus status = ServiceLocator.withService(SecurityUpdateService::getEmailStatus,
+                () -> new EmailStatus(false, null, false, false, null));
+        return new GqlEmailStatus(status, ServiceLocator.canEditSettings());
     }
 
     @GraphQLField

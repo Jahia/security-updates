@@ -3,7 +3,10 @@ package org.jahia.community.securityupdates.graphql;
 import graphql.annotations.annotationTypes.GraphQLName;
 import org.jahia.community.securityupdates.model.BannerPosition;
 import org.jahia.community.securityupdates.model.DismissPolicy;
+import org.jahia.community.securityupdates.model.EmailFrequency;
+import org.jahia.community.securityupdates.model.EmailOutcome;
 import org.jahia.community.securityupdates.model.Severity;
+import org.jahia.community.securityupdates.service.EmailStatus;
 import org.jahia.community.securityupdates.service.SecurityUpdateService;
 import org.jahia.community.securityupdates.service.SettingsKeys;
 import org.jahia.community.securityupdates.service.SettingsStore;
@@ -56,7 +59,7 @@ class SecurityUpdatesSettingsGraphQLTest {
 
     private static GqlSettingsInput input(String background, String text, int interval, String url) {
         return new GqlSettingsInput(true, interval, true, url, "", true, "HIGH", true, background, text, "HOURS", 12,
-                "bottom_right");
+                "bottom_right", true, "daily", "critical");
     }
 
     @Test
@@ -126,9 +129,14 @@ class SecurityUpdatesSettingsGraphQLTest {
         assertThat(result.getSettings().getDefaultStoreUrl()).isEqualTo("https://store.jahia.com");
         ArgumentCaptor<Map<String, String>> written = ArgumentCaptor.forClass(Map.class);
         verify(store).save(written.capture(), eq("jdoe"));
-        assertThat(written.getValue()).hasSize(13).containsEntry("bannerDismissPolicy", "HOURS").containsEntry("bannerDismissHours", "12")
+        assertThat(written.getValue()).hasSize(16).containsEntry("bannerDismissPolicy", "HOURS").containsEntry("bannerDismissHours", "12")
                 .containsEntry("bannerPosition", "BOTTOM_RIGHT");
         assertThat(result.getSettings().getBannerPosition()).isEqualTo(BannerPosition.BOTTOM_RIGHT);
+        assertThat(written.getValue()).containsEntry("emailEnabled", "true").containsEntry("emailFrequency", "DAILY")
+                .containsEntry("emailMinimumSeverity", "CRITICAL");
+        assertThat(result.getSettings().isEmailEnabled()).isTrue();
+        assertThat(result.getSettings().getEmailFrequency()).isEqualTo(EmailFrequency.DAILY);
+        assertThat(result.getSettings().getEmailMinimumSeverity()).isEqualTo(Severity.CRITICAL);
         assertThat(result.getSettings().isCanEdit()).isTrue();
     }
 
@@ -136,7 +144,8 @@ class SecurityUpdatesSettingsGraphQLTest {
     @DisplayName("an invalid banner position is a field error and writes nothing")
     void invalidPosition() throws IOException {
         GqlSettingsResult result = new SecurityUpdatesMutation().updateSettings(new GqlSettingsInput(true, 24, true, "", "",
-                true, "HIGH", true, "#1B1B1B", "#FFFFFF", "SESSION", 24, "LEFT"));
+                true, "HIGH", true, "#1B1B1B", "#FFFFFF", "SESSION", 24, "LEFT", false,
+                "WEEKLY", "HIGH"));
 
         assertThat(result.isOk()).isFalse();
         assertThat(result.getErrors()).singleElement().satisfies(e -> {
@@ -221,8 +230,11 @@ class SecurityUpdatesSettingsGraphQLTest {
     void permissions() throws NoSuchMethodException {
         assertThat(SecurityUpdatesQuery.class.getMethod("getSettings").getAnnotation(GraphQLRequiresPermission.class).value())
                 .isEqualTo("adminTemplates");
+        assertThat(SecurityUpdatesQuery.class.getMethod("getEmail").getAnnotation(GraphQLRequiresPermission.class).value())
+                .isEqualTo("adminTemplates");
         for (Method method : new Method[]{SecurityUpdatesMutation.class.getMethod("updateSettings", GqlSettingsInput.class),
-                SecurityUpdatesMutation.class.getMethod("resetSettings")}) {
+                SecurityUpdatesMutation.class.getMethod("resetSettings"),
+                SecurityUpdatesMutation.class.getMethod("sendTestEmail")}) {
             assertThat(method.getAnnotation(GraphQLRequiresPermission.class)).as(method.getName()).isNotNull();
             assertThat(method.getAnnotation(GraphQLRequiresPermission.class).value()).isEqualTo("admin");
         }
@@ -320,14 +332,55 @@ class SecurityUpdatesSettingsGraphQLTest {
         assertThat(full.getBannerDismissPolicy()).isEqualTo("HOURS");
         assertThat(full.getBannerDismissHours()).isEqualTo(12);
         assertThat(full.getBannerPosition()).isEqualTo("bottom_right");
+        assertThat(full.getEmailEnabled()).isTrue();
+        assertThat(full.getEmailFrequency()).isEqualTo("daily");
+        assertThat(full.getEmailMinimumSeverity()).isEqualTo("critical");
     }
 
     @Test
     @DisplayName("a null input value is left out, so that the validator reports it MISSING")
     void nullValuesAreLeftOut() {
         GqlSettingsInput partial = new GqlSettingsInput(null, null, true, "", "", true, "HIGH", true, "#1B1B1B", "#FFFFFF",
-                "SESSION", 24, "TOP");
+                "SESSION", 24, "TOP", null, "WEEKLY", "HIGH");
 
-        assertThat(partial.toValues()).doesNotContainKeys("enabled", "refreshIntervalHours");
+        assertThat(partial.toValues()).doesNotContainKeys("enabled", "refreshIntervalHours", "emailEnabled");
+    }
+
+    @Test
+    @DisplayName("the email status shows the recipient to server administrators only")
+    void emailStatus() {
+        when(service.getEmailStatus()).thenReturn(new EmailStatus(true, "admin@example.org", false, true,
+                java.time.Instant.parse("2026-11-13T10:00:00Z")));
+
+        GqlEmailStatus status = new SecurityUpdatesQuery().getEmail();
+        assertThat(status.isMailServerReady()).isTrue();
+        assertThat(status.getRecipient()).isEqualTo("admin@example.org");
+        assertThat(status.isRecipientMissing()).isFalse();
+        assertThat(status.isProcessingServer()).isTrue();
+        assertThat(status.getLastSentAt()).isEqualTo("2026-11-13T10:00:00Z");
+
+        ServiceLocator.overrideCanEdit(() -> false);
+        assertThat(new SecurityUpdatesQuery().getEmail().getRecipient()).isNull();
+    }
+
+    @Test
+    @DisplayName("without the service, the email status says that no email can be sent")
+    void emailStatusWithoutService() {
+        ServiceLocator.override(() -> null);
+
+        GqlEmailStatus status = new SecurityUpdatesQuery().getEmail();
+
+        assertThat(status.isMailServerReady()).isFalse();
+        assertThat(status.getLastSentAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("sendTestEmail returns the outcome of the service; without the service it is FAILED")
+    void sendTestEmail() {
+        when(service.sendTestEmail()).thenReturn(EmailOutcome.SENT);
+        assertThat(new SecurityUpdatesMutation().sendTestEmail()).isEqualTo(EmailOutcome.SENT);
+
+        ServiceLocator.override(() -> null);
+        assertThat(new SecurityUpdatesMutation().sendTestEmail()).isEqualTo(EmailOutcome.FAILED);
     }
 }

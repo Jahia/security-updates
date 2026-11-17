@@ -3,6 +3,7 @@ package org.jahia.community.securityupdates.service;
 import org.jahia.community.securityupdates.feed.StoreUrls;
 import org.jahia.community.securityupdates.model.BannerPosition;
 import org.jahia.community.securityupdates.model.DismissPolicy;
+import org.jahia.community.securityupdates.model.EmailFrequency;
 import org.jahia.community.securityupdates.model.Severity;
 
 import java.util.ArrayList;
@@ -26,7 +27,9 @@ import java.util.Optional;
  *     <li>{@code bannerMinimumSeverity} is LOW, MEDIUM, HIGH or CRITICAL; {@code bannerDismissPolicy} a
  *     {@link DismissPolicy}; {@code bannerPosition} a {@link BannerPosition} (TOP, BOTTOM, TOP_RIGHT or
  *     BOTTOM_RIGHT); these three in any case, stored in upper case;</li>
- *     <li>colours are {@code #RRGGBB} and their contrast ratio is at least 7:1.</li>
+ *     <li>colours are {@code #RRGGBB} and their contrast ratio is at least 7:1;</li>
+ *     <li>{@code emailFrequency} is DAILY, WEEKLY or MONTHLY and {@code emailMinimumSeverity} LOW, MEDIUM, HIGH or
+ *     CRITICAL, in any case, stored in upper case.</li>
  * </ul>
  */
 public final class SettingsValidator {
@@ -59,13 +62,16 @@ public final class SettingsValidator {
         bool(input, SettingsKeys.USE_FORGE_SETTINGS, values, errors);
         bool(input, SettingsKeys.BANNER_ENABLED, values, errors);
         bool(input, SettingsKeys.BANNER_INCLUDE_OWNER_REPORTS, values, errors);
+        bool(input, SettingsKeys.EMAIL_ENABLED, values, errors);
         hours(input, SettingsKeys.REFRESH_INTERVAL_HOURS, values, errors);
         hours(input, SettingsKeys.BANNER_DISMISS_HOURS, values, errors);
         defaultStoreUrl(input, values, errors);
         extraFeedUrls(input, values, errors);
-        minimumSeverity(input, values, errors);
+        minimumSeverity(input, SettingsKeys.BANNER_MINIMUM_SEVERITY, values, errors);
+        minimumSeverity(input, SettingsKeys.EMAIL_MINIMUM_SEVERITY, values, errors);
         dismissPolicy(input, values, errors);
         position(input, values, errors);
+        frequency(input, values, errors);
         colors(input, values, errors);
         return new ValidationResult(values, errors);
     }
@@ -135,12 +141,22 @@ public final class SettingsValidator {
         values.put(SettingsKeys.EXTRA_FEED_URLS, String.join(", ", urls));
     }
 
-    private static void minimumSeverity(Map<String, String> input, Map<String, String> values, List<FieldError> errors) {
-        Severity severity = Severity.parse(input.get(SettingsKeys.BANNER_MINIMUM_SEVERITY));
+    private static void minimumSeverity(Map<String, String> input, String key, Map<String, String> values,
+                                        List<FieldError> errors) {
+        Severity severity = Severity.parse(input.get(key));
         if (severity == Severity.UNKNOWN) {
-            errors.add(new FieldError(SettingsKeys.BANNER_MINIMUM_SEVERITY, INVALID_VALUE, "Must be LOW, MEDIUM, HIGH or CRITICAL"));
+            errors.add(new FieldError(key, INVALID_VALUE, "Must be LOW, MEDIUM, HIGH or CRITICAL"));
         } else {
-            values.put(SettingsKeys.BANNER_MINIMUM_SEVERITY, severity.name());
+            values.put(key, severity.name());
+        }
+    }
+
+    private static void frequency(Map<String, String> input, Map<String, String> values, List<FieldError> errors) {
+        try {
+            EmailFrequency frequency = EmailFrequency.valueOf(input.get(SettingsKeys.EMAIL_FREQUENCY).trim().toUpperCase(Locale.ROOT));
+            values.put(SettingsKeys.EMAIL_FREQUENCY, frequency.name());
+        } catch (IllegalArgumentException e) {
+            errors.add(new FieldError(SettingsKeys.EMAIL_FREQUENCY, INVALID_VALUE, "Must be DAILY, WEEKLY or MONTHLY"));
         }
     }
 
