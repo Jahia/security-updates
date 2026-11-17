@@ -188,7 +188,7 @@ final class EmailNotifier {
     private void logOutcome(EmailOutcome outcome) {
         boolean problem = outcome == EmailOutcome.MAIL_SERVER_NOT_CONFIGURED || outcome == EmailOutcome.NO_RECIPIENT
                 || outcome == EmailOutcome.FAILED;
-        if (problem && outcome != lastLogged) {
+        if (problem && outcome != lastLogged && logger.isWarnEnabled()) {
             logger.warn("The security updates email is due but was not sent: {}", describe(outcome));
         }
         if (outcome == EmailOutcome.SENT || problem) {

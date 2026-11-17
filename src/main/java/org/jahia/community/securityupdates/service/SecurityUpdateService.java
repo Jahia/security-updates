@@ -124,8 +124,8 @@ public class SecurityUpdateService {
     private EmailState emailState;
     private BooleanSupplier processingServer = SecurityUpdateService::isJahiaProcessingServer;
     private Supplier<String> serverName = SecurityUpdateService::localHostName;
-    /** Built once both email references are set; null before. */
-    private volatile EmailNotifier emailNotifier;
+    /** Built once both email references are set; null before. Guarded by this (the setters and emailNotifier()). */
+    private EmailNotifier emailNotifier;
 
     /** Declarative Services constructor: the system clock, the running Jahia version and the WARN log. */
     public SecurityUpdateService() {
@@ -162,19 +162,19 @@ public class SecurityUpdateService {
     }
 
     @Reference
-    void setMailSender(MailSender mailSender) {
+    synchronized void setMailSender(MailSender mailSender) {
         this.mailSender = mailSender;
         this.emailNotifier = null;
     }
 
     @Reference
-    void setEmailState(EmailState emailState) {
+    synchronized void setEmailState(EmailState emailState) {
         this.emailState = emailState;
         this.emailNotifier = null;
     }
 
     /** Test hook: whether this node is the processing server, and its name in the email. */
-    void setEmailEnvironment(BooleanSupplier processingServer, Supplier<String> serverName) {
+    synchronized void setEmailEnvironment(BooleanSupplier processingServer, Supplier<String> serverName) {
         this.processingServer = processingServer;
         this.serverName = serverName;
         this.emailNotifier = null;

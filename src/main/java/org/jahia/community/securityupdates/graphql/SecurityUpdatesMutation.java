@@ -72,7 +72,9 @@ public class SecurityUpdatesMutation {
     @GraphQLRequiresPermission(Permissions.ADMIN)
     public EmailOutcome sendTestEmail() {
         EmailOutcome outcome = ServiceLocator.withService(SecurityUpdateService::sendTestEmail, () -> EmailOutcome.FAILED);
-        logger.info("Security updates test email requested by {}: {}", ServiceLocator.username(), outcome);
+        if (logger.isInfoEnabled()) {
+            logger.info("Security updates test email requested by {}: {}", ServiceLocator.username(), outcome);
+        }
         return outcome;
     }
 

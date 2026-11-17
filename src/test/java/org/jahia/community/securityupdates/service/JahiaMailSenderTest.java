@@ -100,7 +100,7 @@ class JahiaMailSenderTest {
 
     @Test
     @DisplayName("a mail service that does not answer within the limit is reported as not sent, without blocking the caller")
-    void sendTimeout() throws InterruptedException {
+    void sendTimeout() {
         legacy(true, "admin@example.org");
         CountDownLatch release = new CountDownLatch(1);
         doAnswer(invocation -> {
