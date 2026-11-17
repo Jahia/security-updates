@@ -23,6 +23,10 @@ services:
             # through a truststore made of the JDK cacerts of this image plus that certificate (generate-tls.sh).
             # The image appends CATALINA_OPTS to its own JVM options (tomcat/bin/setenv.sh, entrypoint.sh).
             - CATALINA_OPTS=-Djavax.net.ssl.trustStore=/srv/storefixture/trust/truststore.p12 -Djavax.net.ssl.trustStoreType=PKCS12 -Djavax.net.ssl.trustStorePassword=changeit
+            # TEST-ONLY mail server (the smtp-server service). The @jahia/cypress provisioning script
+            # script-setup-smtp.groovy reads it in the Jahia JVM and points Jahia's mail service at it, so the security
+            # email of the module reaches Mailpit (spec 09). A literal on purpose: see MAILPIT_URL below.
+            - SMTP_SERVER_URL=smtp://smtp-server:1025
         volumes:
             - storefixture-generated:/srv/storefixture:ro
         extra_hosts:
@@ -70,12 +74,23 @@ services:
         depends_on:
             - jahia
             - storefixture
+            - smtp-server
         environment:
             - MANIFEST=${MANIFEST}
             - SUPER_USER_PASSWORD=${SUPER_USER_PASSWORD}
             - JAHIA_URL=http://jahia:8080
+            # The Mailpit API as the Cypress container reaches it. A literal, not ${MAILPIT_URL}: a host-side value
+            # (http://localhost:8025, for a Cypress run outside Docker) must never reach the container.
+            - MAILPIT_URL=http://smtp-server:8025
             - NEXUS_USERNAME=${NEXUS_USERNAME}
             - NEXUS_PASSWORD=${NEXUS_PASSWORD}
+        networks:
+            - stack
+    # TEST-ONLY mail sink: Jahia sends to it on 1025 (SMTP_SERVER_URL), Cypress reads it on 8025 (MAILPIT_URL).
+    # Nothing is published on the host.
+    smtp-server:
+        image: 'axllent/mailpit:v1.27.11'
+        container_name: smtp-server
         networks:
             - stack
 networks:
