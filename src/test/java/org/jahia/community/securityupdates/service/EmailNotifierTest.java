@@ -165,6 +165,8 @@ class EmailNotifierTest {
         volatile MailStatus status = new MailStatus(true, "admin@example.org", false);
         volatile boolean accept = true;
         volatile boolean statusFailure;
+        /** Runs at the start of each send, as the mail service would be called. */
+        volatile Runnable onSend;
 
         @Override
         public MailStatus status() {
@@ -176,6 +178,10 @@ class EmailNotifierTest {
 
         @Override
         public boolean send(EmailMessage message) {
+            Runnable hook = onSend;
+            if (hook != null) {
+                hook.run();
+            }
             RuntimeException e = failure.get();
             if (e != null) {
                 throw e;
