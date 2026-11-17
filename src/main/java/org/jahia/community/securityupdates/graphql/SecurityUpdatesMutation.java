@@ -4,7 +4,9 @@ import graphql.annotations.annotationTypes.GraphQLDescription;
 import graphql.annotations.annotationTypes.GraphQLField;
 import graphql.annotations.annotationTypes.GraphQLName;
 import graphql.annotations.annotationTypes.GraphQLNonNull;
+import org.jahia.community.securityupdates.model.EmailOutcome;
 import org.jahia.community.securityupdates.service.FieldError;
+import org.jahia.community.securityupdates.service.SecurityUpdateService;
 import org.jahia.community.securityupdates.service.Settings;
 import org.jahia.community.securityupdates.service.SettingsStore;
 import org.jahia.community.securityupdates.service.SettingsValidator;
@@ -60,6 +62,20 @@ public class SecurityUpdatesMutation {
     @GraphQLRequiresPermission(Permissions.ADMIN)
     public GqlSettingsResult resetSettings() {
         return save(Settings.defaults().toValues());
+    }
+
+    @GraphQLField
+    @GraphQLName("sendTestEmail")
+    @GraphQLNonNull
+    @GraphQLDescription("Sends a test security updates email now, through Jahia's mail service, with the current report "
+            + "(requires admin; at most one a minute, whatever the email settings)")
+    @GraphQLRequiresPermission(Permissions.ADMIN)
+    public EmailOutcome sendTestEmail() {
+        EmailOutcome outcome = ServiceLocator.withService(SecurityUpdateService::sendTestEmail, () -> EmailOutcome.FAILED);
+        if (logger.isInfoEnabled()) {
+            logger.info("Security updates test email requested by {}: {}", ServiceLocator.username(), outcome);
+        }
+        return outcome;
     }
 
     private static GqlSettingsResult save(Map<String, String> values) {

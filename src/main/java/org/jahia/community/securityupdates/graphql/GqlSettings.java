@@ -6,6 +6,7 @@ import graphql.annotations.annotationTypes.GraphQLName;
 import graphql.annotations.annotationTypes.GraphQLNonNull;
 import org.jahia.community.securityupdates.model.BannerPosition;
 import org.jahia.community.securityupdates.model.DismissPolicy;
+import org.jahia.community.securityupdates.model.EmailFrequency;
 import org.jahia.community.securityupdates.model.Severity;
 import org.jahia.community.securityupdates.service.Colors;
 import org.jahia.community.securityupdates.service.SettingsKeys;
@@ -140,6 +141,29 @@ public class GqlSettings {
     @GraphQLDescription("Where the notice appears in the Jahia UI")
     public BannerPosition getBannerPosition() {
         return BannerPosition.valueOf(values.get(SettingsKeys.BANNER_POSITION));
+    }
+
+    @GraphQLField
+    @GraphQLName("emailEnabled")
+    @GraphQLDescription("Whether the security updates email is sent")
+    public boolean isEmailEnabled() {
+        return bool(SettingsKeys.EMAIL_ENABLED);
+    }
+
+    @GraphQLField
+    @GraphQLName("emailFrequency")
+    @GraphQLNonNull
+    @GraphQLDescription("How often the security updates email may be sent")
+    public EmailFrequency getEmailFrequency() {
+        return EmailFrequency.valueOf(values.get(SettingsKeys.EMAIL_FREQUENCY));
+    }
+
+    @GraphQLField
+    @GraphQLName("emailMinimumSeverity")
+    @GraphQLNonNull
+    @GraphQLDescription("Lowest severity listed by the security updates email")
+    public Severity getEmailMinimumSeverity() {
+        return Severity.valueOf(values.get(SettingsKeys.EMAIL_MINIMUM_SEVERITY));
     }
 
     @GraphQLField

@@ -66,6 +66,8 @@ final class ServiceFixture {
     /** The task of the last schedule, run by {@link #check}. */
     final AtomicReference<Runnable> scheduledTask = new AtomicReference<>();
     final MutableClock clock = new MutableClock(Instant.parse("2026-11-13T10:00:00Z"));
+    final EmailNotifierTest.FakeSender mail = new EmailNotifierTest.FakeSender();
+    final EmailNotifierTest.MemoryState emailState = new EmailNotifierTest.MemoryState();
 
     ServiceFixture() {
         when(installed.installedModules()).thenReturn(List.of(
@@ -87,6 +89,9 @@ final class ServiceFixture {
         service.setHttpFetcher(fetcher);
         service.setForgeSettingsReader(forges);
         service.setInstalledComponentsProvider(installed);
+        service.setMailSender(mail);
+        service.setEmailState(emailState);
+        service.setEmailEnvironment(() -> true, () -> "jahia-test");
         return service;
     }
 

@@ -176,7 +176,7 @@
   },
   "settings": {
     "title": "Settings",
-    "intro": "Changes are saved in the Jahia configuration, for every server of the cluster. Banner changes apply at once. After a change to the checks, the next check runs about one minute later.",
+    "intro": "Changes are saved in the Jahia configuration, for every server of the cluster. Banner changes apply at once. After a change to the checks, the next check runs about one minute later. Email changes apply from the next check.",
     "loading": "Loading the settings…",
     "loadError": "The settings could not be loaded. Reload the page to try again.",
     "readOnly": "Only server administrators can change these settings. They are shown here for information.",
@@ -187,7 +187,8 @@
     },
     "groups": {
       "checks": "Checks",
-      "banner": "Banner in the Jahia interface"
+      "banner": "Banner in the Jahia interface",
+      "email": "Security email"
     },
     "fields": {
       "enabled": {
@@ -244,6 +245,18 @@
         "label": "Hours the banner stays hidden",
         "help": "A whole number from 1 to 720, used only with \"Hidden for a number of hours\".",
         "disabled": "Not used now: choose \"Hidden for a number of hours\" above to set it."
+      },
+      "emailEnabled": {
+        "label": "Send the security email",
+        "help": "Emails the list of the components that need a security update, through Jahia's mail service, to the address that receives Jahia's notifications. Sent only when at least one component needs an update, after a check, by the processing server of the cluster."
+      },
+      "emailFrequency": {
+        "label": "Email frequency",
+        "help": "The email goes out with the first check after this period has passed since the previous email. A component found later is emailed at the next check."
+      },
+      "emailMinimumSeverity": {
+        "label": "Lowest severity listed by the email",
+        "help": "Components whose updates are less severe are not listed, and alone do not send the email."
       }
     },
     "dismiss": {
@@ -257,6 +270,33 @@
       "BOTTOM": "Bottom of the window, full width",
       "TOP_RIGHT": "Top right corner",
       "BOTTOM_RIGHT": "Bottom right corner"
+    },
+    "frequency": {
+      "DAILY": "Daily",
+      "WEEKLY": "Weekly",
+      "MONTHLY": "Monthly (every 30 days)"
+    },
+    "email": {
+      "title": "Email delivery",
+      "loading": "Loading the state of the email…",
+      "loadError": "The state of the email could not be loaded.",
+      "notConfigured": "Jahia's mail server is off or not configured: no email can be sent. Configure it in Server settings, Mail server.",
+      "noRecipient": "Jahia's mail server settings have no administrator email address: no email can be sent.",
+      "recipient": "Emails go to {{recipient}}, the address that receives Jahia's notifications.",
+      "recipientDefault": "Emails go to the address that receives Jahia's notifications.",
+      "otherNode": "This server is not the processing server of the cluster: the processing server sends the email.",
+      "lastSent": "Last email from this server: {{date}}.",
+      "neverSent": "No email has been sent from this server yet.",
+      "sendTest": "Send a test email",
+      "sending": "Sending the test email…",
+      "outcome": {
+        "SENT": "Test email handed to Jahia's mail service. If it does not arrive, check the mail server settings and the Jahia log.",
+        "MAIL_SERVER_NOT_CONFIGURED": "Not sent: Jahia's mail server is off or not configured.",
+        "NO_RECIPIENT": "Not sent: Jahia's mail server settings have no administrator email address.",
+        "RATE_LIMITED": "Not sent: a test email was sent less than a minute ago. Try again later.",
+        "FAILED": "Not sent: Jahia's mail service refused or failed to send the email. See the Jahia log.",
+        "REQUEST_FAILED": "The request could not be sent to the server. Check your connection and try again."
+      }
     },
     "preview": {
       "title": "Preview",

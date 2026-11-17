@@ -15,6 +15,9 @@ const settings = {
     bannerPosition: 'BOTTOM_RIGHT',
     bannerDismissPolicy: 'SESSION',
     bannerDismissHours: 24,
+    emailEnabled: true,
+    emailFrequency: 'DAILY',
+    emailMinimumSeverity: 'CRITICAL',
     contrastRatio: 17.22
 };
 
@@ -33,8 +36,29 @@ describe('settings form values', () => {
             'bannerTextColor',
             'bannerPosition',
             'bannerDismissPolicy',
-            'bannerDismissHours'
+            'bannerDismissHours',
+            'emailEnabled',
+            'emailFrequency',
+            'emailMinimumSeverity'
         ]);
+    });
+
+    test('the email settings are kept as returned and sent typed', () => {
+        const {input} = toInput(fromSettings(settings));
+        expect(input.emailEnabled).toBe(true);
+        expect(input.emailFrequency).toBe('DAILY');
+        expect(input.emailMinimumSeverity).toBe('CRITICAL');
+    });
+
+    test('email choices the server does not return take the server defaults, and the email stays off', () => {
+        const form = fromSettings({...settings, emailEnabled: undefined, emailFrequency: undefined, emailMinimumSeverity: null});
+        expect(form.emailEnabled).toBe(false);
+        expect(form.emailFrequency).toBe('WEEKLY');
+        expect(form.emailMinimumSeverity).toBe('HIGH');
+    });
+
+    test('an email change does not restart the schedule', () => {
+        expect(restartsSchedule(settings, {...settings, emailEnabled: false, emailFrequency: 'MONTHLY'})).toBe(false);
     });
 
     test('numbers become editable text, booleans stay booleans', () => {

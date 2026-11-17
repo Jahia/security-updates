@@ -223,9 +223,11 @@ class SecurityUpdatesGraphQLTest {
                 "SecurityUpdatesQuery.report", "adminTemplates",
                 "SecurityUpdatesQuery.banner", "adminTemplates",
                 "SecurityUpdatesQuery.settings", "adminTemplates",
+                "SecurityUpdatesQuery.email", "adminTemplates",
                 "SecurityUpdatesMutation.refresh", "adminTemplates",
                 "SecurityUpdatesMutation.updateSettings", "admin",
-                "SecurityUpdatesMutation.resetSettings", "admin");
+                "SecurityUpdatesMutation.resetSettings", "admin",
+                "SecurityUpdatesMutation.sendTestEmail", "admin");
         Map<String, String> actual = new java.util.HashMap<>();
         for (Class<?> type : List.of(SecurityUpdatesQuery.class, SecurityUpdatesMutation.class,
                 SecurityUpdatesQueryExtension.class, SecurityUpdatesMutationExtension.class)) {

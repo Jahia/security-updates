@@ -16,6 +16,7 @@ import {
     readBanner,
     readReport,
     readSettings,
+    readEmailStatus,
     readStoredSettings,
     refresh,
     resetSettings,
@@ -123,6 +124,15 @@ describe('Security updates: permissions', () => {
         });
     });
 
+    it('a web designer reads the email state without the recipient, and cannot send a test email', () => {
+        asDesigner();
+        readEmailStatus().then(email => {
+            expect(email.mailServerReady, 'the mail sink of the test stack').to.equal(true);
+            expect(email.recipient, 'the address is for server administrators only').to.equal(null);
+        });
+        raw.sendTestEmail().then(result => expect(errorText(result)).to.contain(DENIED));
+    });
+
     it('a web designer starts a check', () => {
         asDesigner();
         refresh().then(answer => expect(answer.inProgress, 'a check runs').to.equal(true));
@@ -174,6 +184,8 @@ describe('Security updates: permissions', () => {
         raw.refresh().then(result => expect(errorText(result)).to.contain(DENIED));
         raw.update({refreshIntervalHours: 1}).then(result => expect(errorText(result)).to.contain(DENIED));
         raw.reset().then(result => expect(errorText(result)).to.contain(DENIED));
+        raw.email().then(result => expect(errorText(result)).to.contain(DENIED));
+        raw.sendTestEmail().then(result => expect(errorText(result)).to.contain(DENIED));
 
         asRoot();
         readSettings().then(settings => expect(settings, 'unchanged').to.deep.equal(FIXTURE_SETTINGS));

@@ -228,6 +228,47 @@ To publish your own feed, serve these documents:
   `version-`, for example `version-8.2.3.7`, and the module removes it. Without a catalogue,
   compatibility is `Unknown`.
 
+## Security email
+
+The module can also send the list by email, so that administrators who do not open the Jahia
+administration learn about the updates. It is **off by default**: turn it on in the Settings tab
+(`emailEnabled`).
+
+- **Through Jahia's mail service, to the address that receives Jahia's notifications.** On Jahia 8.2.3.7 and
+  earlier, that is the administrator email address of Server settings > Mail server; the sender is the
+  sender address set there. On the Jahia versions where the mail-service module sends the mail (8.2.3.8 and
+  later 8.2.3.x releases, 8.2.4 and later), the email goes to the default recipient of that module
+  (`default.recipient` of `org.jahia.modules.mail`). Nothing is sent while the mail service is off or not
+  configured, nor, on 8.2.3.7, when the mail server settings have no administrator address.
+- **Only when there is something to do.** After each check whose report is kept, the email goes out when it is
+  due and at least one finding reaches `emailMinimumSeverity` (default `HIGH`; a finding of unknown severity
+  never counts). Jahia advisories and owner reports both count.
+- **At most once per `emailFrequency`:** `DAILY`, `WEEKLY` (default) or `MONTHLY` (every 30 days). The email is
+  due when the previous one is older than that period less one hour, so a check at the same time of day is not
+  one interval late. With checks every 24 hours, a weekly email therefore goes out with the check of the
+  seventh day. A check with nothing to report sends nothing and keeps the email due: a finding found later is
+  emailed at the next check. A frequency shorter than the check interval sends at most one email per check.
+- **One email per cluster.** Only the processing server sends it. The time of the last email is kept in the
+  data area of the module on that node (`email-state.properties`), so a restart does not send it again.
+- **Content.** In English, as text and HTML: the Jahia version and the server name, one block per finding
+  (installed and recommended versions, severity, compatibility, source, advisories with their CVEs and their
+  https link), the time of the check, a sentence when the check was incomplete, and the path of the page. At
+  most 100 findings are listed; the others are counted. Feed text is escaped in the HTML body, and only https
+  advisory URLs are shown. The subject, for example `Jahia on jahia-prod-1: 2 components need a security
+  update`, holds no feed text.
+- **Check now** ends once the email of its check has gone out.
+- **Send a test email** (Settings tab, server administrators) sends the same email now, with the current
+  report, whatever `emailEnabled` and the node, even with no finding. It does not count as the scheduled email,
+  and only one test email per minute is sent. The page says what happened: handed to the mail service, mail
+  server not configured, no recipient, too soon, or failed.
+- The Settings tab shows whether the mail service can send, where the email goes (the address is shown to
+  server administrators, when the mail service gives it), whether this node is the processing server, and when
+  this node sent the last email.
+- "Sent" means that Jahia's mail service accepted the email; its delivery is not known. The module waits at most
+  60 seconds for the mail service: an email still being sent then counts as not sent (it may still arrive), and
+  the check ends. When a due email cannot
+  be sent, one WARN in the log says why, until the cause changes.
+
 ## When checks run
 
 - The first check runs about one minute after the module starts, then every `refreshIntervalHours`
@@ -235,7 +276,8 @@ To publish your own feed, serve these documents:
 - A change of `enabled`, `refreshIntervalHours`, `useForgeSettings`, `extraFeedUrls` or `defaultStoreUrl`
   restarts the schedule: the next check runs about one minute later. When such a change arrives during a
   check, that check publishes nothing and one new check runs as soon as it ends. A change of the `banner*`
-  settings does not start a check and does not cancel one. It applies on the next query.
+  or `email*` settings does not start a check and does not cancel one. A banner change applies on the next
+  query, an email change from the next check.
 - Turning the checks on again (`enabled=true`) shows `NOT_CHECKED` until the first check, and keeps
   `lastSuccess`. A check that runs while the checks are turned off publishes nothing, even if they are turned
   on again before it ends. One new check follows.
@@ -273,6 +315,7 @@ To publish your own feed, serve these documents:
   answers with its own report. The page shows the node that answered your request. After a restart a
   node has no report until its first check (one minute later).
 - Each node needs outbound HTTPS to the stores.
+- Only the processing server sends the security email (see [Security email](#security-email)).
 
 ## Report status and errors
 
@@ -445,6 +488,9 @@ changes survive restarts and redeployments.
 | `bannerDismissPolicy` | `SESSION` | `SESSION`, `HOURS`, `UNTIL_CHANGE`, `NEVER` | See [Banner](#banner). |
 | `bannerDismissHours` | `24` | 1 to 720 | Hours a dismissal lasts with `HOURS`. |
 | `bannerPosition` | `TOP` | `TOP`, `BOTTOM`, `TOP_RIGHT`, `BOTTOM_RIGHT` | Where the banner appears. See [Banner](#banner). |
+| `emailEnabled` | `false` | `true`, `false` | Send the security email. See [Security email](#security-email). |
+| `emailFrequency` | `WEEKLY` | `DAILY`, `WEEKLY`, `MONTHLY` | How often the email may be sent (`MONTHLY` is every 30 days). |
+| `emailMinimumSeverity` | `HIGH` | `LOW`, `MEDIUM`, `HIGH`, `CRITICAL` | Lowest severity the email lists. |
 | `onDemandMinIntervalSeconds` | `30` | 0 to 3600 | Hidden key, not shown in the settings page. Seconds from the later of the start and the end of the previous check before **Check now** may start another. The e2e tests set it to 0, except the rate-limit test (3600). The page never changes it. |
 
 **A `.cfg` file edited by hand is read leniently**, so a typo never stops the module. The service reads the
@@ -459,8 +505,9 @@ raw values: an unreadable value takes its default and the module still starts.
 - A property with several values (an array) is joined with ", ".
 - `extraFeedUrls` accepts commas or spaces. Beyond 10 URLs only the first 10 are used, with one WARN.
 - An empty or unknown `bannerMinimumSeverity` means `HIGH`, an empty or unknown `bannerDismissPolicy` means
-  `SESSION`, an empty or unknown `bannerPosition` means `TOP`, and an invalid colour or a pair below 7:1 means
-  the default pair. An unknown severity, policy or position and an invalid colour give a WARN. An empty
+  `SESSION`, an empty or unknown `bannerPosition` means `TOP`, an empty or unknown `emailFrequency` means
+  `WEEKLY`, an empty or unknown `emailMinimumSeverity` means `HIGH`, and an invalid colour or a pair below 7:1
+  means the default pair. An unknown severity, policy or position and an invalid colour give a WARN. An empty
   severity, policy or position gives none. An empty colour gives a WARN.
 - An empty `defaultStoreUrl` means no default store: with no module manager store either, the report
   shows `NO_STORE`.
@@ -476,14 +523,14 @@ with no control. While a save runs, the text fields are read-only. Editing a fie
 A refused save lists links to the fields to correct ("Settings to correct:").
 A change to the checks (`enabled`, `refreshIntervalHours`, `useForgeSettings`, `defaultStoreUrl`,
 `extraFeedUrls`) restarts the schedule. The page then says "Settings saved. The next check runs in about one
-minute." when checks are on. Otherwise (for example a banner change) it says "Settings saved. They apply at
+minute." when checks are on. Otherwise (for example a banner or email change) it says "Settings saved. They apply at
 once." If the `.cfg` file exists but is not loaded yet, the save fails with `WRITE_FAILED` and the file is
 not overwritten: try again in a few seconds.
 
 ## GraphQL API
 
-One field on `Query` and one on `Mutation`. `report`, `banner`, `settings` and `refresh` require
-`adminTemplates`. `updateSettings` and `resetSettings` require `admin`: a user without it gets the GraphQL
+One field on `Query` and one on `Mutation`. `report`, `banner`, `settings`, `email` and `refresh` require
+`adminTemplates`. `updateSettings`, `resetSettings` and `sendTestEmail` require `admin`: a user without it gets the GraphQL
 error "Permission denied". The full schema is in the GraphQL schema of the running Jahia
 (`/modules/graphql`).
 
@@ -511,7 +558,15 @@ query {
     banner { visible count minimumSeverity components dismissalKeys backgroundColor textColor dismissPolicy dismissHours position username }
     settings { canEdit enabled refreshIntervalHours useForgeSettings defaultStoreUrl extraFeedUrls bannerEnabled
                bannerMinimumSeverity bannerIncludeOwnerReports bannerBackgroundColor bannerTextColor
-               bannerDismissPolicy bannerDismissHours bannerPosition contrastRatio }
+               bannerDismissPolicy bannerDismissHours bannerPosition emailEnabled emailFrequency
+               emailMinimumSeverity contrastRatio }
+    email {
+      mailServerReady   # Jahia's mail service is on and configured
+      recipient         # the notification address; null for a user without admin, or when the mail service chooses it
+      recipientMissing  # the mail server settings have no administrator address: nothing can be sent
+      processingServer  # this node sends the scheduled email
+      lastSentAt        # ISO-8601, last scheduled email sent from this node, null if none
+    }
   }
 }
 
@@ -532,6 +587,12 @@ mutation ($input: InputSecurityUpdatesSettingsValues!) {
 mutation {
   securityUpdates { resetSettings { ok settings { bannerDismissPolicy } } }
 }
+
+# Sends a test email now (at most one a minute). Answers SENT, MAIL_SERVER_NOT_CONFIGURED, NO_RECIPIENT,
+# RATE_LIMITED or FAILED.
+mutation {
+  securityUpdates { sendTestEmail }
+}
 ```
 
 Example of variables for `updateSettings`:
@@ -543,7 +604,8 @@ Example of variables for `updateSettings`:
     "defaultStoreUrl": "https://store.jahia.com", "extraFeedUrls": "",
     "bannerEnabled": true, "bannerMinimumSeverity": "HIGH", "bannerIncludeOwnerReports": true,
     "bannerBackgroundColor": "#1B1B1B", "bannerTextColor": "#FFFFFF",
-    "bannerDismissPolicy": "SESSION", "bannerDismissHours": 24, "bannerPosition": "TOP"
+    "bannerDismissPolicy": "SESSION", "bannerDismissHours": 24, "bannerPosition": "TOP",
+    "emailEnabled": false, "emailFrequency": "WEEKLY", "emailMinimumSeverity": "HIGH"
   }
 }
 ```
@@ -587,6 +649,10 @@ Notes:
 - **Untrusted text.** All feed text is untrusted: control characters are removed (tab, CR and LF become spaces) and lengths bounded on
   parsing, remote text is never echoed in error messages, and the UI renders it as React text (no
   `dangerouslySetInnerHTML`).
+- **Email.** The module sends only to the address configured in Jahia's mail service, never to an address of
+  a setting, so a GraphQL user cannot send mail elsewhere. In the email, feed text is HTML-escaped, only https
+  advisory URLs are shown, and the subject holds no feed text (the server name is reduced to printable
+  characters). A test email needs `admin`, at most one a minute per node, and is logged at INFO with the user.
 - **CSRF.** The GraphQL mutations rely on the Jahia security filter profile, which is on by default. Do not
   disable it.
 

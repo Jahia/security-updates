@@ -1,6 +1,6 @@
 // Conversion between the settings returned by GraphQL, the form state (text for the inputs) and the mutation input.
 
-import {DEFAULT_BANNER_POSITION} from '../common/constants';
+import {DEFAULT_BANNER_POSITION, DEFAULT_EMAIL_FREQUENCY} from '../common/constants';
 
 export const FIELDS = [
     'enabled',
@@ -15,7 +15,10 @@ export const FIELDS = [
     'bannerTextColor',
     'bannerPosition',
     'bannerDismissPolicy',
-    'bannerDismissHours'
+    'bannerDismissHours',
+    'emailEnabled',
+    'emailFrequency',
+    'emailMinimumSeverity'
 ];
 
 /** The settings whose change restarts the check schedule on the server (Settings.sameSchedule). */
@@ -32,14 +35,18 @@ export const SCHEDULE_FIELDS = ['enabled', 'refreshIntervalHours', 'useForgeSett
 export const restartsSchedule = (before, after) => Boolean(after?.enabled) &&
     SCHEDULE_FIELDS.some(field => String(before?.[field] ?? '') !== String(after?.[field] ?? ''));
 
-export const BOOLEAN_FIELDS = ['enabled', 'useForgeSettings', 'bannerEnabled', 'bannerIncludeOwnerReports'];
+export const BOOLEAN_FIELDS = ['enabled', 'useForgeSettings', 'bannerEnabled', 'bannerIncludeOwnerReports', 'emailEnabled'];
 export const NUMBER_FIELDS = ['refreshIntervalHours', 'bannerDismissHours'];
 
 /**
  * The value a choice takes when the server returns none, so that the select shows (and a save sends) a valid value
  * rather than an empty one.
  */
-export const FIELD_DEFAULTS = {bannerPosition: DEFAULT_BANNER_POSITION};
+export const FIELD_DEFAULTS = {
+    bannerPosition: DEFAULT_BANNER_POSITION,
+    emailFrequency: DEFAULT_EMAIL_FREQUENCY,
+    emailMinimumSeverity: 'HIGH'
+};
 
 const WHOLE_NUMBER = /^-?\d+$/;
 

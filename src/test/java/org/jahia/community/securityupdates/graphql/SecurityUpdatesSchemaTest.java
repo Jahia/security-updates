@@ -31,7 +31,7 @@ class SecurityUpdatesSchemaTest {
     private static final String SETTINGS_FIELDS = "fragment SecurityUpdatesSettingsFields on SecurityUpdatesSettings {"
             + " enabled refreshIntervalHours useForgeSettings defaultStoreUrl extraFeedUrls bannerEnabled bannerMinimumSeverity"
             + " bannerIncludeOwnerReports bannerBackgroundColor bannerTextColor bannerDismissPolicy bannerDismissHours"
-            + " bannerPosition contrastRatio canEdit }";
+            + " bannerPosition emailEnabled emailFrequency emailMinimumSeverity contrastRatio canEdit }";
     private static final String SETTINGS_RESULT = "{ ok errors { field code message suggestions { field value ratio } }"
             + " settings { ...SecurityUpdatesSettingsFields } }";
 
@@ -95,6 +95,14 @@ class SecurityUpdatesSchemaTest {
     }
 
     @Test
+    @DisplayName("the email status query and the test email mutation of the UI are valid")
+    void emailDocuments() {
+        assertThat(validate("query SecurityUpdatesEmail { securityUpdates { email { mailServerReady recipient recipientMissing"
+                + " processingServer lastSentAt } } }")).isEmpty();
+        assertThat(validate("mutation SecurityUpdatesSendTestEmail { securityUpdates { sendTestEmail } }")).isEmpty();
+    }
+
+    @Test
     @DisplayName("an unknown field is refused, so the checks above are meaningful")
     void unknownFieldIsRefused() {
         assertThat(validate("query { securityUpdates { report { notAField } } }")).isNotEmpty();
@@ -114,5 +122,11 @@ class SecurityUpdatesSchemaTest {
         assertThat(((graphql.schema.GraphQLEnumType) schema.getType("SecurityUpdatesBannerPosition")).getValues())
                 .extracting(graphql.schema.GraphQLEnumValueDefinition::getName)
                 .containsExactly("TOP", "BOTTOM", "TOP_RIGHT", "BOTTOM_RIGHT");
+        assertThat(((graphql.schema.GraphQLEnumType) schema.getType("SecurityUpdatesEmailFrequency")).getValues())
+                .extracting(graphql.schema.GraphQLEnumValueDefinition::getName).containsExactly("DAILY", "WEEKLY", "MONTHLY");
+        assertThat(((graphql.schema.GraphQLEnumType) schema.getType("SecurityUpdatesEmailOutcome")).getValues())
+                .extracting(graphql.schema.GraphQLEnumValueDefinition::getName).containsExactly("SENT", "DISABLED",
+                        "NOT_PROCESSING_SERVER", "NOT_DUE", "NOTHING_TO_REPORT", "MAIL_SERVER_NOT_CONFIGURED", "NO_RECIPIENT",
+                        "RATE_LIMITED", "FAILED");
     }
 }

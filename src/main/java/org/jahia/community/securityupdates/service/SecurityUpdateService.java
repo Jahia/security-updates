@@ -4,6 +4,7 @@ import org.jahia.bin.Jahia;
 import org.jahia.community.securityupdates.feed.ForgeSettingsReader;
 import org.jahia.community.securityupdates.feed.HttpFetcher;
 import org.jahia.community.securityupdates.model.BannerDecision;
+import org.jahia.community.securityupdates.model.EmailOutcome;
 import org.jahia.community.securityupdates.model.Finding;
 import org.jahia.community.securityupdates.model.ReportStatus;
 import org.jahia.community.securityupdates.model.ReportView;
@@ -11,6 +12,7 @@ import org.jahia.community.securityupdates.model.SecurityReport;
 import org.jahia.community.securityupdates.model.StoreError;
 import org.jahia.community.securityupdates.model.StoreErrorDetail;
 import org.jahia.community.securityupdates.model.StoreErrorKind;
+import org.jahia.settings.SettingsBean;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
@@ -20,6 +22,8 @@ import org.osgi.service.metatype.annotations.Designate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -34,6 +38,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -60,6 +65,9 @@ import java.util.function.Supplier;
  *     <li>A report whose last check is older than twice the refresh interval is "stale": its status is at best
  *     {@link ReportStatus#PARTIAL} and it carries a {@link StoreErrorKind#STALE} error.</li>
  *     <li>Each new finding is logged once at WARN level (again if it disappears and comes back).</li>
+ *     <li>After a check whose report is published, the security email is sent when it is due ({@link EmailNotifier}),
+ *     outside the lock, on the check thread, before the check ends: the report is visible, and the check still in
+ *     progress, while the email goes out.</li>
  * </ul>
  */
 @Component(service = SecurityUpdateService.class, configurationPid = SecurityUpdateService.PID, immediate = true)
@@ -112,6 +120,12 @@ public class SecurityUpdateService {
     private HttpFetcher httpFetcher;
     private ForgeSettingsReader forgeSettingsReader;
     private InstalledComponentsProvider installedComponentsProvider;
+    private MailSender mailSender;
+    private EmailState emailState;
+    private BooleanSupplier processingServer = SecurityUpdateService::isJahiaProcessingServer;
+    private Supplier<String> serverName = SecurityUpdateService::localHostName;
+    /** Built once both email references are set; null before. Guarded by this (the setters and emailNotifier()). */
+    private EmailNotifier emailNotifier;
 
     /** Declarative Services constructor: the system clock, the running Jahia version and the WARN log. */
     public SecurityUpdateService() {
@@ -145,6 +159,25 @@ public class SecurityUpdateService {
     @Reference
     void setInstalledComponentsProvider(InstalledComponentsProvider installedComponentsProvider) {
         this.installedComponentsProvider = installedComponentsProvider;
+    }
+
+    @Reference
+    synchronized void setMailSender(MailSender mailSender) {
+        this.mailSender = mailSender;
+        this.emailNotifier = null;
+    }
+
+    @Reference
+    synchronized void setEmailState(EmailState emailState) {
+        this.emailState = emailState;
+        this.emailNotifier = null;
+    }
+
+    /** Test hook: whether this node is the processing server, and its name in the email. */
+    synchronized void setEmailEnvironment(BooleanSupplier processingServer, Supplier<String> serverName) {
+        this.processingServer = processingServer;
+        this.serverName = serverName;
+        this.emailNotifier = null;
     }
 
     /**
@@ -264,6 +297,33 @@ public class SecurityUpdateService {
             }
         }
         return getReportView();
+    }
+
+    /**
+     * @return whether the security email can be sent, to whom, from which node, and when the last one went out
+     */
+    public EmailStatus getEmailStatus() {
+        EmailNotifier notifier = emailNotifier();
+        return notifier == null ? new EmailStatus(false, null, false, false, null) : notifier.status();
+    }
+
+    /**
+     * Sends a test email with the current report and settings, whatever the email settings (at most one a minute).
+     *
+     * @return what happened; FAILED when the mail sender is not available
+     */
+    public EmailOutcome sendTestEmail() {
+        EmailNotifier notifier = emailNotifier();
+        if (notifier == null) {
+            return EmailOutcome.FAILED;
+        }
+        SecurityReport current;
+        EmailSettings email;
+        synchronized (lock) {
+            current = getReportView().getReport();
+            email = settings.getEmail();
+        }
+        return notifier.sendTest(current, email);
     }
 
     static ScheduledExecutorService newExecutor() {
@@ -445,21 +505,41 @@ public class SecurityUpdateService {
 
     /**
      * Ends a check: keeps its report unless the check was stopped or cancelled by disabling the check, or the check
-     * settings changed while it ran (it describes settings no longer in effect), then starts the check asked for while
-     * it ran, if any.
+     * settings changed while it ran (it describes settings no longer in effect), sends the security email when it is
+     * due for a kept report, then ends the check ({@link #end}), even when the email fails.
      *
      * @param settingsUsed the settings the check ran with
      */
     private void publish(SecurityReport next, Settings settingsUsed, boolean scheduledRun) {
+        SecurityReport published = null;
+        EmailSettings email;
+        boolean current;
+        synchronized (lock) {
+            current = settings.sameSchedule(settingsUsed) && !checkCancelled;
+            if (next != null && current && !closed.get()) {
+                report = next;
+                published = next;
+            }
+            email = settings.getEmail();
+        }
+        try {
+            // still running while the email goes out: no other check starts, and "Check now" ends after the email
+            EmailNotifier notifier = emailNotifier();
+            if (published != null && notifier != null) {
+                notifier.afterCheck(published, email);
+            }
+        } finally {
+            end(current, scheduledRun);
+        }
+    }
+
+    /** Marks the check as ended, then starts the check asked for while it ran, if any. */
+    private void end(boolean current, boolean scheduledRun) {
         synchronized (lock) {
             running = false;
             checkStartedAt = null;
             lastEnd = clock.instant();
-            boolean current = settings.sameSchedule(settingsUsed) && !checkCancelled;
             checkCancelled = false;
-            if (next != null && current && !closed.get()) {
-                report = next;
-            }
             if (scheduledRun && current && scheduled != null) {
                 nextCheckAt = clock.instant().plusSeconds(settings.getRefreshIntervalHours() * SECONDS_PER_HOUR);
             }
@@ -468,6 +548,29 @@ public class SecurityUpdateService {
             if (rerun && executor != null && begin(false)) {
                 startInBackground();
             }
+        }
+    }
+
+    /** @return the email notifier, or null while a mail reference is missing; built once (UI and check thread) */
+    private synchronized EmailNotifier emailNotifier() {
+        EmailNotifier notifier = emailNotifier;
+        if (notifier == null && mailSender != null && emailState != null) {
+            notifier = new EmailNotifier(clock, mailSender, emailState, processingServer, serverName);
+            emailNotifier = notifier;
+        }
+        return notifier;
+    }
+
+    private static boolean isJahiaProcessingServer() {
+        SettingsBean settingsBean = SettingsBean.getInstance();
+        return settingsBean != null && settingsBean.isProcessingServer();
+    }
+
+    private static String localHostName() {
+        try {
+            return InetAddress.getLocalHost().getHostName();
+        } catch (UnknownHostException e) {
+            return null;
         }
     }
 

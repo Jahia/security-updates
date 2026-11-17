@@ -38,6 +38,9 @@ class SettingsValidatorTest {
         input.put(SettingsKeys.BANNER_MINIMUM_SEVERITY, "critical");
         input.put(SettingsKeys.BANNER_DISMISS_POLICY, "until_change");
         input.put(SettingsKeys.BANNER_POSITION, " top_right ");
+        input.put(SettingsKeys.EMAIL_ENABLED, "True");
+        input.put(SettingsKeys.EMAIL_FREQUENCY, " monthly ");
+        input.put(SettingsKeys.EMAIL_MINIMUM_SEVERITY, "medium");
 
         ValidationResult result = SettingsValidator.validate(input);
 
@@ -48,6 +51,9 @@ class SettingsValidatorTest {
                 .containsEntry(SettingsKeys.BANNER_MINIMUM_SEVERITY, "CRITICAL")
                 .containsEntry(SettingsKeys.BANNER_DISMISS_POLICY, "UNTIL_CHANGE")
                 .containsEntry(SettingsKeys.BANNER_POSITION, "TOP_RIGHT")
+                .containsEntry(SettingsKeys.EMAIL_ENABLED, "true")
+                .containsEntry(SettingsKeys.EMAIL_FREQUENCY, "MONTHLY")
+                .containsEntry(SettingsKeys.EMAIL_MINIMUM_SEVERITY, "MEDIUM")
                 .containsEntry(SettingsKeys.EXTRA_FEED_URLS, "https://a.example.org/f.json, https://b.example.org/g.json");
         assertThat(result.getValues()).containsOnlyKeys(SettingsKeys.ALL);
     }
@@ -75,7 +81,11 @@ class SettingsValidatorTest {
             "bannerPosition, LEFT, INVALID_VALUE",
             "bannerPosition, '', INVALID_VALUE",
             "bannerBackgroundColor, #FFF, INVALID_COLOR",
-            "bannerTextColor, white, INVALID_COLOR"
+            "bannerTextColor, white, INVALID_COLOR",
+            "emailEnabled, maybe, INVALID_BOOLEAN",
+            "emailFrequency, HOURLY, INVALID_VALUE",
+            "emailFrequency, '', INVALID_VALUE",
+            "emailMinimumSeverity, UNKNOWN, INVALID_VALUE"
     })
     void refusesInvalidFields(String field, String value, String code) {
         Map<String, String> input = valid();
