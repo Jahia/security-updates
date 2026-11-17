@@ -15,6 +15,9 @@ const SETTINGS_FIELDS = gql`
         bannerPosition
         bannerDismissPolicy
         bannerDismissHours
+        emailEnabled
+        emailFrequency
+        emailMinimumSeverity
         contrastRatio
         canEdit
     }
@@ -49,6 +52,29 @@ export const UPDATE_SETTINGS = gql`
         }
     }
     ${SETTINGS_FIELDS}
+`;
+
+// The recipient is null for a user who is not a server administrator, and when the mail service chooses it.
+export const GET_EMAIL_STATUS = gql`
+    query SecurityUpdatesEmail {
+        securityUpdates {
+            email {
+                mailServerReady
+                recipient
+                recipientMissing
+                processingServer
+                lastSentAt
+            }
+        }
+    }
+`;
+
+export const SEND_TEST_EMAIL = gql`
+    mutation SecurityUpdatesSendTestEmail {
+        securityUpdates {
+            sendTestEmail
+        }
+    }
 `;
 
 export const RESET_SETTINGS = gql`

@@ -11,6 +11,7 @@ import {requestErrorCode, splitErrors} from './settingsResult';
 import {ColorField, idOf, SelectField, SwitchField, TextField} from './fields';
 import {BannerPreview} from './BannerPreview';
 import {SettingsSummary} from './SettingsSummary';
+import {EmailStatusPanel} from './EmailStatusPanel';
 import {ResetDialog} from './ResetDialog';
 import {StatusMessage} from '../SecurityUpdates/StatusMessage';
 import {
@@ -19,6 +20,7 @@ import {
     DEFAULT_BANNER_BACKGROUND,
     DEFAULT_BANNER_TEXT,
     DISMISS_POLICIES,
+    EMAIL_FREQUENCIES,
     NS,
     QUERY_FETCH_POLICY,
     THRESHOLD_SEVERITIES
@@ -301,6 +303,17 @@ export const SettingsForm = ({onSettingsChanged}) => {
                             note={form.bannerDismissPolicy === 'HOURS' ? undefined : t('settings.fields.bannerDismissHours.disabled')}
                             {...fieldProps}
                         />
+                    </fieldset>
+                    <fieldset className={styles.group}>
+                        <Typography component="legend" variant="subheading" weight="bold">{t('settings.groups.email')}</Typography>
+                        <SwitchField field="emailEnabled" {...fieldProps}/>
+                        <SelectField field="emailFrequency" {...fieldProps}>
+                            {EMAIL_FREQUENCIES.map(frequency => <option key={frequency} value={frequency}>{t(`settings.frequency.${frequency}`)}</option>)}
+                        </SelectField>
+                        <SelectField field="emailMinimumSeverity" {...fieldProps}>
+                            {THRESHOLD_SEVERITIES.map(severity => <option key={severity} value={severity}>{t(`page.severity.${severity}`)}</option>)}
+                        </SelectField>
+                        <EmailStatusPanel hasTestButton/>
                     </fieldset>
                 </fieldset>
                 {formError && <FormAlert formError={formError} errors={errors}/>}

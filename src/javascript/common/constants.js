@@ -18,6 +18,12 @@ export const DISMISS_POLICIES = ['SESSION', 'HOURS', 'UNTIL_CHANGE', 'NEVER'];
  */
 export const BANNER_POSITIONS = ['TOP', 'BOTTOM', 'TOP_RIGHT', 'BOTTOM_RIGHT'];
 
+/** How often the security email may be sent (setting emailFrequency). */
+export const EMAIL_FREQUENCIES = ['DAILY', 'WEEKLY', 'MONTHLY'];
+
+/** Default email frequency (same as the server default). */
+export const DEFAULT_EMAIL_FREQUENCY = 'WEEKLY';
+
 /** Default banner position (same as the server default). */
 export const DEFAULT_BANNER_POSITION = 'TOP';
 

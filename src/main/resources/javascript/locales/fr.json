@@ -176,7 +176,7 @@
   },
   "settings": {
     "title": "Paramètres",
-    "intro": "Les modifications sont enregistrées dans la configuration de Jahia, pour tous les serveurs du cluster. Les modifications du bandeau s’appliquent immédiatement. Après une modification des vérifications, la vérification suivante a lieu environ une minute plus tard.",
+    "intro": "Les modifications sont enregistrées dans la configuration de Jahia, pour tous les serveurs du cluster. Les modifications du bandeau s’appliquent immédiatement. Après une modification des vérifications, la vérification suivante a lieu environ une minute plus tard. Les modifications de l’e-mail s’appliquent à partir de la vérification suivante.",
     "loading": "Chargement des paramètres…",
     "loadError": "Les paramètres n’ont pas pu être chargés. Rechargez la page pour réessayer.",
     "readOnly": "Seuls les administrateurs du serveur peuvent modifier ces paramètres. Ils sont affichés ici pour information.",
@@ -187,7 +187,8 @@
     },
     "groups": {
       "checks": "Vérifications",
-      "banner": "Bandeau dans l’interface de Jahia"
+      "banner": "Bandeau dans l’interface de Jahia",
+      "email": "E-mail de sécurité"
     },
     "fields": {
       "enabled": {
@@ -244,6 +245,18 @@
         "label": "Heures pendant lesquelles le bandeau reste masqué",
         "help": "Un nombre entier de 1 à 720, utilisé seulement avec « Masqué pendant un nombre d’heures ».",
         "disabled": "Non utilisé pour l’instant : choisissez « Masqué pendant un nombre d’heures » ci-dessus pour le régler."
+      },
+      "emailEnabled": {
+        "label": "Envoyer l’e-mail de sécurité",
+        "help": "Envoie par e-mail la liste des composants qui ont besoin d’une mise à jour de sécurité, par le service de messagerie de Jahia, à l’adresse qui reçoit les notifications de Jahia. Envoyé seulement si au moins un composant a besoin d’une mise à jour, après une vérification, par le serveur de traitement du cluster."
+      },
+      "emailFrequency": {
+        "label": "Fréquence de l’e-mail",
+        "help": "L’e-mail part avec la première vérification une fois cette période écoulée depuis l’e-mail précédent. Un composant trouvé plus tard est envoyé à la vérification suivante."
+      },
+      "emailMinimumSeverity": {
+        "label": "Sévérité la plus basse listée dans l’e-mail",
+        "help": "Les composants dont les mises à jour sont moins sévères ne sont pas listés et, seuls, ne déclenchent pas l’e-mail."
       }
     },
     "dismiss": {
@@ -257,6 +270,33 @@
       "BOTTOM": "En bas de la fenêtre, sur toute la largeur",
       "TOP_RIGHT": "Coin supérieur droit",
       "BOTTOM_RIGHT": "Coin inférieur droit"
+    },
+    "frequency": {
+      "DAILY": "Quotidienne",
+      "WEEKLY": "Hebdomadaire",
+      "MONTHLY": "Mensuelle (tous les 30 jours)"
+    },
+    "email": {
+      "title": "Envoi de l’e-mail",
+      "loading": "Chargement de l’état de l’e-mail…",
+      "loadError": "L’état de l’e-mail n’a pas pu être chargé.",
+      "notConfigured": "Le serveur de messagerie de Jahia est désactivé ou n’est pas configuré : aucun e-mail ne peut être envoyé. Configurez-le dans Paramètres du serveur, Serveur de messagerie.",
+      "noRecipient": "Les paramètres du serveur de messagerie de Jahia n’ont pas d’adresse e-mail d’administrateur : aucun e-mail ne peut être envoyé.",
+      "recipient": "Les e-mails sont envoyés à {{recipient}}, l’adresse qui reçoit les notifications de Jahia.",
+      "recipientDefault": "Les e-mails sont envoyés à l’adresse qui reçoit les notifications de Jahia.",
+      "otherNode": "Ce serveur n’est pas le serveur de traitement du cluster : le serveur de traitement envoie l’e-mail.",
+      "lastSent": "Dernier e-mail envoyé par ce serveur : {{date}}.",
+      "neverSent": "Aucun e-mail n’a encore été envoyé par ce serveur.",
+      "sendTest": "Envoyer un e-mail de test",
+      "sending": "Envoi de l’e-mail de test…",
+      "outcome": {
+        "SENT": "E-mail de test transmis au service de messagerie de Jahia. S’il n’arrive pas, vérifiez les paramètres du serveur de messagerie et le journal de Jahia.",
+        "MAIL_SERVER_NOT_CONFIGURED": "Non envoyé : le serveur de messagerie de Jahia est désactivé ou n’est pas configuré.",
+        "NO_RECIPIENT": "Non envoyé : les paramètres du serveur de messagerie de Jahia n’ont pas d’adresse e-mail d’administrateur.",
+        "RATE_LIMITED": "Non envoyé : un e-mail de test a été envoyé il y a moins d’une minute. Réessayez plus tard.",
+        "FAILED": "Non envoyé : le service de messagerie de Jahia a refusé ou n’a pas pu envoyer l’e-mail. Consultez le journal de Jahia.",
+        "REQUEST_FAILED": "La demande n’a pas pu être envoyée au serveur. Vérifiez votre connexion et réessayez."
+      }
     },
     "preview": {
       "title": "Aperçu",

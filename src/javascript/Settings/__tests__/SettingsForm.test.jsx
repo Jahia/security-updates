@@ -18,6 +18,9 @@ const settings = {
     bannerPosition: 'TOP',
     bannerDismissPolicy: 'SESSION',
     bannerDismissHours: 24,
+    emailEnabled: false,
+    emailFrequency: 'WEEKLY',
+    emailMinimumSeverity: 'HIGH',
     contrastRatio: 17.22,
     canEdit: true
 };
@@ -84,6 +87,35 @@ describe('SettingsForm', () => {
         expect(field('bannerPosition')).toHaveValue('TOP');
         expect(field('bannerDismissPolicy')).toHaveValue('SESSION');
         expect(field('bannerDismissHours')).toHaveValue(24);
+        expect(field('emailEnabled')).not.toBeChecked();
+        expect(field('emailFrequency')).toHaveValue('WEEKLY');
+        expect(field('emailMinimumSeverity')).toHaveValue('HIGH');
+    });
+
+    test('the email group offers the three frequencies and the four severities, then the email state and the test button', () => {
+        render(<SettingsForm/>);
+
+        expect(within(field('emailFrequency')).getAllByRole('option').map(option => option.value)).toEqual(['DAILY', 'WEEKLY', 'MONTHLY']);
+        expect(within(field('emailMinimumSeverity')).getAllByRole('option').map(option => option.value))
+            .toEqual(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']);
+        const group = screen.getByRole('group', {name: 'settings.groups.email'});
+        expect(within(group).getByTestId('security-updates-email-status')).toBeInTheDocument();
+        expect(within(group).getByRole('button', {name: 'settings.email.sendTest'})).toHaveAttribute('type', 'button');
+    });
+
+    test('a save sends the email settings', async () => {
+        render(<SettingsForm/>);
+        fireEvent.click(field('emailEnabled'));
+        fireEvent.change(field('emailFrequency'), {target: {value: 'DAILY'}});
+        fireEvent.change(field('emailMinimumSeverity'), {target: {value: 'CRITICAL'}});
+        fireEvent.click(save());
+
+        await waitFor(() => expect(update).toHaveBeenCalled());
+        expect(update.mock.calls[0][0].variables.input).toEqual(expect.objectContaining({
+            emailEnabled: true,
+            emailFrequency: 'DAILY',
+            emailMinimumSeverity: 'CRITICAL'
+        }));
     });
 
     test('the settings are read outside the Apollo cache (see apolloCache.test.js)', () => {
@@ -125,8 +157,12 @@ describe('SettingsForm', () => {
             expect(value('bannerPosition').querySelector('dd').textContent).toBe('settings.position.BOTTOM_RIGHT');
             expect(value('bannerBackgroundColor').querySelector('dd')).toHaveTextContent('#1B1B1B');
             expect(value('bannerBackgroundColor').querySelector('[aria-hidden="true"]').style.backgroundColor).toBe('rgb(27, 27, 27)');
+            expect(value('emailFrequency').querySelector('dd').textContent).toBe('settings.frequency.WEEKLY');
+            expect(value('emailMinimumSeverity').querySelector('dd').textContent).toBe('page.severity.HIGH');
             expect(screen.getAllByRole('heading', {level: 3}).map(heading => heading.textContent))
-                .toEqual(['settings.groups.checks', 'settings.groups.banner', 'settings.preview.title']);
+                .toEqual(['settings.groups.checks', 'settings.groups.banner', 'settings.preview.title', 'settings.groups.email']);
+            expect(screen.getByTestId('security-updates-email-status')).toBeInTheDocument();
+            expect(screen.queryByRole('button', {name: 'settings.email.sendTest'})).toBeNull();
             expect(screen.getByTestId('security-updates-banner-preview')).toBeInTheDocument();
             expect(screen.queryByTestId('security-updates-suggestion-status')).toBeNull();
         });
@@ -228,7 +264,7 @@ describe('SettingsForm', () => {
             const input = update.mock.calls[0][0].variables.input;
             expect(input.refreshIntervalHours).toBe(6);
             expect(input.enabled).toBe(true);
-            expect(Object.keys(input)).toHaveLength(13);
+            expect(Object.keys(input)).toHaveLength(16);
             expect(field('defaultStoreUrl')).toHaveValue('https://saved.example');
             expect(query.refetch).not.toHaveBeenCalled();
             expect(changed).toHaveBeenCalledTimes(1);
@@ -670,7 +706,7 @@ describe('SettingsForm', () => {
         const {container} = render(<SettingsForm/>);
         const used = name => container.querySelectorAll(`[data-moonstone="${name}"]`).length;
 
-        expect(used('Switch')).toBe(4);
+        expect(used('Switch')).toBe(5);
         expect(used('Input')).toBe(5);
         expect(used('Textarea')).toBe(1);
         expect(save()).toHaveAttribute('data-moonstone', 'Button');

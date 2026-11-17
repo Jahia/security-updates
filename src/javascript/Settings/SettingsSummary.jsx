@@ -6,6 +6,7 @@ import {NS} from '../common/constants';
 import {BOOLEAN_FIELDS} from './settingsValues';
 import {normalizeHex} from './colorUtils';
 import {BannerPreview} from './BannerPreview';
+import {EmailStatusPanel} from './EmailStatusPanel';
 
 /** The settings of each group, in the order of the form. */
 export const GROUPS = {
@@ -17,7 +18,8 @@ export const GROUPS = {
         'bannerTextColor',
         'bannerPosition',
         'bannerDismissPolicy',
-        'bannerDismissHours']
+        'bannerDismissHours'],
+    email: ['emailEnabled', 'emailFrequency', 'emailMinimumSeverity']
 };
 
 const COLOR_FIELDS = ['bannerBackgroundColor', 'bannerTextColor'];
@@ -32,8 +34,12 @@ const valueText = (t, field, value) => {
         return t('settings.value.none');
     }
 
-    if (field === 'bannerMinimumSeverity') {
+    if (field === 'bannerMinimumSeverity' || field === 'emailMinimumSeverity') {
         return t(`page.severity.${value}`);
+    }
+
+    if (field === 'emailFrequency') {
+        return t(`settings.frequency.${value}`);
     }
 
     if (field === 'bannerPosition') {
@@ -62,7 +68,8 @@ Value.propTypes = {field: PropTypes.string.isRequired, value: PropTypes.oneOfTyp
 
 /**
  * The settings of a user who cannot change them, as text: a list of each setting and its value per group, at full
- * contrast (a disabled form would grey them out and take them out of the keyboard order), then the banner preview.
+ * contrast (a disabled form would grey them out and take them out of the keyboard order); the banner group ends with
+ * the banner preview, the email group with the state of the email (without the test button).
  */
 export const SettingsSummary = ({form}) => {
     const {t} = useTranslation(NS);
@@ -79,9 +86,10 @@ export const SettingsSummary = ({form}) => {
                             </div>
                         ))}
                     </dl>
+                    {group === 'banner' && <BannerPreview isReadOnly form={form} onApply={() => undefined}/>}
+                    {group === 'email' && <EmailStatusPanel/>}
                 </div>
             ))}
-            <BannerPreview isReadOnly form={form} onApply={() => undefined}/>
         </div>
     );
 };

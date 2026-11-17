@@ -310,3 +310,14 @@ $focus-color: var(--color-accent_dark_contrast, #004781);
     transition: none !important;
   }
 }
+
+// The state of the security email, under its settings: a panel with Moonstone's border, so that it reads as
+// information about the settings above, not as one more setting.
+.emailStatus {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-small, 8px);
+  padding: var(--spacing-medium, 16px);
+  border: 1px solid var(--color-gray40, #8F8F8F);
+  border-radius: 4px;
+}
