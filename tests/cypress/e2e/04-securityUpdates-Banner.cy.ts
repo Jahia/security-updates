@@ -192,7 +192,7 @@ describe('Security updates: banner', () => {
             cy.get(BANNER).should('not.exist');
             cy.window().then(win => {
                 const stored = JSON.parse(win.sessionStorage.getItem(SESSION_DISMISS_KEY) as string);
-                expectStoredDismissalKeys(stored, banner.dismissalKeys, 'session dismissal');
+                expectStoredDismissalKeys(stored, banner, 'session dismissal');
             });
 
             reloadAppPage().then(answer => expect(answer.data?.securityUpdates?.banner?.visible).to.equal(true));

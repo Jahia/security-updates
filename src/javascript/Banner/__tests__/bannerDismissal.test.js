@@ -1,4 +1,5 @@
-import {hashKeys, hashText, hashUser, isDismissed, localKey, recordDismissal, SESSION_KEY} from '../bannerDismissal';
+import * as dismissal from '../bannerDismissal';
+import {isDismissed, localKey, recordDismissal, SESSION_KEY} from '../bannerDismissal';
 
 const HOUR = 3600 * 1000;
 const KEYS = ['jahia-core|JSA-2026-0001', 'security-updates|JSA-2026-0002'];
@@ -159,55 +160,27 @@ describe('banner dismissal', () => {
         });
     });
 
-    describe('user key', () => {
-        test('the local key carries a hash, not the user name', () => {
+    describe('user key and tokens (SECUPD-SEC-002)', () => {
+        test('the local key carries the user token of the server, not the user name', () => {
             expect(localKey('abc')).toBe('security-updates-banner-dismissed:abc');
         });
 
-        test('hashUser gives the SHA-256 of the user name, in hexadecimal', async () => {
-            const {webcrypto} = await import('crypto');
-            const {TextEncoder} = await import('util');
-            // Jsdom has no TextEncoder (browsers do).
-            global.TextEncoder = global.TextEncoder || TextEncoder;
-            // Node's SubtleCrypto, given the bytes as a Node buffer (jsdom's typed arrays come from another realm).
-            const subtle = {digest: (algorithm, data) => webcrypto.subtle.digest(algorithm, Buffer.from(data))};
-            expect(await hashUser('root', subtle)).toBe('4813494d137e1631bba301d5acab6e7bb7aa74ce1185d456565ef51d737677b2');
+        test('the module no longer hashes anything itself: the server tokens are stored as they are', () => {
+            expect(Object.keys(dismissal).sort()).toEqual(['SESSION_KEY', 'isDismissed', 'localKey', 'recordDismissal']);
         });
 
-        test('without SubtleCrypto (plain http), a non-reversible fallback still hides the name', async () => {
-            const hashed = await hashUser('jdoe', undefined);
-            expect(hashed).toMatch(/^[0-9a-f]{8}$/);
-            expect(hashed).not.toContain('jdoe');
-            expect(await hashUser('jdoe', undefined)).toBe(hashed);
-            expect(await hashUser('jdoe2', undefined)).not.toBe(hashed);
-        });
-
-        test('hashKeys hashes each dismissal key, in order, so that the storage does not name the components', async () => {
-            const stored = await hashKeys(KEYS);
-            expect(stored).toEqual([await hashText(KEYS[0]), await hashText(KEYS[1])]);
-            stored.forEach(value => expect(value).toMatch(/^[0-9a-f]+$/));
-            expect(stored.join('')).not.toContain('jahia-core');
-            expect(await hashKeys(undefined)).toEqual([]);
-            expect(await hashKeys(['a'], text => Promise.resolve(`h:${text}`))).toEqual(['h:a']);
-            expect(hashUser).toBe(hashText);
-        });
-
-        test('hashed keys keep the rules: a new key shows the banner, a removed one keeps it hidden', async () => {
-            const ctx = context({policy: 'UNTIL_CHANGE', keys: await hashKeys(KEYS)});
+        test('tokens keep the rules: a new token shows the banner, a removed one keeps it hidden', () => {
+            const tokens = ['0f1e2d3c4b5a69788796a5b4c3d2e1f0', '00112233445566778899aabbccddeeff'];
+            const ctx = context({policy: 'UNTIL_CHANGE', keys: tokens});
             recordDismissal(ctx);
-            expect(isDismissed({...ctx, keys: await hashKeys([KEYS[0]])})).toBe(true);
-            expect(isDismissed({...ctx, keys: await hashKeys([...KEYS, 'jcontent|JSA-1'])})).toBe(false);
+            expect(isDismissed({...ctx, keys: [tokens[0]]})).toBe(true);
+            expect(isDismissed({...ctx, keys: [...tokens, 'ffeeddccbbaa99887766554433221100']})).toBe(false);
         });
 
-        test('a record of keys stored in clear (older version) shows the banner', async () => {
+        test('a record of an older version (keys or plain hashes) never matches a token, so it shows the banner', () => {
             const ctx = context({policy: 'UNTIL_CHANGE'});
             recordDismissal(ctx);
-            expect(isDismissed({...ctx, keys: await hashKeys(KEYS)})).toBe(false);
-        });
-
-        test('a failing SubtleCrypto falls back too', async () => {
-            const failing = {digest: () => Promise.reject(new Error('NotSupported'))};
-            expect(await hashUser('jdoe', failing)).toMatch(/^[0-9a-f]{8}$/);
+            expect(isDismissed({...ctx, keys: ['0f1e2d3c4b5a69788796a5b4c3d2e1f0']})).toBe(false);
         });
     });
 });

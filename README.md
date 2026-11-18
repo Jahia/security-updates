@@ -106,6 +106,8 @@ The server decides whether it is shown, from the current report and the `banner*
   `bannerIncludeOwnerReports=true`. A finding of unknown severity is never counted.
 - `components` lists those components, distinct and sorted.
 - `dismissalKeys` lists one `<component>|<advisory id>` per counted advisory, distinct and sorted.
+- `dismissalTokens` gives one opaque token per dismissal key, in the same order, and `userToken` one for the
+  current user: what the browser stores (see Dismissal below).
 - `visible` is `bannerEnabled && count > 0`.
 - `backgroundColor`, `textColor`, `dismissPolicy`, `dismissHours`, `position` are the validated presentation settings,
   and `username` the current Jahia user.
@@ -135,7 +137,7 @@ reaches 7:1 when a pair does not.
 | Policy | Hidden until | Stored in |
 |---|---|---|
 | `SESSION` (default) | the browser tab is closed | `sessionStorage` of the tab: a new tab shows the banner again |
-| `HOURS` | `bannerDismissHours` hours have passed | `localStorage`, key `security-updates-banner-dismissed:<hash of the user name>` |
+| `HOURS` | `bannerDismissHours` hours have passed | `localStorage`, key `security-updates-banner-dismissed:<user token>` |
 | `UNTIL_CHANGE` | a new advisory or a new component is counted | `localStorage`, same key |
 | `NEVER` | (no dismiss button) | nothing |
 
@@ -144,11 +146,15 @@ comes back as soon as a key is not in the dismissed set: a new advisory, even fo
 already counted, or a new component. It stays hidden when keys only disappear (an update was installed).
 Any storage failure (blocked, full, corrupt record) shows the banner.
 
-The browser stores hashes, never the advisory ids or the user name in clear. The hash is SHA-256 (hex) in a
-secure context, and a 32-bit FNV-1a (8 hex characters) otherwise. In `localStorage` the value is
-`{keys: [hash per key], at}`. In `sessionStorage`, `security-updates-banner-dismissed` holds the array of
-hashes and `security-updates-banner-announced` holds `<count>|<sorted hashes>`. A record written in clear by a
-development version never matches, so the banner shows again.
+The browser stores opaque tokens that the server computes, never the advisory ids, the component names or the user
+name: the banner query gives one token per dismissal key (`dismissalTokens`) and a `userToken`. A token is an
+HMAC-SHA256 under a random 256-bit secret of the server, cut to 32 hexadecimal characters, so a list of candidate
+components and advisories cannot be matched against the browser storage. The secret is created on the first query in
+`dismissal-secret`, in the data area of the module (readable by its owner only), and kept across restarts. Each
+cluster node has its own secret, so a banner hidden on one node shows again on another. In `localStorage` the value
+is `{keys: [token per key], at}`. In `sessionStorage`, `security-updates-banner-dismissed` holds the array of tokens
+and `security-updates-banner-announced` holds `<count>|<sorted tokens>`. A record written by a development version
+(keys in clear, or plain hashes) never matches, so the banner shows again.
 
 ## Data sources
 
@@ -556,7 +562,7 @@ query {
         advisories { id title url cves severity storeHost }
       }
     }
-    banner { visible count minimumSeverity components dismissalKeys backgroundColor textColor dismissPolicy dismissHours position username }
+    banner { visible count minimumSeverity components dismissalKeys dismissalTokens backgroundColor textColor dismissPolicy dismissHours position username userToken }
     settings { canEdit enabled refreshIntervalHours useForgeSettings defaultStoreUrl extraFeedUrls bannerEnabled
                bannerMinimumSeverity bannerIncludeOwnerReports bannerBackgroundColor bannerTextColor
                bannerDismissPolicy bannerDismissHours bannerPosition emailEnabled emailFrequency
@@ -691,7 +697,8 @@ See [SECURITY.md](SECURITY.md) to report a vulnerability.
 - The file `karaf/etc/org.jahia.community.securityupdates.cfg` stays, so the settings are kept if you
   install the module again. Delete it for a clean removal.
 - The banner dismissals live in the browsers (`sessionStorage`, and `localStorage` keys that start with
-  `security-updates-banner-dismissed`). They hold hashes only and can stay.
+  `security-updates-banner-dismissed`). They hold opaque tokens only and can stay. The server secret of
+  those tokens, `dismissal-secret`, goes with the bundle data.
 
 ## Troubleshooting
 

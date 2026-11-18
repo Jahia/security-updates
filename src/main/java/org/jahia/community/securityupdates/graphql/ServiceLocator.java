@@ -1,5 +1,6 @@
 package org.jahia.community.securityupdates.graphql;
 
+import org.jahia.community.securityupdates.service.DismissalTokens;
 import org.jahia.community.securityupdates.service.SecurityUpdateService;
 import org.jahia.community.securityupdates.service.SettingsStore;
 import org.jahia.osgi.BundleUtils;
@@ -26,6 +27,7 @@ final class ServiceLocator {
     private static final Supplier<SecurityUpdateService> OSGI =
             () -> BundleUtils.getOsgiService(SecurityUpdateService.class, null);
     private static final Supplier<SettingsStore> OSGI_STORE = () -> BundleUtils.getOsgiService(SettingsStore.class, null);
+    private static final Supplier<DismissalTokens> OSGI_TOKENS = () -> BundleUtils.getOsgiService(DismissalTokens.class, null);
     /** The Jahia user of the current request, null when there is none. */
     private static final Supplier<String> JAHIA_USER = () -> {
         JahiaUser user = JCRSessionFactory.getInstance().getCurrentUser();
@@ -37,6 +39,7 @@ final class ServiceLocator {
 
     private static final AtomicReference<Supplier<SecurityUpdateService>> SERVICE = new AtomicReference<>(OSGI);
     private static final AtomicReference<Supplier<SettingsStore>> STORE = new AtomicReference<>(OSGI_STORE);
+    private static final AtomicReference<Supplier<DismissalTokens>> TOKENS = new AtomicReference<>(OSGI_TOKENS);
     private static final AtomicReference<Supplier<String>> USERNAME = new AtomicReference<>(JAHIA_USER);
     private static final AtomicReference<BooleanSupplier> CAN_EDIT = new AtomicReference<>(JAHIA_CAN_EDIT);
 
@@ -60,6 +63,16 @@ final class ServiceLocator {
     /** @return the settings store, or null when it is not running */
     static SettingsStore store() {
         return STORE.get().get();
+    }
+
+    /** @return the banner dismissal tokens of this server, or null when the service is not running */
+    static DismissalTokens dismissalTokens() {
+        return TOKENS.get().get();
+    }
+
+    /** Test seam. */
+    static void overrideTokens(Supplier<DismissalTokens> testSupplier) {
+        TOKENS.set(testSupplier);
     }
 
     /** @return the name of the Jahia user of the current request, or null */
@@ -114,6 +127,7 @@ final class ServiceLocator {
     static void reset() {
         SERVICE.set(OSGI);
         STORE.set(OSGI_STORE);
+        TOKENS.set(OSGI_TOKENS);
         USERNAME.set(JAHIA_USER);
         CAN_EDIT.set(JAHIA_CAN_EDIT);
     }

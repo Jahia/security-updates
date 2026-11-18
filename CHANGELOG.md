@@ -18,6 +18,10 @@ First release (1.0.0). It requires Jahia 8.2.3.7 or later.
   `securityUpdates.sendTestEmail`.
   Only advisories of the Jahia Store are labelled "Jahia advisory" in the email; an advisory from another store
   names that store and the host of its link (pre-release audit finding SECUPD-SEC-001).
+- The browser stores the banner dismissals as opaque tokens computed by the server (HMAC-SHA256 under a secret of
+  the server), never as a plain hash of the component and advisory, nor of the user name, which a list of
+  candidates could invert (pre-release audit finding SECUPD-SEC-002). The banner query gains `dismissalTokens` and
+  `userToken`.
 - Security check of the installed Jahia core and modules against the store security feed
   (`modules-repository.securityUpdates.json`, schema version 1), on a schedule and on demand. On a standard
   Jahia, the module reads the store of the module manager.

@@ -9,11 +9,11 @@ import {
     KEY_CORE,
     KEY_MODULE,
     KEY_OWNER,
-    ROOT_LOCAL_DISMISS_KEYS,
     Settings,
     checkPageAccessibility,
     ensureFixtureReport,
     expectStoredDismissalKeys,
+    localDismissKey,
     openAppPage,
     provision,
     readBanner,
@@ -47,11 +47,11 @@ describe('Security updates: settings', () => {
 
     const codesOf = (errors: FieldError[]) => errors.map(e => `${e.field}:${e.code}`).sort();
 
-    /** The localStorage record of root's dismissal, under the hashed user key (never the user name itself). */
+    /** The localStorage record of root's dismissal, under the user token of the server (never the user name itself). */
     const localRecord = (win: Window) => {
         const keys = Object.keys(win.localStorage).filter(key => key.startsWith('security-updates-banner-dismissed'));
         expect(keys, 'one dismissal record').to.have.length(1);
-        expect(ROOT_LOCAL_DISMISS_KEYS, 'key made of the hashed user name').to.include(keys[0]);
+        expect(keys[0], 'key made of an opaque user token').to.match(/^security-updates-banner-dismissed:[0-9a-f]{32}$/);
         expect(keys[0]).to.not.contain('root');
         return {key: keys[0], record: JSON.parse(win.localStorage.getItem(keys[0]) as string)};
     };
@@ -258,8 +258,9 @@ describe('Security updates: settings', () => {
             cy.get(BANNER_DISMISS, {timeout: 30000}).click();
             cy.get(BANNER).should('not.exist');
             cy.window().then(win => {
-                const {record} = localRecord(win);
-                expectStoredDismissalKeys(record.keys, banner.dismissalKeys, 'HOURS dismissal');
+                const {key, record} = localRecord(win);
+                expect(key, 'the user token of the server').to.equal(localDismissKey(banner));
+                expectStoredDismissalKeys(record.keys, banner, 'HOURS dismissal');
                 expect(record.at).to.be.a('number');
             });
         });
