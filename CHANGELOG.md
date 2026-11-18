@@ -16,6 +16,8 @@ First release (1.0.0). It requires Jahia 8.2.3.7 or later.
   `emailMinimumSeverity`. The Settings tab shows where the email goes and when the last one went out, and a
   **Send a test email** button (server administrators, one a minute). GraphQL: `securityUpdates.email` and
   `securityUpdates.sendTestEmail`.
+  Only advisories of the Jahia Store are labelled "Jahia advisory" in the email; an advisory from another store
+  names that store and the host of its link (pre-release audit finding SECUPD-SEC-001).
 - Security check of the installed Jahia core and modules against the store security feed
   (`modules-repository.securityUpdates.json`, schema version 1), on a schedule and on demand. On a standard
   Jahia, the module reads the store of the module manager.

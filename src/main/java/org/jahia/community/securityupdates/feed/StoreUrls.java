@@ -16,7 +16,8 @@ public final class StoreUrls {
     private static final String HTTPS = "https";
     private static final String HTTP = "http";
     /** Host of the Jahia Store: its advisories take precedence over those of other stores. */
-    private static final String JAHIA_STORE_HOST = "store.jahia.com";
+    /** The host of the Jahia Store. */
+    public static final String JAHIA_STORE_HOST = "store.jahia.com";
     private static final char LAST_ASCII = 0x7E;
     private static final char FIRST_PRINTABLE = 0x21;
     private static final String SCHEME_SEPARATOR = "://";

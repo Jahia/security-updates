@@ -254,7 +254,8 @@ administration learn about the updates. It is **off by default**: turn it on in 
   (installed and recommended versions, severity, compatibility, source, advisories with their CVEs and their
   https link), the time of the check, a sentence when the check was incomplete, and the path of the page. At
   most 100 findings are listed; the others are counted. Feed text is escaped in the HTML body, and only https
-  advisory URLs are shown. The subject, for example `Jahia on jahia-prod-1: 2 components need a security
+  advisory URLs are shown. Only advisories of the Jahia Store are called "Jahia advisory": an advisory from another
+  store names that store, and the host of its link when it is another one, as the page does. The subject, for example `Jahia on jahia-prod-1: 2 components need a security
   update`, holds no feed text.
 - **Check now** ends once the email of its check has gone out.
 - **Send a test email** (Settings tab, server administrators) sends the same email now, with the current

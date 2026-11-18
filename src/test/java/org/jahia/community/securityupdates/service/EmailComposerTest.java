@@ -185,4 +185,40 @@ class EmailComposerTest {
 
         assertThat(text).contains("No check has run yet").doesNotContain("Last check:");
     }
+
+    @Test
+    @DisplayName("SECUPD-SEC-001: an advisory from another store is never labelled a Jahia advisory, and names its store and link host")
+    void otherStoreAdvisory() {
+        AdvisoryRef jahia = ref("JSA-2026-0011", "Injection", "https://academy.jahia.com/jsa");
+        AdvisoryRef mirror = new AdvisoryRef("MIRROR-1", "Spoofed", "https://evil.example.net/a", List.of(), Severity.HIGH,
+                "store.example.org");
+        AdvisoryRef sameHost = new AdvisoryRef("MIRROR-2", "Own link", "https://store.example.org/a", List.of(), Severity.HIGH,
+                "store.example.org");
+        Finding fromJahia = finding("graphql-dxm-provider", Severity.HIGH, FindingSource.ADVISORY, jahia);
+        Finding fromMirror = finding("jcontent", Severity.HIGH, FindingSource.ADVISORY, mirror, sameHost);
+
+        EmailMessage message = EmailComposer.periodic(report(ReportStatus.OK), List.of(fromJahia, fromMirror), WEEKLY_HIGH, "s");
+
+        String text = message.getText();
+        String mirrorBlock = text.substring(text.indexOf("jcontent 3.4.0"));
+        assertThat(mirrorBlock).contains("Source: Advisory from store.example.org").doesNotContain("Jahia advisory")
+                .contains("MIRROR-1 Spoofed (from store.example.org, link to evil.example.net) https://evil.example.net/a")
+                .contains("MIRROR-2 Own link (from store.example.org) https://store.example.org/a");
+        assertThat(text.substring(0, text.indexOf("jcontent 3.4.0"))).contains("Source: Jahia advisory")
+                .contains("JSA-2026-0011 Injection (CVE-2026-1234) https://academy.jahia.com/jsa")
+                .doesNotContain("(from ");
+        assertThat(message.getHtml()).contains("Advisory from store.example.org")
+                .contains("(from store.example.org, link to evil.example.net)");
+    }
+
+    @Test
+    @DisplayName("SECUPD-SEC-001: an advisory whose store is not known is not labelled a Jahia advisory either")
+    void unknownStoreAdvisory() {
+        AdvisoryRef unknown = new AdvisoryRef("X-1", "Unknown", "https://x.example.org/a", List.of(), Severity.HIGH);
+        Finding finding = finding("m", Severity.HIGH, FindingSource.ADVISORY, unknown);
+
+        String text = EmailComposer.periodic(report(ReportStatus.OK), List.of(finding), WEEKLY_HIGH, "s").getText();
+
+        assertThat(text).contains("Source: Advisory from a store that is not named").doesNotContain("Jahia advisory");
+    }
 }
