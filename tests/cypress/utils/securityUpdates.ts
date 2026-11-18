@@ -29,44 +29,24 @@ export const BANNER = '#security-updates-banner';
 export const BANNER_DISMISS = '[data-sel-role="security-updates-banner-dismiss"]';
 export const BANNER_LINK = '[data-sel-role="security-updates-banner-link"]';
 export const SESSION_DISMISS_KEY = 'security-updates-banner-dismissed';
-/**
- * The localStorage key of root's dismissals: the SHA-256 of the user name where SubtleCrypto exists (a secure
- * context such as localhost), else its 32-bit FNV-1a (http://jahia:8080 in the test network is not a secure context).
- */
-export const ROOT_LOCAL_DISMISS_KEYS = [
-    `${SESSION_DISMISS_KEY}:4813494d137e1631bba301d5acab6e7bb7aa74ce1185d456565ef51d737677b2`,
-    `${SESSION_DISMISS_KEY}:20fd0e45`
-];
-
 /** The dismissal keys of the fixture store, one per counted advisory (or owner report) of a component. */
 export const KEY_CORE = 'jahia-core|JSA-2099-0001';
 export const KEY_MODULE = 'security-updates|JSA-2099-0002';
 export const KEY_OWNER = 'security-updates|GHSA-2c2c-3f3f-4g4g';
 
 /**
- * The hashes under which the banner stores those keys (never the keys themselves): SHA-256 in hexadecimal of the
- * UTF-8 key where SubtleCrypto exists, else its 32-bit FNV-1a, as for the user name. Precomputed: the specs run at
- * http://jahia:8080, which is not a secure context, so they have no SubtleCrypto either.
+ * SECUPD-SEC-002: the browser stores the opaque tokens of the server as they are (one per dismissal key, in the same
+ * order), never a dismissal key nor a plain hash of one.
  */
-const STORED_KEY_HASHES: Record<string, { sha256: string; fnv1a: string }> = {
-    [KEY_CORE]: {sha256: 'feddab4d011d7e07eb60cec5253fdc803fb2383a1991f5fed32704fa177d35a1', fnv1a: '5d7fe35d'},
-    [KEY_MODULE]: {sha256: '9c778a9cf1deb093774a8528db6c17235ea74d145fa46e9ccfe0230ccab63e5e', fnv1a: '1cffbca6'},
-    [KEY_OWNER]: {sha256: '9b1b9d8169a1cbfe409586d1bc25f2d197cb258854bcc375993358def4acc6a6', fnv1a: '41e38b68'}
+export const expectStoredDismissalKeys = (stored: unknown, banner: Banner, label: string): void => {
+    expect(banner.dismissalTokens, `${label}: one token per dismissal key`).to.have.length(banner.dismissalKeys.length);
+    banner.dismissalTokens.forEach(token => expect(token, `${label}: an opaque token`).to.match(/^[0-9a-f]{32}$/));
+    expect(stored, `${label}: the server tokens`).to.deep.equal(banner.dismissalTokens);
+    banner.dismissalKeys.forEach(key => expect(JSON.stringify(stored), `${label}: ${key} not stored in clear`).to.not.contain(key));
 };
 
-/**
- * Asserts that a stored list of dismissed keys is the list of the hashes of the keys, in the same order, all made
- * with the same hash function, and that no key is stored in clear.
- */
-export const expectStoredDismissalKeys = (stored: unknown, keys: string[], label: string): void => {
-    keys.forEach(key => expect(STORED_KEY_HASHES, `${label}: precomputed hashes of ${key}`).to.have.property(key));
-    const hashed = [
-        JSON.stringify(keys.map(key => STORED_KEY_HASHES[key].sha256)),
-        JSON.stringify(keys.map(key => STORED_KEY_HASHES[key].fnv1a))
-    ];
-    expect(hashed, `${label}: the hashes of ${keys.join(', ')}`).to.include(JSON.stringify(stored));
-    keys.forEach(key => expect(JSON.stringify(stored), `${label}: ${key} not stored in clear`).to.not.contain(key));
-};
+/** The localStorage key of a user's dismissals: made of the user token of the server, never of the user name. */
+export const localDismissKey = (banner: Banner): string => `${SESSION_DISMISS_KEY}:${banner.userToken}`;
 
 const GQL = {
     report: 'graphql/query/getSecurityUpdatesReport.graphql',
@@ -115,6 +95,8 @@ export type Banner = {
     dismissHours: number;
     position: string;
     username: string;
+    dismissalTokens: string[];
+    userToken: string;
 };
 export type Settings = {
     enabled: boolean;

@@ -24,11 +24,21 @@ const KEYS = ['jahia-core|JSA-2026-0001', 'security-updates|JSA-2026-0002'];
 
 const response = body => Promise.resolve({ok: true, json: () => Promise.resolve(body)});
 
+// The server sends one opaque token per dismissal key and a user token (SECUPD-SEC-002); here a readable stand-in.
+const token = text => `hash(${text})`;
+const hashed = keys => keys.map(token);
+
+const withTokens = banner => ({
+    ...banner,
+    dismissalTokens: banner.dismissalTokens ?? hashed(banner.dismissalKeys || []),
+    userToken: banner.userToken ?? token(banner.username || '')
+});
+
 const answer = (overrides = {}, hasPermission = true) => ({
     data: {
         jcr: {nodeByPath: {hasPermission}},
         securityUpdates: {
-            banner: {
+            banner: withTokens({
                 visible: true,
                 count: 2,
                 minimumSeverity: 'HIGH',
@@ -42,7 +52,7 @@ const answer = (overrides = {}, hasPermission = true) => ({
                 position: 'BOTTOM_RIGHT',
                 username: 'jdoe',
                 ...overrides
-            }
+            })
         }
     }
 });
@@ -53,9 +63,7 @@ const fetchAnswering = (...bodies) => {
     return fetchImpl;
 };
 
-const hash = text => Promise.resolve(`hash(${text})`);
-const hashed = keys => keys.map(key => `hash(${key})`);
-const show = (fetchImpl, options = {}) => showSecurityBanner({t, language: 'fr', fetchImpl, hash, ...options});
+const show = (fetchImpl, options = {}) => showSecurityBanner({t, language: 'fr', fetchImpl, ...options});
 const banner = () => document.getElementById(BANNER_ID);
 const dismissButton = () => document.querySelector('[data-sel-role="security-updates-banner-dismiss"]');
 const queryOf = (fetchImpl, call) => JSON.parse(fetchImpl.mock.calls[call][1].body).query;
@@ -86,8 +94,11 @@ describe('showSecurityBanner', () => {
         expect(fetchImpl).toHaveBeenCalledTimes(1);
         expect(fetchImpl.mock.calls[0][0]).toBe('/ctx/modules/graphql');
         const query = queryOf(fetchImpl, 0);
-        ['hasPermission', 'banner', 'dismissalKeys', 'backgroundColor', 'textColor', 'dismissPolicy', 'dismissHours', 'position', 'username']
+        ['hasPermission', 'banner', 'dismissalTokens', 'backgroundColor', 'textColor', 'dismissPolicy', 'dismissHours', 'position', 'userToken']
             .forEach(field => expect(query).toContain(field));
+        // SECUPD-SEC-002: what the browser stores comes from the tokens only, so it asks for neither the keys nor the name.
+        expect(query).not.toContain('dismissalKeys');
+        expect(query).not.toContain('username');
         expect(query).not.toContain('findings');
     });
 
@@ -336,7 +347,7 @@ describe('showSecurityBanner', () => {
             expect(await show(fetchAnswering(answer({dismissPolicy: 'UNTIL_CHANGE', count: 1, dismissalKeys: [KEYS[1]]})))).toBe(false);
         });
 
-        test('HOURS: stored under a hash of the user name, with its time, and expires', async () => {
+        test('HOURS: stored under the user token of the server, with its time, and expires', async () => {
             let now = 1_000_000;
             const hours = () => answer({dismissPolicy: 'HOURS', dismissHours: 2});
 
@@ -383,10 +394,15 @@ describe('showSecurityBanner', () => {
             expect(banner()).toBeNull();
         });
 
-        test('a failing hash fails open', async () => {
-            const failing = () => Promise.reject(new Error('no crypto'));
+        test('without the server tokens nothing is stored, and the banner cannot be hidden (fail open)', async () => {
+            const noTokens = answer({dismissPolicy: 'UNTIL_CHANGE', dismissalTokens: [], userToken: ''});
+            await show(fetchAnswering(noTokens));
+            dismissButton().click();
+            expect(Object.keys(window.localStorage).filter(key => key.startsWith('security-updates-banner-dismissed'))
+                .map(key => JSON.parse(window.localStorage.getItem(key)).keys)).toEqual([[]]);
 
-            expect(await show(fetchAnswering(answer({dismissPolicy: 'UNTIL_CHANGE'})), {hash: failing})).toBe(true);
+            expect(await show(fetchAnswering(noTokens))).toBe(true);
+            expect(await show(fetchAnswering(answer({dismissPolicy: 'UNTIL_CHANGE', dismissalTokens: [42]})))).toBe(true);
         });
     });
 
@@ -640,7 +656,7 @@ describe('startSecurityBanner', () => {
     test('asks the server again after a check or a settings change, every 15 minutes, and when the tab is shown again', async () => {
         jest.useFakeTimers({doNotFake: ['setTimeout']});
         const fetchImpl = jest.fn(() => response(answer()));
-        const stop = startSecurityBanner({t, fetchImpl, hash});
+        const stop = startSecurityBanner({t, fetchImpl});
         await flush();
         expect(fetchImpl).toHaveBeenCalledTimes(1);
         expect(banner()).not.toBeNull();
@@ -676,7 +692,7 @@ describe('startSecurityBanner', () => {
     test('the tab shown again asks the server when the last request failed', async () => {
         const debug = jest.spyOn(console, 'debug').mockImplementation(() => undefined);
         const fetchImpl = jest.fn(() => Promise.reject(new Error('offline')));
-        const stop = startSecurityBanner({t, fetchImpl, hash});
+        const stop = startSecurityBanner({t, fetchImpl});
         await flush();
 
         document.dispatchEvent(new Event('visibilitychange'));
@@ -689,7 +705,7 @@ describe('startSecurityBanner', () => {
 
     test('is hidden while the Security updates page is open, and asked again when it closes', async () => {
         const fetchImpl = jest.fn(() => response(answer()));
-        const stop = startSecurityBanner({t, fetchImpl, hash});
+        const stop = startSecurityBanner({t, fetchImpl});
         await flush();
         expect(banner()).not.toBeNull();
 
@@ -712,7 +728,7 @@ describe('startSecurityBanner', () => {
                 releaseFirst = () => resolve({ok: true, json: () => Promise.resolve(answer({count: 1}))});
             }))
             .mockImplementationOnce(() => response(answer({count: 5})));
-        const stop = startSecurityBanner({t, fetchImpl, hash});
+        const stop = startSecurityBanner({t, fetchImpl});
         window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
         await flush();
         releaseFirst();
@@ -776,7 +792,7 @@ describe('banner robustness', () => {
         });
 
         test('is ready after Hide, and goes when the banner is stopped', async () => {
-            const stop = startSecurityBanner({t, fetchImpl: jest.fn(() => response(answer())), hash});
+            const stop = startSecurityBanner({t, fetchImpl: jest.fn(() => response(answer()))});
             await flush();
             await flush();
             expect(ready()).toBe('ready');
@@ -788,7 +804,7 @@ describe('banner robustness', () => {
         });
 
         test('is ready when the Security updates page opens', async () => {
-            const stop = startSecurityBanner({t, fetchImpl: jest.fn(() => new Promise(() => undefined)), hash});
+            const stop = startSecurityBanner({t, fetchImpl: jest.fn(() => new Promise(() => undefined))});
             expect(ready()).toBe('pending');
 
             window.dispatchEvent(new CustomEvent(PAGE_EVENT, {detail: {isOpen: true}}));
@@ -833,7 +849,7 @@ describe('banner robustness', () => {
                 .mockImplementationOnce(() => response(answer()))
                 .mockImplementationOnce(() => Promise.reject(new Error('restarting')))
                 .mockImplementation(() => response(answer({count: 4})));
-            const stop = startSecurityBanner({t, fetchImpl, hash});
+            const stop = startSecurityBanner({t, fetchImpl});
             await flush();
             window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
             await flush();
@@ -848,7 +864,7 @@ describe('banner robustness', () => {
             const fetchImpl = jest.fn()
                 .mockImplementationOnce(() => Promise.reject(new Error('restarting')))
                 .mockImplementation(() => response(answer({count: 4})));
-            const stop = startSecurityBanner({t, fetchImpl, hash});
+            const stop = startSecurityBanner({t, fetchImpl});
             await jest.advanceTimersByTimeAsync(0);
             expect(fetchImpl).toHaveBeenCalledTimes(1);
 
@@ -864,7 +880,7 @@ describe('banner robustness', () => {
         test('stopping cancels a planned retry', async () => {
             jest.useFakeTimers();
             const fetchImpl = jest.fn(() => Promise.reject(new Error('offline')));
-            const stop = startSecurityBanner({t, fetchImpl, hash});
+            const stop = startSecurityBanner({t, fetchImpl});
             await jest.advanceTimersByTimeAsync(0);
             stop();
 
@@ -885,7 +901,7 @@ describe('banner robustness', () => {
 
         test('stopping right after Hide cancels the pending feedback', async () => {
             jest.useFakeTimers();
-            const stop = startSecurityBanner({t, fetchImpl: jest.fn(() => response(answer())), hash});
+            const stop = startSecurityBanner({t, fetchImpl: jest.fn(() => response(answer()))});
             await jest.advanceTimersByTimeAsync(0);
             dismissButton().click();
             stop();
@@ -921,28 +937,24 @@ describe('banner robustness', () => {
     });
 
     describe('dismissal keys', () => {
-        test('are stored hashed, with the default hash, and still hide the banner', async () => {
-            await show(fetchAnswering(answer({dismissPolicy: 'UNTIL_CHANGE'})), {hash: undefined});
+        test('SECUPD-SEC-002: only the server tokens are stored, never a key or the user name, and they still hide the banner', async () => {
+            const opaque = {dismissalTokens: ['0f1e2d3c4b5a69788796a5b4c3d2e1f0', '00112233445566778899aabbccddeeff'],
+                userToken: 'aabbccddeeff00112233445566778899'};
+            await show(fetchAnswering(answer({dismissPolicy: 'UNTIL_CHANGE', ...opaque})));
             dismissButton().click();
 
-            const stored = Object.keys(window.localStorage).map(key => window.localStorage.getItem(key)).join('');
+            const stored = Object.keys(window.localStorage).map(key => key + window.localStorage.getItem(key)).join('');
             expect(stored).not.toContain('jahia-core');
             expect(stored).not.toContain('JSA-2026');
-            expect(await show(fetchAnswering(answer({dismissPolicy: 'UNTIL_CHANGE'})), {hash: undefined})).toBe(false);
+            expect(stored).not.toContain('jdoe');
+            expect(JSON.parse(window.localStorage.getItem(localKey(opaque.userToken))).keys).toEqual(opaque.dismissalTokens);
+            expect(await show(fetchAnswering(answer({dismissPolicy: 'UNTIL_CHANGE', ...opaque})))).toBe(false);
         });
 
         test('keys stored in clear by an older version show the banner again', async () => {
             window.sessionStorage.setItem(DISMISS_KEY, JSON.stringify(KEYS));
 
             expect(await show(fetchAnswering(answer()))).toBe(true);
-        });
-
-        test('keys that cannot be hashed fail open', async () => {
-            const failing = text => (text.includes('|') ? Promise.reject(new Error('no crypto')) : hash(text));
-            await show(fetchAnswering(answer({dismissPolicy: 'UNTIL_CHANGE'})), {hash: failing});
-            dismissButton().click();
-
-            expect(await show(fetchAnswering(answer({dismissPolicy: 'UNTIL_CHANGE'})), {hash: failing})).toBe(true);
         });
     });
 

@@ -42,7 +42,7 @@ public class SecurityUpdatesQuery {
     @GraphQLRequiresPermission(Permissions.ADMIN_TEMPLATES)
     public GqlBanner getBanner() {
         return new GqlBanner(ServiceLocator.withService(SecurityUpdateService::getBanner, BannerDecision::hidden),
-                ServiceLocator.username());
+                ServiceLocator.username(), ServiceLocator.dismissalTokens());
     }
 
     @GraphQLField

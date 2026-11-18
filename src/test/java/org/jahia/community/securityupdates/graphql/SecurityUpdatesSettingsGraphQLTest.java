@@ -383,4 +383,33 @@ class SecurityUpdatesSettingsGraphQLTest {
         ServiceLocator.override(() -> null);
         assertThat(new SecurityUpdatesMutation().sendTestEmail()).isEqualTo(EmailOutcome.FAILED);
     }
+
+    @Test
+    @DisplayName("SECUPD-SEC-002: the banner gives one server token per dismissal key, in order, and a user token")
+    void bannerTokens() {
+        when(service.getBanner()).thenReturn(new org.jahia.community.securityupdates.model.BannerDecision(true, Severity.HIGH,
+                java.util.List.of("a", "b"), java.util.List.of("a|X", "b|Y"), "#1B1B1B", "#FFFFFF", DismissPolicy.SESSION, 24,
+                BannerPosition.TOP));
+        ServiceLocator.overrideTokens(() -> value -> "t(" + value + ")");
+
+        GqlBanner banner = new SecurityUpdatesQuery().getBanner();
+
+        assertThat(banner.getDismissalTokens()).containsExactly("t(a|X)", "t(b|Y)");
+        assertThat(banner.getUserToken()).isEqualTo("t(user:jdoe)");
+        assertThat(banner.getDismissalKeys()).containsExactly("a|X", "b|Y");
+    }
+
+    @Test
+    @DisplayName("SECUPD-SEC-002: without the token service the banner gives no token, so it cannot be hidden (fail open)")
+    void bannerWithoutTokens() {
+        when(service.getBanner()).thenReturn(new org.jahia.community.securityupdates.model.BannerDecision(true, Severity.HIGH,
+                java.util.List.of("a"), java.util.List.of("a|X"), "#1B1B1B", "#FFFFFF", DismissPolicy.SESSION, 24,
+                BannerPosition.TOP));
+        ServiceLocator.overrideTokens(() -> null);
+
+        GqlBanner banner = new SecurityUpdatesQuery().getBanner();
+
+        assertThat(banner.getDismissalTokens()).isEmpty();
+        assertThat(banner.getUserToken()).isEmpty();
+    }
 }

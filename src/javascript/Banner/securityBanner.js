@@ -2,7 +2,7 @@ import {adminUrl, graphqlUrl} from '../SecurityUpdates/securityUpdatesUtils';
 import {normalizeHex} from '../Settings/colorUtils';
 import {CHANGED_EVENT, DEFAULT_BANNER_BACKGROUND, DEFAULT_BANNER_TEXT, PAGE_EVENT, ROUTE_KEY, THRESHOLD_SEVERITIES} from '../common/constants';
 import {pluralKey, values} from '../common/i18n';
-import {hashKeys, hashUser, isDismissed, recordDismissal, SESSION_KEY} from './bannerDismissal';
+import {isDismissed, recordDismissal, SESSION_KEY} from './bannerDismissal';
 
 export const BANNER_ID = 'security-updates-banner';
 export const DISMISS_KEY = SESSION_KEY;
@@ -50,8 +50,8 @@ const FEEDBACK_DELAY_MS = 100;
 // One request: the permission (users without adminTemplates get a denied banner field and nothing is shown) and the
 // decision of the server, which validates the presentation: the client only renders.
 const BANNER_QUERY = 'query SecurityUpdatesBanner { jcr { nodeByPath(path: "/") { hasPermission(permissionName: "adminTemplates") } } ' +
-    'securityUpdates { banner { visible count minimumSeverity components dismissalKeys backgroundColor textColor ' +
-    'dismissPolicy dismissHours position username } } }';
+    'securityUpdates { banner { visible count minimumSeverity components dismissalTokens backgroundColor textColor ' +
+    'dismissPolicy dismissHours position userToken } } }';
 
 // The colours come from the settings, validated server-side to a contrast of at least 7:1 (WCAG AAA). The text, the
 // link, the button border and the focus ring all use the text colour, so each of them keeps that contrast against
@@ -590,23 +590,15 @@ const render = (t, language, banner, dismissal) => {
     announce(element, text, banner, dismissal);
 };
 
-const userKeyOf = async (hash, username) => {
-    try {
-        return await hash(username || '');
-    } catch (error) {
-        debug('user name not hashed', error);
-        return null;
-    }
-};
+const isToken = value => typeof value === 'string' && value.length > 0;
 
-// Keys that cannot be hashed are not stored nor compared: the banner cannot be hidden then (fail open).
-const storedKeysOf = async (hash, keys) => {
-    try {
-        return await hashKeys(keys || [], hash);
-    } catch (error) {
-        debug('dismissal keys not hashed', error);
-        return [];
-    }
+/**
+ * What the browser may store: the opaque tokens of the server, never a dismissal key nor the user name
+ * (SECUPD-SEC-002). Without valid tokens nothing is stored nor compared, so the banner cannot be hidden (fail open).
+ */
+const storedKeysOf = banner => {
+    const tokens = banner?.dismissalTokens;
+    return Array.isArray(tokens) && tokens.every(isToken) && isToken(banner?.userToken) ? tokens : [];
 };
 
 let generation = 0;
@@ -617,8 +609,7 @@ let generation = 0;
  * (network, timeout, HTTP or GraphQL error, malformed answer) keeps the banner as it was and calls onFailed.
  *
  * @param {object} options translation function, UI language (or a function giving it), whether the Security updates
- *        page is open, onFetched and onFailed callbacks, and (for tests) the fetch implementation, clock, storages and
- *        the hash of the user name and of the dismissal keys
+ *        page is open, onFetched and onFailed callbacks, and (for tests) the fetch implementation, clock and storages
  * @returns {Promise<boolean>} whether a new banner decision shows the banner
  */
 export const showSecurityBanner = async ({
@@ -629,7 +620,6 @@ export const showSecurityBanner = async ({
     now = Date.now,
     session = storage('sessionStorage'),
     local = storage('localStorage'),
-    hash = hashUser,
     onFetched = () => undefined,
     onFailed = () => undefined
 }) => {
@@ -645,12 +635,11 @@ export const showSecurityBanner = async ({
         setReady('pending');
         const banner = await fetchBanner(fetchImpl);
         onFetched();
-        const keys = Array.isArray(banner?.dismissalKeys) && banner.dismissalKeys.length > 0 ? banner.dismissalKeys : banner?.components;
         const dismissal = banner && {
             policy: banner.dismissPolicy || 'SESSION',
             hours: banner.dismissHours || 24,
-            keys: await storedKeysOf(hash, keys),
-            userKey: await userKeyOf(hash, banner.username),
+            keys: storedKeysOf(banner),
+            userKey: isToken(banner.userToken) ? banner.userToken : null,
             session,
             local,
             clock: now

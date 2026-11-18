@@ -6,12 +6,14 @@ query getSecurityUpdatesBanner {
             minimumSeverity
             components
             dismissalKeys
+            dismissalTokens
             backgroundColor
             textColor
             dismissPolicy
             dismissHours
             position
             username
+            userToken
         }
     }
 }

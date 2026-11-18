@@ -1,5 +1,6 @@
 package org.jahia.community.securityupdates.service;
 
+import org.jahia.community.securityupdates.feed.StoreUrls;
 import org.jahia.community.securityupdates.model.AdvisoryRef;
 import org.jahia.community.securityupdates.model.Finding;
 import org.jahia.community.securityupdates.model.FindingSource;
@@ -7,6 +8,7 @@ import org.jahia.community.securityupdates.model.ReportStatus;
 import org.jahia.community.securityupdates.model.SecurityReport;
 import org.jahia.community.securityupdates.model.Severity;
 
+import java.net.URI;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -25,6 +27,8 @@ import java.util.Set;
  *     <li>The subject holds no feed text; the server name is reduced to printable characters and bounded, so that
  *     it cannot add a mail header.</li>
  *     <li>At most {@value #MAX_LISTED} findings are listed; the others are counted.</li>
+ *     <li>Only advisories of the Jahia Store are labelled "Jahia advisory"; an advisory from another store names
+ *     that store, and the host of its link when it differs (SECUPD-SEC-001), as the page does.</li>
  * </ul>
  */
 final class EmailComposer {
@@ -191,9 +195,51 @@ final class EmailComposer {
         lines.add(new String[]{"Install", finding.getRecommendedVersion()});
         lines.add(new String[]{"Severity", label(finding.getSeverity())});
         lines.add(new String[]{"Compatibility", compatibility(finding)});
-        lines.add(new String[]{"Source", finding.getSource() == FindingSource.ADVISORY
-                ? "Jahia advisory" : "Reported by the module owner"});
+        lines.add(new String[]{"Source", sourceText(finding)});
         return lines;
+    }
+
+    /**
+     * SECUPD-SEC-001: "Jahia advisory" only when every advisory comes from the Jahia Store; otherwise the stores that
+     * published them, so that a third-party feed cannot pass its advisories off as Jahia's.
+     */
+    private static String sourceText(Finding finding) {
+        if (finding.getSource() != FindingSource.ADVISORY) {
+            return "Reported by the module owner";
+        }
+        Set<String> otherStores = new LinkedHashSet<>();
+        boolean unnamed = false;
+        for (AdvisoryRef ref : finding.getAdvisories()) {
+            String store = ref.getStoreHost();
+            if (store == null || store.isEmpty()) {
+                unnamed = true;
+            } else if (!StoreUrls.JAHIA_STORE_HOST.equalsIgnoreCase(store)) {
+                otherStores.add(store);
+            }
+        }
+        if (!otherStores.isEmpty()) {
+            return "Advisory from " + String.join(", ", otherStores);
+        }
+        return unnamed ? "Advisory from a store that is not named" : "Jahia advisory";
+    }
+
+    /** The store and the link host of an advisory not published by the Jahia Store, as the page shows them. */
+    private static String originText(AdvisoryRef ref) {
+        String store = ref.getStoreHost();
+        if (store == null || store.isEmpty() || StoreUrls.JAHIA_STORE_HOST.equalsIgnoreCase(store)) {
+            return "";
+        }
+        String linkHost = isHttps(ref.getUrl()) ? hostOf(ref.getUrl()) : null;
+        return linkHost != null && !linkHost.equalsIgnoreCase(store)
+                ? " (from " + store + ", link to " + linkHost + ")" : " (from " + store + ")";
+    }
+
+    private static String hostOf(String url) {
+        try {
+            return URI.create(url).getHost();
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private static String compatibility(Finding finding) {
@@ -227,7 +273,7 @@ final class EmailComposer {
         if (!ref.getCves().isEmpty()) {
             sb.append(" (").append(String.join(", ", ref.getCves())).append(')');
         }
-        return sb.toString();
+        return sb.append(originText(ref)).toString();
     }
 
     private static String moreText(int more) {

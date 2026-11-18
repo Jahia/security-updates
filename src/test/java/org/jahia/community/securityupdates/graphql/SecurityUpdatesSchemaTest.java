@@ -91,7 +91,8 @@ class SecurityUpdatesSchemaTest {
     @DisplayName("the banner query of the UI is valid (its jcr part belongs to Jahia's schema)")
     void bannerDocument() {
         assertThat(validate("query SecurityUpdatesBanner { securityUpdates { banner { visible count minimumSeverity components"
-                + " dismissalKeys backgroundColor textColor dismissPolicy dismissHours position username } } }")).isEmpty();
+                + " dismissalKeys dismissalTokens backgroundColor textColor dismissPolicy dismissHours position username userToken } } }"))
+                .isEmpty();
     }
 
     @Test
