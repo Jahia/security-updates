@@ -4,7 +4,7 @@ All notable changes to this module are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the module follows
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.0.0] - 2026-11-18
 
 First release (1.0.0). It requires Jahia 8.2.3.7 or later.
 
