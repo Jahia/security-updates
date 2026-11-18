@@ -8,7 +8,7 @@
     </parent>
     <groupId>org.jahia.community</groupId>
     <artifactId>security-updates</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0</version>
     <packaging>bundle</packaging>
     <name>Security updates</name>
     <description>Lists the installed Jahia components (core and modules) that have updates fixing security issues, from the Jahia Store security feed</description>
@@ -28,7 +28,7 @@
         <connection>scm:git:git@github.com:Jahia/security-updates.git</connection>
         <developerConnection>scm:git:git@github.com:Jahia/security-updates.git</developerConnection>
         <url>https://github.com/Jahia/security-updates</url>
-        <tag>HEAD</tag>
+        <tag>1_0_0</tag>
     </scm>
     <properties>
         <yarn.arguments>build:production</yarn.arguments>
