@@ -296,7 +296,11 @@ describe('Security updates: settings', () => {
         // A key disappears (critical only): still hidden.
         save({bannerDismissPolicy: 'UNTIL_CHANGE', bannerIncludeOwnerReports: false, bannerMinimumSeverity: 'CRITICAL'});
         until(readBanner, {dismissalKeys: [KEY_CORE]}, 'one advisory');
-        reloadAppPage().then(answer => expect(answer.data?.securityUpdates?.banner?.dismissalKeys).to.deep.equal([KEY_CORE]));
+        // The page asks for the tokens only (SECUPD-SEC-002): the one token of the one advisory left.
+        readBanner().then(banner => reloadAppPage().then(answer => {
+            expect(answer.data?.securityUpdates?.banner?.dismissalTokens).to.deep.equal(banner.dismissalTokens)
+                .and.to.have.length(1);
+        }));
         waitForBannerDecision();
         cy.get(BANNER).should('not.exist');
 
